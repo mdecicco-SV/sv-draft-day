@@ -7,3 +7,4 @@ data/*.xlsx
 scratch/
 
 .DS_Store
+.vercel
