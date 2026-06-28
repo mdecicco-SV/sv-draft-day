@@ -73,9 +73,10 @@
   .cd-time.low { color:var(--red); }
   .cd-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
   .alert { margin-top:12px; background:#fff5f6; border:1px solid #f1b8c1; border-radius:10px; padding:10px 12px; font-size:14px; font-weight:700; color:var(--red); }
-  .pool-row { display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  .pool-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+  .stat { background:#fafafa; border:1px solid var(--line); border-radius:10px; padding:9px 13px; min-width:92px; }
   .stat .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
-  .stat .v { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .stat .v { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px; }
   .cols { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
   .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
   .panel h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
@@ -393,10 +394,17 @@
   }
 
   const allotment = (round) => { const r = parseInt(round,10)||1; return r<=1?300:r<=4?90:60; };
-  let timer = { pick:null, endsAt:0 };
+  let timer = { pick:null, endsAt:null, remainingMs:0 };   // endsAt set only while the clock runs
+  function clockRunning() { return MODE==="live" || (MODE==="mock" && mock.running); }
+  function setClockForPick(p) {
+    const allot = allotment(p.round) * 1000;
+    timer = { pick: p.overall, remainingMs: allot, endsAt: clockRunning() ? Date.now()+allot : null };
+  }
   function renderCountdown() {
+    if (isPreDraft()) { $("cdTime").textContent = ""; return; }       // no pick-clock before the draft starts
     if (!timer.pick) { $("cdTime").textContent = "--:--"; return; }
-    const left = Math.max(0, Math.round((timer.endsAt - Date.now())/1000));
+    const leftMs = timer.endsAt != null ? (timer.endsAt - Date.now()) : timer.remainingMs;  // frozen when paused
+    const left = Math.max(0, Math.round(leftMs/1000));
     $("cdTime").textContent = `${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`;
     $("cdTime").classList.toggle("low", left <= 15);
   }
@@ -558,12 +566,8 @@
       $("teamAbbr").innerHTML = oc.team ? `<span class="tlink" onclick="openTeam('${oc.team}')">${oc.team}</span>` : (oc.teamName || "—");
       $("teamName").textContent = oc.teamName || "";
       $("cdLabel").textContent = `allotted ${Math.floor(allotment(oc.round)/60)}:${String(allotment(oc.round)%60).padStart(2,"0")}`;
-      // agency alert: does this team like any of our STILL-AVAILABLE guys?
       const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
-      const wants = DATA.clientList.filter(c => !drafted.has(c.key) && latestIntel(c.key, oc.team) && latestIntel(c.key, oc.team).score>0)
-                    .sort((a,b)=>(latestIntel(b.key,oc.team).score)-(latestIntel(a.key,oc.team).score));
-      $("ocAlert").innerHTML = wants.length
-        ? `<div class="alert">⚠ ${oc.team} has logged interest in ${wants.length} available client${wants.length>1?"s":""}: ${wants.map(c=>c.name).join(", ")}</div>` : "";
+      $("ocAlert").innerHTML = "";   // interest is already shown in the "Interest in our guys" panel below
       const pool = state.poolsMap[oc.team];
       $("poolRow").innerHTML = pool ? [
         ["Pick slot", fmt$(oc.slot)],
@@ -904,7 +908,7 @@
   function setState(s) {
     currentState = s;
     if (s) $("yearBadge").textContent = `${s.year} MLB DRAFT`;
-    if (s && s.onClock) { if (s.onClock.overall !== timer.pick) timer = { pick:s.onClock.overall, endsAt:Date.now()+allotment(s.onClock.round)*1000 }; }
+    if (s && s.onClock) { if (s.onClock.overall !== timer.pick) setClockForPick(s.onClock); }
     else timer.pick = null;
     renderActive();
   }
@@ -1019,9 +1023,14 @@
 
   function toggleRun() {
     mock.running = !mock.running;
+    if (mock.running) {                                    // resume the pick-clock from where it was frozen
+      if (timer.pick && timer.endsAt == null) timer.endsAt = Date.now() + (timer.remainingMs || 0);
+      scheduleNext(true);
+    } else if (timer.endsAt != null) {                     // pause -> freeze remaining time
+      timer.remainingMs = Math.max(0, timer.endsAt - Date.now()); timer.endsAt = null;
+    }
     $("btnRun").textContent = mock.running ? "⏸ Pause" : "▶ Start";
     $("btnRun").classList.toggle("primary", !mock.running);
-    if (mock.running) scheduleNext(true);
     renderActive();
   }
   function stepOnce() { if (MODE==="mock" && mock.picks) { autoPickOne(); mock.nextAt=0; pushMock(); } }
