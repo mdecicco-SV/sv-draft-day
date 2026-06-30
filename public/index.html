@@ -151,6 +151,106 @@
     table.ba .hide-sm { display:none; }
     .bar { top:90px; }
   }
+
+  /* ── Scenario Engine: probability bars ── */
+  .proj-strip { margin:10px 0 2px; }
+  .proj-bar { position:relative; height:6px; background:#f0f1f3; border-radius:3px; }
+  .proj-bar .pb-fill { position:absolute; height:100%; background:#e8ddf9; border-radius:3px; }
+  .proj-bar .pb-med { position:absolute; width:10px; height:10px; top:-2px; background:var(--red); border-radius:50%; transform:translateX(-50%); box-shadow:0 0 0 2px #fff; }
+  .proj-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); font-weight:700; margin-top:3px; }
+
+  /* ── Pick probability section on Clock ── */
+  .prob-section { margin-top:12px; }
+  .prob-section .ph3 { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:0 0 6px; }
+  .prob-row { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:13px; }
+  .prob-mini { flex:1; height:5px; background:#f0f1f3; border-radius:3px; overflow:hidden; }
+  .prob-mini .fill { height:100%; background:var(--red); border-radius:3px; }
+  .prob-pct { font-weight:700; font-size:12px; min-width:34px; text-align:right; color:var(--red); }
+
+  /* ── Board entropy ── */
+  .brow.ent-hot { background:#fff8f0!important; border-left:3px solid #e8820e!important; }
+  .brow.ent-chalk { background:#f0fff4!important; border-left:3px solid #1a7f37!important; }
+  .brow.wi-lock { border-left:3px solid #6366f1!important; }
+  .ent-legend { font-size:11px; color:var(--muted); font-weight:700; display:flex; gap:12px; align-items:center; }
+  .ent-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:3px; }
+
+  /* ── Card grid view ── */
+  .board-grid { display:flex; flex-wrap:wrap; gap:5px; }
+  .bc-rnd { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:10px 0 4px; width:100%; }
+  .bcard { background:#fff; border:1px solid var(--line); border-radius:9px; padding:7px 8px; width:88px; min-height:86px; font-size:12px; display:flex; flex-direction:column; cursor:pointer; }
+  .bcard:hover { border-color:var(--red); }
+  .bcard.sv { background:#fff5f6; border-color:#f1b8c1; }
+  .bcard.oc { border-color:var(--red); box-shadow:0 0 0 2px #fdeef0; }
+  .bcard.ent-hot { border-color:#e8820e; background:#fffaf5; }
+  .bcard.ent-chalk { border-color:#1a7f37; background:#f5fff7; }
+  .bcard .bc-no { font-size:10px; font-weight:700; color:var(--muted); }
+  .bcard .bc-team { font-weight:900; font-size:14px; line-height:1.1; }
+  .bcard .bc-slot { font-size:10px; color:var(--muted); }
+  .bcard .bc-player { font-weight:700; font-size:11px; flex:1; margin-top:3px; line-height:1.3; }
+  .bcard .bc-ti { display:flex; flex-wrap:wrap; gap:2px; margin-top:auto; padding-top:3px; }
+  .bcard .ti-pill { font-size:9px; font-weight:800; background:#f0f1f3; border-radius:3px; padding:1px 4px; color:#444; }
+  .bcard .ti-Ap { background:#d4edda; color:#155724; }
+  .bcard .ti-A { background:#d4edda; color:#155724; }
+  .bcard .ti-Bp { background:#dbeafe; color:#1e3a8a; }
+
+  /* ── What If panel ── */
+  .wi-wrap { background:#fff; border:1px solid #c7c3f4; border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .wi-wrap h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:#6366f1; display:flex; align-items:center; gap:8px; }
+  .wi-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .wi-controls select { font:inherit; padding:5px 7px; border:1px solid var(--line); border-radius:7px; max-width:200px; }
+  .wi-lock-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; font-size:13px; }
+  .wi-lock-row select { font:inherit; padding:4px 6px; border:1px solid var(--line); border-radius:6px; }
+  .wi-delta { margin-top:10px; }
+  .wi-delta-hdr { display:flex; gap:8px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding-bottom:4px; border-bottom:1px solid var(--line); }
+  .wi-delta-hdr .dn { flex:1; } .wi-delta-hdr .db,.wi-delta-hdr .dn2,.wi-delta-hdr .dd { min-width:54px; text-align:right; }
+  .wi-drow { display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0; border-bottom:1px solid #f5f5f5; }
+  .wi-drow .dn { font-weight:700; flex:1; }
+  .wi-drow .db { color:var(--muted); min-width:54px; text-align:right; font-variant-numeric:tabular-nums; }
+  .wi-drow .dn2 { font-weight:700; min-width:54px; text-align:right; font-variant-numeric:tabular-nums; }
+  .wi-drow .dd { font-weight:800; min-width:60px; text-align:right; font-variant-numeric:tabular-nums; }
+  .wi-drow .dd.pos { color:var(--good); } .wi-drow .dd.neg { color:var(--red); }
+
+  /* ── Simulation progress toast ── */
+  #projToast { position:fixed; bottom:18px; right:18px; z-index:70; display:none; align-items:center; gap:9px;
+    background:#141414; color:#fff; border-radius:999px; padding:9px 16px; font-size:13px; font-weight:700;
+    box-shadow:0 8px 24px rgba(0,0,0,.28); }
+  #projToast b { font-variant-numeric:tabular-nums; color:#ff6a63; }
+  #projToast .pt-bar { width:60px; height:5px; background:rgba(255,255,255,.2); border-radius:3px; overflow:hidden; }
+  #projToast .pt-fill { height:100%; background:var(--red); border-radius:3px; transition:width .12s linear; }
+
+  /* ── Board: clickable picks + expand-pick in-play table ── */
+  .brow.clickrow { cursor:pointer; } .brow.clickrow:hover { border-color:var(--red); }
+  .brow.clickrow .who { color:var(--red); font-weight:700; }
+  .brow.clickrow.expanded, .bcard.expanded { box-shadow:0 0 0 2px #6366f1; border-color:#6366f1; }
+  .exp-wrap { background:#fff; border:1px solid #c7c3f4; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .exp-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .exp-no { font-weight:900; color:#6366f1; font-size:15px; }
+  .exp-sub { color:var(--muted); font-size:13px; }
+  .exp-approach { margin-top:10px; background:#fff5f6; border:1px solid #f1b8c1; border-radius:8px; padding:8px 11px; font-size:13px; font-weight:800; color:var(--red); }
+  .exp-section { margin-top:14px; margin-bottom:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); }
+  .exp-hint { color:var(--muted); font-weight:600; text-transform:none; letter-spacing:0; font-size:11px; margin-left:6px; }
+  .exp-table { display:flex; flex-direction:column; gap:2px; }
+  .exp-row { display:flex; align-items:center; gap:9px; padding:7px 8px; border:1px solid var(--line); border-radius:8px; background:#fff; flex-wrap:wrap; }
+  .exp-row.ruled { opacity:.55; background:#fafafa; }
+  .er-prob { font-weight:900; color:var(--red); min-width:42px; font-variant-numeric:tabular-nums; }
+  .er-name { font-weight:700; min-width:170px; } .er-name .er-rk { color:var(--muted); font-weight:600; font-size:12px; }
+  .er-bits { display:flex; gap:5px; flex-wrap:wrap; align-items:center; flex:1; }
+  .ib { font-size:11px; font-weight:700; border-radius:5px; padding:1px 6px; background:#f1f3f5; color:#444; display:inline-flex; align-items:center; gap:3px; }
+  .ib.sought { background:#e0e7ff; color:#3730a3; } .ib.received { background:#dcfce7; color:#166534; }
+  .ib.feed { background:#f8f9fa; border:1px solid var(--line); } .ib.win { background:#fef3c7; color:#92400e; } .ib.offer { background:#fae8ff; color:#86198f; }
+  .tg { font-size:11px; font-weight:700; border-radius:5px; padding:1px 6px; background:#f1f3f5; color:#6b7280; }
+  .tg.fit { background:#dcfce7; color:#166534; } .tg.early { background:#fee2e2; color:#991b1b; } .tg.late { background:#e0e7ff; color:#3730a3; }
+  .tg.over { background:#e8f5e9; color:#1a7f37; } .tg.under { background:#fff3e0; color:#e65100; } .tg.ruledtag { background:#fee2e2; color:#991b1b; }
+  .er-act { display:flex; gap:4px; flex-wrap:wrap; }
+  .mini { border:1px solid var(--line); background:#fff; border-radius:6px; padding:3px 7px; font:inherit; font-size:11px; font-weight:700; cursor:pointer; color:#374151; }
+  .mini:hover { border-color:#6366f1; color:#6366f1; } .mini.on { background:#fee2e2; border-color:#f1b8c1; color:#991b1b; }
+  .exp-form { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:2px 0 8px; padding:9px 11px; background:#f4f2ff; border:1px solid #c7c3f4; border-radius:8px; }
+  .exp-form .ef-label { font-weight:800; font-size:12px; color:#6366f1; }
+  .exp-form label { font-size:12px; font-weight:700; color:#374151; display:inline-flex; align-items:center; gap:4px; }
+  .exp-form input, .exp-form select { font:inherit; padding:4px 6px; border:1px solid var(--line); border-radius:6px; }
+  .exp-pub { display:flex; gap:6px; flex-wrap:wrap; }
+  .pub-chip { font-size:12px; font-weight:600; background:#f1f3f5; border-radius:999px; padding:3px 10px; color:#374151; }
+  .pub-chip .pub-rk { color:var(--muted); font-weight:700; }
 </style>
 
 <header>
@@ -210,7 +310,7 @@
     </div>
     <div class="cols">
       <div class="panel"><h3 id="tendHdr">Org tendencies</h3><div class="chips" id="tendChips"></div><div class="r1" id="recentR1"></div></div>
-      <div class="panel"><h3 id="intelHdr">Interest in our guys</h3><div class="intel" id="intelList"></div></div>
+      <div class="panel"><h3 id="intelHdr">Interest in our guys</h3><div class="intel" id="intelList"></div><div id="pickProb"></div></div>
     </div>
     <h2>Recent picks</h2>
     <div class="recent" id="recent"></div>
@@ -228,10 +328,15 @@
   <!-- BOARD (running log of all picks) -->
   <section id="viewBoard" class="view">
     <div class="ba-filters">
-      <label><input type="checkbox" id="bSv" onchange="renderBoard()"> SV picks only</label>
+      <label><input type="checkbox" id="bSv" onchange="renderBoard(currentState)"> SV picks only</label>
       <button class="ctl" onclick="jumpCurrent()">↧ Jump to current pick</button>
+      <span class="seg"><button id="btnBList" class="on" onclick="setBoardView('list')">≡ List</button><button id="btnBGrid" onclick="setBoardView('grid')">⊞ Grid</button></span>
+      <button class="ctl" id="btnWhatIf" onclick="toggleWhatIf()" style="background:#f4f2ff;border-color:#c7c3f4;color:#6366f1;font-weight:800">✦ Scenario</button>
+      <span class="ent-legend" id="entLegend" style="display:none"><span class="ent-dot" style="background:#e8820e"></span>Contested&nbsp;<span class="ent-dot" style="background:#1a7f37"></span>Chalk</span>
       <span class="count" id="boardCount"></span>
     </div>
+    <div id="wiPanel"></div>
+    <div id="pickExpand"></div>
     <div id="boardList" class="board"></div>
   </section>
 
@@ -251,17 +356,19 @@
       <span class="count" id="baCount"></span>
     </div>
     <table class="ba">
-      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Age</th></tr></thead>
+      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Age</th><th>Range</th></tr></thead>
       <tbody id="baBody"></tbody>
     </table>
   </section>
 </main>
 
 <div id="orgTip"></div>
+<div id="projToast"></div>
 
 <script>
   const $ = (id) => document.getElementById(id);
   const fmt$ = (n) => n == null ? "—" : "$" + Math.round(n).toLocaleString();
+  const fmtAge = (a) => { if (a==null||a==="") return ""; const n=parseFloat(a); return Number.isFinite(n) ? String(n).replace(/\.0$/,"") : String(a); };
   const fmtM = (n) => n == null ? "—" : "$" + (n/1e6).toFixed(2) + "M";
   const DRAFT_START = Date.UTC(2026, 6, 11, 17, 30, 0);   // Jul 11 2026, 1:30 PM ET (EDT = UTC-4)
   function fmtCountdown(ms) {
@@ -285,7 +392,17 @@
     EROSION_FLOOR: 0.40,
     HOLD: { HS:0.90, JUCO:0.85, "College-JR":0.55, "College-SR":0.15 }, // over-slot premium captured
     POS_LEAN: 14, INTEREST_MAX: 3,
+    BAND: 0.25,           // signing bonus lands within slot +/-25% (95% of high picks do, 2015-24)
+    FLOOR_MULT: 0.82,     // default personal walk-away ~= 0.82x market value (per-player capturable later)
+    SAVE_W: 3.0,          // banking weight: talent pts a spreader gives per $1M saved vs slot.
+                          // Tuned so a SPECIFIC high-pick faller-grab stays "unlikely" (~14% for a top
+                          // spreader like SF) per scouting input, while aggregate under-slot/faller
+                          // rates sit near the 2015-24 history (~35-49% / ~19-31%).
   };
+  // Pool-spreader propensity 0..1 from 2015-24 (under-slot early -> over-slot late). Drives which
+  // teams will grab a faller under slot to bank for an over-slot pick later.
+  const SPREAD = {"TEX":1,"SD":0.91,"SF":0.83,"BAL":0.64,"LAA":0.63,"CLE":0.58,"ATL":0.54,"BOS":0.53,"LAD":0.53,"NYY":0.48,"ATH":0.46,"CHC":0.42,"MIA":0.41,"DET":0.38,"ARI":0.36,"NYM":0.35,"CHW":0.31,"CIN":0.31,"HOU":0.3,"KC":0.3,"STL":0.29,"MIN":0.28,"TOR":0.26,"PHI":0.21,"MIL":0.2,"PIT":0.14,"WSH":0.05,"TB":0.04,"COL":0,"SEA":0};
+  const spreadOf = (t) => SPREAD[t] != null ? SPREAD[t] : 0.3;
   const fmtOU = (n) => !n ? "at slot" : (n>0 ? "+"+fmtM(n)+" over" : fmtM(-n)+" banked");
   const fmtVsSlot = (n) => n==null ? "" : (!n ? "at slot" : (n>0 ? "+"+fmtM(n)+" over slot" : fmtM(-n)+" under slot"));
   const MEDICAL_FLOOR = 0.75;   // combine-medical consent guarantees >=75% of slot
@@ -302,7 +419,14 @@
   // range.lo and is taken by range.hi, in projections AND mocks.
   let RANGES = {};   // normName -> { lo, hi }  (pick numbers)
   try { RANGES = JSON.parse(localStorage.getItem("dd:ranges") || "{}"); } catch (e) {}
-  const rangeOf = (comp) => comp ? RANGES[normName(comp.name)] : null;
+  // Effective hard-range for the engine: local manual range wins; else a captured strike window.
+  const rangeOf = (comp) => {
+    if (!comp) return null;
+    const k = normName(comp.name);
+    if (RANGES[k]) return RANGES[k];
+    const s = (typeof INTEL !== "undefined" && INTEL.byKey) ? INTEL.byKey.get(k) : null;
+    return (s && s.window && (s.window.lo || s.window.hi)) ? { lo: s.window.lo, hi: s.window.hi } : null;
+  };
   const roundSpan = (r) => { const ps=(ORDER?.picks||[]).filter(p=>String(p.round)===String(r)); return ps.length?{first:Math.min(...ps.map(p=>p.overall)), last:Math.max(...ps.map(p=>p.overall))}:null; };
   const roundOfPick = (n) => (ORDER?.picks||[]).find(p=>p.overall===n)?.round;
   function saveRanges(key) { try { localStorage.setItem("dd:ranges", JSON.stringify(RANGES)); } catch (e) {}
@@ -323,6 +447,15 @@
   const COLOR_HEX = { green:"#1a7f37","light green":"#86c98b", yellow:"#e3b505", orange:"#e8820e", red:"#C8102E" };
 
   let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null };
+  let whatIfLocks = [];        // [{overall, playerKey}]
+  let whatIfBaseline = null;   // projCache snapshot before locks applied
+  let whatIfOpen = false;
+  let boardView = "list";      // "list" | "grid"
+  let slotEntropyData = {};    // overall -> distinct SV client count across sims
+  let inPlayByPick = {};       // overall -> { playerKey: count }  (board "who's in play")
+  let boardSimK = 0;           // K of the last board sim (denominator for probabilities)
+  let expandedPick = null;     // overall # whose in-play list is expanded, or null
+  let projInvalid = false;
 
   // ----- bonus / leverage model: expected bonus = slot-at-rank × leverage multiplier -----
   function levelClass(comp) {
@@ -350,13 +483,22 @@
     if (!comp) return null;
     return Math.round((slotForRank(comp.rank) || LATE_EXEMPT) * effMult(comp));
   }
-  // negotiated bonus if `comp` is taken at a given pick (slot) and overall position
+  // Personal walk-away floor — the bonus below which a player won't sign anywhere. Default scales
+  // with market value; per-athlete signability can override this later via captured intel.
+  function signFloor(comp) {
+    const market = slotForRank(comp.rank) || LATE_EXEMPT;
+    const k = normName(comp.name);
+    if (typeof SIGN_FLOORS !== "undefined" && SIGN_FLOORS[k] != null) return SIGN_FLOORS[k];
+    return Math.max(50000, market * ENG.FLOOR_MULT);
+  }
+  // Negotiated bonus = the pick's slot +/-25% band, centered on the player's market value, floored
+  // at his personal signability. Produces UNDER-slot deals at high picks (team banks the savings)
+  // and OVER-slot faller-grabs deep (funded by banked pool). Calibrated to 2015-24 history.
   function negBonus(comp, pickSlot, overall) {
-    let dem = (slotForRank(comp.rank) || LATE_EXEMPT) * effMult(comp);
-    if (overall > comp.rank) dem *= Math.max(ENG.EROSION_FLOOR, 1 - ENG.EROSION_RATE*(overall-comp.rank));
-    if (pickSlot <= 0) return Math.round(Math.min(dem, 175000));
-    const hold = ENG.HOLD[levelClass(comp)] ?? 0.5;
-    let b = dem <= pickSlot ? dem : pickSlot + (dem-pickSlot)*hold;
+    const market = slotForRank(comp.rank) || LATE_EXEMPT;
+    if (pickSlot <= 0) return Math.round(Math.min(market, 175000));   // rounds 11+ (no pool slot)
+    let b = Math.min(pickSlot*(1+ENG.BAND), Math.max(pickSlot*(1-ENG.BAND), market));
+    b = Math.max(b, signFloor(comp));
     if (medicalOf(comp) === "yes") b = Math.max(b, MEDICAL_FLOOR*pickSlot);   // combine-medical 75% floor
     return Math.max(50000, Math.round(b));
   }
@@ -384,6 +526,7 @@
       const names = [...new Set(DATA.intel.map(r => r.player))];
       DATA.clientList = names.map(name => ({ name, key:normName(name), comp:DATA.compByName.get(normName(name)) || null }))
         .sort((a,b) => (a.comp?.rank || 9999) - (b.comp?.rank || 9999));
+      _tiCache.clear();   // recompute interest aggregates against fresh feed
     } catch (e) {}
   }
   async function loadOrder() {
@@ -474,12 +617,44 @@
     return DATA.intel.filter(r => teamAlias(r.team)===team && normName(r.player)===clientKey)
                      .sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0] || null;
   }
+  // Aggregate a team's interest in a client across the FULL intel history — recency- and
+  // source-tier-weighted, with a small boost for sustained volume. Returns strength 0..1.
+  // (Months of repeated, recent, director-level interest should outweigh one stale score.)
+  const _tiCache = new Map();
+  function teamInterest(clientKey, team) {
+    const ck = clientKey + "|" + team;
+    if (_tiCache.has(ck)) return _tiCache.get(ck);
+    const recs = DATA.intel.filter(r => teamAlias(r.team)===team && normName(r.player)===clientKey);
+    let out;
+    if (!recs.length) out = { strength:0, n:0, max:0, latest:null };
+    else {
+      const now = Date.now();
+      let wsum=0, w=0, max=0, latest=null;
+      for (const r of recs) {
+        const score = (r.score!=null ? r.score : 0);
+        if (score>max) max=score;
+        if (!latest || (r.date||"")>(latest.date||"")) latest=r;
+        const days = r.date ? Math.max(0,(now - Date.parse(r.date))/86400000) : 150;
+        const recW = Math.exp(-days/90);                      // ~90-day decay; near-draft intel dominates
+        const tierW = Math.sqrt(r.tier_multiplier || 1);      // a scouting director outweighs an area scout
+        const wt = recW * tierW;
+        wsum += score*wt; w += wt;
+      }
+      const wavg = w ? wsum/w : 0;
+      const vol = Math.min(1.2, 1 + Math.log10(recs.length+1)*0.12);   // sustained-interest boost
+      const strength = Math.max(0, Math.min(1, ((wavg*0.6 + max*0.4)/6) * vol));
+      out = { strength, n:recs.length, max, latest };
+    }
+    _tiCache.set(ck, out);
+    return out;
+  }
   function teamNextPick(state, team) { return state.picks.find(p => p.team===team && !p.isDrafted) || null; }
 
-  // landing-spot fit FOR the client: interest 35 / dev 25 / type 20 / money 20
-  function fit(comp, team, rec, state) {
+  // landing-spot fit FOR the client: interest 45 / dev 20 / type 15 / money 20, where
+  // interest is the full-history aggregate (teamInterest). Interest-dominant by design.
+  function fit(comp, team, clientKey, state) {
     const o = DATA.orgs[team] || {};
-    const interestN = rec ? Math.max(0, Math.min(1, (rec.score||0)/6)) : 0;
+    const interestN = clientKey ? teamInterest(clientKey, team).strength : 0;
     const devN = o.orgRank != null ? Math.max(0, (31 - o.orgRank)/30) : 0.5;
     let typeN = 0.5;
     if (comp) {
@@ -492,10 +667,15 @@
     }
     const pool = state.poolsMap[team];
     const moneyN = pool && pool.ceiling ? Math.max(0, Math.min(1, pool.room/pool.ceiling)) : 0.5;
-    const score = Math.round(100*(0.35*interestN + 0.25*devN + 0.20*typeN + 0.20*moneyN));
-    const grade = score>=85?"A+":score>=75?"A":score>=66?"B+":score>=56?"B":score>=46?"C":"D";
-    const color = score>=75?"#1a7f37":score>=56?"#3949ab":score>=46?"#e8820e":"#9aa0a6";
-    return { score, grade, color };
+    const gradeOf = (s)=> s>=85?"A+":s>=75?"A":s>=66?"B+":s>=56?"B":s>=46?"C":"D";
+    const colorOf = (s)=> s>=75?"#1a7f37":s>=56?"#3949ab":s>=46?"#e8820e":"#9aa0a6";
+    const score = Math.round(100*(0.45*interestN + 0.20*devN + 0.15*typeN + 0.20*moneyN));
+    // org fit = interest/dev/type only (money excluded), renormalized — lets a strong intel/org
+    // fit surface at a slot even when the team's money doesn't work.
+    const orgScore = Math.round(100*(0.45*interestN + 0.20*devN + 0.15*typeN)/0.80);
+    return { score, grade:gradeOf(score), color:colorOf(score),
+             orgScore, orgGrade:gradeOf(orgScore), color2:colorOf(orgScore),
+             interestN, devN, typeN, moneyN };
   }
 
   // ---------- VIEW: OUR CLIENTS ----------
@@ -519,13 +699,13 @@
       const plTxt = comp ? `${comp.pos} · ${comp.level}` : "";
       let status, teamsHtml = "";
       if (pk) {
-        const f = fit(comp, pk.team, latestIntel(c.key, pk.team), state);
+        const f = fit(comp, pk.team, c.key, state);
         status = `<span class="status dr">DRAFTED #${pk.overall} · ${pk.team} · ${moneyCell(pk)}
                   <span class="grade" data-org="${pk.team}" style="background:${f.color}">${f.grade}</span></span>`;
       } else {
         // interested teams, ranked by fit
         const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
-          .map(t => { const rec = latestIntel(c.key, t); return { t, rec, f:fit(comp, t, rec, state), nx:teamNextPick(state, t) }; })
+          .map(t => { const rec = latestIntel(c.key, t); return { t, rec, f:fit(comp, t, c.key, state), nx:teamNextPick(state, t) }; })
           .sort((a,b)=> b.f.score - a.f.score).slice(0,4);
         const dem = demandFor(comp);
         status = `<span class="status av">On the board${dem!=null?` · est. value ~${fmt$(dem)} (${levelClass(comp).replace("College-","Col ")} ${comp.posGroup})`:""}</span>`;
@@ -538,9 +718,30 @@
             <span class="nx">${x.nx?`#${x.nx.overall} ${fmtM(x.nx.slot)}${ou!=null?` · ${fmtVsSlot(ou)}`:""}`:"no picks left"}${pool?` · ammo ${fmtM(pool.room)}`:""}</span></div>`;
         }).join("") || `<div class="ct" style="color:#9aa0a6">No logged team interest yet.</div>`;
       }
+      // Probability bar for undrafted clients
+      let probHtml = "";
+      if (!pk && comp) {
+        const cache = projCache[c.key];
+        if (!cache) { computeProjection(c.key); }
+        else if (!cache.computing && cache.lands && cache.lands.length) {
+          const p10=pctOf(cache.lands,0.1), med=pctOf(cache.lands,0.5), p90=pctOf(cache.lands,0.9);
+          const SCALE = 90; // picks 1-90 mapped to 100% width
+          const pct = (n) => Math.min(100, Math.round((n-1)/(SCALE-1)*100));
+          const fillL = pct(p10), fillR = pct(p90), medPct = pct(med);
+          probHtml = `<div class="proj-strip">
+            <div class="proj-bar">
+              <div class="pb-fill" style="left:${fillL}%;width:${fillR-fillL}%"></div>
+              <div class="pb-med" style="left:${medPct}%"></div>
+            </div>
+            <div class="proj-labels"><span>P10 #${p10}</span><span>med #${med}</span><span>P90 #${p90}</span></div>
+          </div>`;
+        } else if (cache.computing) {
+          probHtml = `<div style="font-size:11px;color:var(--muted);margin-top:8px">Projecting…</div>`;
+        }
+      }
       return `<div class="cc clickable ${pk?"drafted":""}" onclick="openPlayer('${c.key.replace(/'/g,"\\'")}')">
         <div class="top"><span class="rk">${rkTxt}</span><span class="nm">${c.name}</span><span class="pl">${plTxt} ›</span></div>
-        ${status}${teamsHtml}</div>`;
+        ${status}${teamsHtml}${probHtml}</div>`;
     }).join("");
   }
   // rough slot for a board rank: use the order's slot at that overall pick (approx draft stock -> $)
@@ -571,10 +772,11 @@
         ["Picks", `${pool.picksMade}/${pool.picksTotal}`],
       ].map(([k,v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("") : "";
       renderTendencies(oc.team); renderIntel(oc.team, drafted);
+      renderPickProb(oc.team, drafted);
     } else {
       $("pickNo").textContent = MODE==="mock" ? "MOCK · Draft complete" : "Draft complete";
       $("teamAbbr").textContent="✓"; $("teamName").textContent=""; $("ocAlert").innerHTML=""; $("poolRow").innerHTML="";
-      renderTendencies(null); renderIntel(null, new Set());
+      renderTendencies(null); renderIntel(null, new Set()); $("pickProb").innerHTML="";
     }
     const made = state.picks.filter(p=>p.isDrafted).slice(-12).reverse();
     $("recent").innerHTML = made.length ? made.map(p => {
@@ -615,6 +817,35 @@
     }).join("") : `<div class="placeholder">No logged interest from ${team} on our clients.</div>`;
   }
 
+  function renderPickProb(team, drafted) {
+    const el = $("pickProb"); if (!el) return;
+    if (!team) { el.innerHTML=""; return; }
+    const drafted2 = drafted || new Set();
+    // Gather SV clients with a warm projection for this team
+    const rows = DATA.clientList
+      .filter(c => !drafted2.has(c.key))
+      .map(c => {
+        const cache = projCache[c.key];
+        if (!cache || cache.computing || !cache.byTeam) return null;
+        const count = cache.byTeam[team] || 0;
+        if (!count) return null;
+        const K = cache.lands ? cache.lands.length : 50;
+        const pct = Math.round(count / K * 100);
+        return { name: c.name, pct };
+      })
+      .filter(Boolean)
+      .sort((a,b) => b.pct - a.pct)
+      .slice(0, 5);
+    if (!rows.length) { el.innerHTML=""; return; }
+    const maxPct = rows[0].pct || 1;
+    el.innerHTML = `<div class="prob-section"><div class="ph3">Pick probability</div>`
+      + rows.map(r => `<div class="prob-row">
+          <span style="font-weight:700;flex:1">${r.name}</span>
+          <div class="prob-mini"><div class="fill" style="width:${Math.round(r.pct/maxPct*100)}%"></div></div>
+          <span class="prob-pct">${r.pct}%</span></div>`).join("")
+      + `</div>`;
+  }
+
   // ---------- VIEW: BEST AVAILABLE ----------
   function renderBest() {
     if (!currentState) return;
@@ -632,16 +863,37 @@
     $("baCount").textContent = `${rows.length} available${clickable?" · click a row to draft":""}`;
     $("baBody").innerHTML = rows.map(p => {
       const ours = DATA.clients.has(normName(p.name));
+      const key = normName(p.name);
+      let rangeCell = `<span style="color:#ccc">—</span>`;
+      if (ours) {
+        const cache = projCache[key];
+        if (!cache) { computeProjection(key); rangeCell = `<span style="color:var(--muted);font-size:11px">…</span>`; }
+        else if (cache.computing) { rangeCell = `<span style="color:var(--muted);font-size:11px">…</span>`; }
+        else if (cache.lands && cache.lands.length) {
+          const p10=pctOf(cache.lands,0.1), p90=pctOf(cache.lands,0.9);
+          rangeCell = `<span style="font-size:12px;font-weight:700;color:var(--red)">#${p10}–#${p90}</span>`;
+        }
+      }
       return `<tr class="${ours?"sv":""} ${clickable?"draftable":""}" ${clickable?`onclick="draftManual('${p.name.replace(/'/g,"\\'")}')"`:""}>
         <td class="rk">#${p.rank}</td><td>${p.name} ${ours?'<span class="svtag">SV</span>':""}</td>
         <td>${p.pos}</td><td><span class="lvl ${p.level}">${p.level}</span></td>
-        <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${p.age||""}</td></tr>`;
-    }).join("") || `<tr><td colspan="6" style="color:#9aa0a6;padding:14px">No players match these filters.</td></tr>`;
+        <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${fmtAge(p.age)}</td><td>${rangeCell}</td></tr>`;
+    }).join("") || `<tr><td colspan="7" style="color:#9aa0a6;padding:14px">No players match these filters.</td></tr>`;
   }
 
-  // ---------- VIEW: BOARD (running log) ----------
+  // ---------- VIEW: BOARD (running log + card grid) ----------
+  const roundLabel = (r) => /^\d+$/.test(String(r)) ? `Round ${r}` : String(r); // "1"->Round 1, "CB-A"->CB-A
+  const surnameOf = (name) => { const last = (name||"").trim().split(/\s+/).pop()||""; return last.length>9 ? last.slice(0,9)+"…" : last; };
   function renderBoard(state) {
     if (!state) return;
+    // What If panel
+    $("wiPanel").innerHTML = whatIfOpen ? renderWhatIfHtml(state) : "";
+    // Entropy legend visibility
+    const hasEntropy = Object.keys(slotEntropyData).length > 0;
+    $("entLegend").style.display = hasEntropy ? "" : "none";
+    $("boardCount").textContent = `${state.madeCount} of ${state.picks.length} picks made`;
+    renderPickExpand(state);
+    if (boardView === "grid") { renderBoardGrid(state); return; }
     const svOnly = $("bSv").checked;
     let html = "", lastRound = null;
     for (const p of state.picks) {
@@ -650,7 +902,10 @@
       if (!svOnly && p.round !== lastRound) { lastRound = p.round; html += `<div class="rnd">Round ${p.round}</div>`; }
       const onclock = state.onClock && state.onClock.overall === p.overall;
       const comp = p.isDrafted ? DATA.compByName.get(normName(p.player||"")) : null;
-      const cls = `brow ${p.isDrafted ? "" : "up"} ${ours ? "sv" : ""} ${onclock ? "oc" : ""}`.trim();
+      const isLock = !p.isDrafted && whatIfLocks.some(l => l.overall === p.overall);
+      const ent = !p.isDrafted ? slotEntropy(p.overall) : 0;
+      const entCls = ent >= 2 ? "ent-hot" : ent === 1 ? "ent-chalk" : "";
+      const cls = `brow ${p.isDrafted ? "" : "up"} ${ours ? "sv" : ""} ${onclock ? "oc" : ""} ${entCls} ${isLock?"wi-lock":""}`.trim().replace(/\s+/g," ");
       if (p.isDrafted) {
         html += `<div class="${cls}"><span class="ov">#${p.overall}</span><span class="tm">${p.team||""}</span>
           <span class="who">${p.player||"—"}</span>${ours?'<span class="svtag">SV</span>':""}
@@ -658,15 +913,151 @@
           ${comp?`<span class="rkbadge">#${comp.rank}</span>`:""}
           <span class="meta">${p.pos||""} · ${moneyCell(p)}</span></div>`;
       } else {
-        html += `<div class="${cls}" ${onclock?'id="ocRow"':""}><span class="ov">#${p.overall}</span><span class="tm">${p.team||""}</span>
-          <span class="who">${onclock?"⏱ ON THE CLOCK":"—"}</span>
-          <span class="meta">slot ${fmt$(p.slot)}</span></div>`;
+        const lockInfo = isLock ? (() => { const l=whatIfLocks.find(x=>x.overall===p.overall); return l?` · ✦ locked → ${DATA.compByName.get(l.playerKey)?.name||l.playerKey}`:""; })() : "";
+        const expCls = expandedPick===p.overall ? " expanded" : "";
+        html += `<div class="${cls} clickrow${expCls}" ${onclock?'id="ocRow"':""} onclick="expandPick(${p.overall})"><span class="ov">#${p.overall}</span><span class="tm">${p.team||""}</span>
+          <span class="who">${onclock?"⏱ ON THE CLOCK":"in play ▸"}</span>
+          <span class="meta">slot ${fmt$(p.slot)}${lockInfo}</span></div>`;
       }
     }
     $("boardList").innerHTML = html || `<div class="placeholder">No SV picks yet.</div>`;
-    $("boardCount").textContent = `${state.madeCount} of ${state.picks.length} picks made`;
   }
+
+  function renderBoardGrid(state) {
+    const svOnly = $("bSv").checked;
+    // One continuous flex grid; full-width round headers force a wrap. Dedupe by
+    // round so interleaved comp/PPI picks don't re-emit "Round 1" repeatedly.
+    let html = `<div class="board-grid">`;
+    const seenRounds = new Set();
+    for (const p of state.picks) {
+      const ours = p.isDrafted && DATA.clients.has(normName(p.player||""));
+      if (svOnly && !ours) continue;
+      if (!seenRounds.has(p.round)) { seenRounds.add(p.round); html += `<div class="bc-rnd">${roundLabel(p.round)}</div>`; }
+      const onclock = state.onClock && state.onClock.overall === p.overall;
+      const ent = !p.isDrafted ? slotEntropy(p.overall) : 0;
+      const entCls = ent >= 2 ? "ent-hot" : ent === 1 ? "ent-chalk" : "";
+      const isLock = !p.isDrafted && whatIfLocks.some(l => l.overall === p.overall);
+      const cardCls = `bcard ${ours?"sv":""} ${onclock?"oc":""} ${entCls} ${isLock?"wi-lock":""}`.trim().replace(/\s+/g," ");
+      // SV clients whose sims land at/near this pick — show surname + fit grade
+      let tiHtml = "";
+      if (!p.isDrafted) {
+        const svHere = DATA.clientList.filter(c => {
+          const cache = projCache[c.key];
+          return cache && !cache.computing && cache.lands && cache.lands.some(l => Math.abs(l-p.overall)<=2);
+        }).slice(0,3);
+        if (svHere.length) {
+          tiHtml = `<div class="bc-ti">${svHere.map(c => {
+            const f = fit(c.comp, p.team, c.key, state);
+            const grCls = f.grade==="A+"?"Ap":f.grade==="A"?"A":f.grade==="B+"?"Bp":"";
+            return `<span class="ti-pill ${grCls}">${surnameOf(c.name)} ${f.grade}</span>`;
+          }).join("")}</div>`;
+        }
+      }
+      const onclick = p.isDrafted ? `openPlayer('${normName(p.player||"").replace(/'/g,"\\'")}')` : `expandPick(${p.overall})`;
+      const expSel = expandedPick===p.overall ? " expanded" : "";
+      html += `<div class="${cardCls}${expSel}" onclick="${onclick}">
+        <div class="bc-no">#${p.overall}</div>
+        <div class="bc-team">${p.team||"—"}</div>
+        <div class="bc-slot">${p.slot>0?fmtM(p.slot):"—"}</div>
+        <div class="bc-player">${p.isDrafted?(p.player||"—")+(ours?' <span class="svtag">SV</span>':""):onclock?"⏱ OTC":"—"}</div>
+        ${tiHtml}</div>`;
+    }
+    html += `</div>`;
+    $("boardList").innerHTML = html === `<div class="board-grid"></div>` ? `<div class="placeholder">No picks.</div>` : html;
+  }
+
   function jumpCurrent() { document.getElementById("ocRow")?.scrollIntoView({ block:"center", behavior:"smooth" }); }
+  function setBoardView(v) {
+    boardView = v;
+    $("btnBList").classList.toggle("on", v==="list");
+    $("btnBGrid").classList.toggle("on", v==="grid");
+    renderBoard(currentState);
+  }
+  function toggleWhatIf() {
+    whatIfOpen = !whatIfOpen;
+    $("btnWhatIf").style.background = whatIfOpen ? "#6366f1" : "#f4f2ff";
+    $("btnWhatIf").style.color = whatIfOpen ? "#fff" : "#6366f1";
+    renderBoard(currentState);
+  }
+  function renderWhatIfHtml(state) {
+    const undrafted = (state.picks||[]).filter(p => !p.isDrafted).slice(0,200);
+    const slotOpts = undrafted.map(p => `<option value="${p.overall}">#${p.overall} · ${p.team} R${p.round} ${fmtM(p.slot)}</option>`).join("");
+    const playerOpts = DATA.composite.filter(p => {
+      const drafted = new Set((state.picks||[]).filter(x=>x.isDrafted&&x.player).map(x=>normName(x.player)));
+      return !drafted.has(normName(p.name));
+    }).slice(0,300).map(p => `<option value="${normName(p.name)}">#${p.rank} ${p.name} (${p.pos})</option>`).join("");
+
+    let lockRows = whatIfLocks.map((l,i) => {
+      const comp = DATA.compByName.get(l.playerKey);
+      const pk = (state.picks||[]).find(p=>p.overall===l.overall);
+      return `<div class="wi-lock-row">
+        <span style="color:#6366f1;font-weight:800">✦</span>
+        <b>#${l.overall}</b> <span style="color:var(--muted)">${pk?pk.team+" R"+pk.round:""}</span>
+        → <b>${comp?comp.name:l.playerKey}</b>
+        <button class="ctl" style="padding:3px 8px;font-size:12px" onclick="removeWhatIfLock(${i})">×</button>
+      </div>`;
+    }).join("");
+
+    // Build delta table if baseline exists
+    let deltaHtml = "";
+    if (whatIfBaseline) {
+      const drafted = new Set((state.picks||[]).filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
+      const rows = DATA.clientList.filter(c=>!drafted.has(c.key)&&projCache[c.key]&&!projCache[c.key].computing&&whatIfBaseline[c.key]&&!whatIfBaseline[c.key].computing).map(c=>{
+        const base = whatIfBaseline[c.key], cur = projCache[c.key];
+        const bMed = base.lands&&base.lands.length?pctOf(base.lands,0.5):null;
+        const nMed = cur.lands&&cur.lands.length?pctOf(cur.lands,0.5):null;
+        if (bMed==null||nMed==null) return null;
+        const delta = nMed - bMed; // negative = picked earlier
+        return { name:c.name, bMed, nMed, delta };
+      }).filter(Boolean).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+      if (rows.length) {
+        deltaHtml = `<div class="wi-delta">
+          <div class="wi-delta-hdr"><span class="dn">Client</span><span class="db">Baseline</span><span class="dn2">Scenario</span><span class="dd">Δ median</span></div>`
+          + rows.map(r=>`<div class="wi-drow">
+            <span class="dn">${r.name}</span>
+            <span class="db">#${r.bMed}</span>
+            <span class="dn2">#${r.nMed}</span>
+            <span class="dd ${r.delta<0?"pos":r.delta>0?"neg":""}">${r.delta===0?"±0":r.delta>0?"+"+r.delta:r.delta} picks</span>
+          </div>`).join("")
+          + `</div>`;
+      }
+    }
+
+    return `<div class="wi-wrap">
+      <h3>✦ Scenario<span style="font-weight:400;font-size:11px;color:#9aa0a6;text-transform:none;letter-spacing:0">— lock picks and re-run sims to see impact on client draft positions</span></h3>
+      ${lockRows || `<div style="color:var(--muted);font-size:13px;margin-bottom:10px">No overrides yet. Add a pick lock below.</div>`}
+      <div class="wi-controls">
+        <select id="wiSlot">${slotOpts}</select>
+        <select id="wiPlayer">${playerOpts}</select>
+        <button class="ctl" onclick="addWhatIfLock()" style="background:#6366f1;color:#fff;border-color:#6366f1">+ Lock</button>
+        <button class="ctl primary" onclick="runWhatIf()" ${whatIfLocks.length?"":'disabled style="opacity:.5"'}>▶ Run 200 sims</button>
+        ${whatIfBaseline?`<button class="ctl" onclick="resetWhatIf()">↺ Reset to baseline</button>`:""}
+      </div>
+      ${deltaHtml}
+    </div>`;
+  }
+  window.removeWhatIfLock = (i) => { whatIfLocks.splice(i,1); renderBoard(currentState); };
+  function addWhatIfLock() {
+    const overall = parseInt($("wiSlot")?.value,10);
+    const playerKey = $("wiPlayer")?.value;
+    if (!overall || !playerKey) return;
+    const existing = whatIfLocks.findIndex(l => l.overall===overall);
+    if (existing>=0) whatIfLocks[existing] = {overall,playerKey};
+    else whatIfLocks.push({overall,playerKey});
+    renderBoard(currentState);
+  }
+  function runWhatIf() {
+    if (!whatIfLocks.length || !currentState) return;
+    whatIfBaseline = {};
+    for (const [k,v] of Object.entries(projCache)) whatIfBaseline[k] = v;
+    projCache = {}; slotEntropyData = {};
+    projectAll(200);
+    renderBoard(currentState);
+  }
+  function resetWhatIf() {
+    whatIfLocks=[]; whatIfBaseline=null; projCache={}; slotEntropyData={};
+    projectAll(50); renderBoard(currentState);
+  }
 
   // ---------- VIEW: BONUS POOLS ----------
   const POOL_COLS = [["team","Team"],["pool","Pool"],["picksMade","Picks"],["committedSlot","Committed slot"],
@@ -711,33 +1102,319 @@
   const teamMade = (state, t) => state.picks.filter(p => p.team===t && p.isDrafted).sort((a,b)=>a.overall-b.overall);
 
   // ----- engine landing projection: run the budget sim K times, record where he lands -----
-  let projCache = {};   // key -> { lands:[picks], made } | { computing:true }
+  let projCache = {};   // key -> { lands:[picks], byTeam:{team->count}, made } | { computing:true }
   const pctOf = (arr,p) => { if(!arr.length) return null; const s=arr.slice().sort((a,b)=>a-b); return s[Math.min(s.length-1, Math.max(0, Math.round(p*(s.length-1))))]; };
+  // Apply what-if pick locks to a cloned board (pre-mark those slots as drafted).
+  function applyLocksTo(picks) {
+    for (const lock of whatIfLocks) {
+      const lidx = picks.findIndex(p => p.overall === lock.overall);
+      if (lidx < 0) continue;
+      const comp = DATA.compByName.get(lock.playerKey);
+      if (!comp) continue;
+      const lp = picks[lidx];
+      lp.isDrafted=true; lp.player=comp.name; lp.pos=comp.pos; lp.school=comp.school;
+      lp.rank=comp.rank; lp.bonus=negBonus(comp,lp.slot,lp.overall);
+      lp.bucket=comp.level==="HS"?"HS":comp.level==="College"?"4YR":comp.level==="JUCO"?"JUCO":"UNK";
+    }
+  }
+  // Single-client landing distribution (used by the player-detail "recompute" button).
   function projectLanding(key, K=50) {
-    if (!currentState) return null;
-    const base = currentState.picks, saved = mock.picks, lands = [];
+    if (!currentState) return { lands:[], byTeam:{} };
+    const base = currentState.picks, saved = mock.picks, lands = [], byTeam = {};
     for (let k=0;k<K;k++) {
       mock.picks = base.map(p => ({...p}));
+      applyLocksTo(mock.picks);
       for (let i=0;i<mock.picks.length;i++) {
         const pk = mock.picks[i];
-        if (pk.isDrafted) { if (normName(pk.player||"")===key) { lands.push(pk.overall); break; } continue; }
+        if (pk.isDrafted) {
+          if (normName(pk.player||"")===key) { lands.push(pk.overall); byTeam[pk.team]=(byTeam[pk.team]||0)+1; break; }
+          continue;
+        }
         applyPick(i, choosePick(pk));
-        if (normName(mock.picks[i].player||"")===key) { lands.push(mock.picks[i].overall); break; }
+        if (normName(mock.picks[i].player||"")===key) { lands.push(mock.picks[i].overall); byTeam[mock.picks[i].team]=(byTeam[mock.picks[i].team]||0)+1; break; }
       }
     }
     mock.picks = saved;
-    return lands;
+    return { lands, byTeam };
   }
-  function computeProjection(key) {
+  function computeProjection(key, K=50) {
     if (!DATA.compByName.get(key)) return;
     projCache[key] = { computing:true, made:currentState?currentState.madeCount:0 };
     setTimeout(() => {
-      const lands = projectLanding(key, 50) || [];
-      projCache[key] = { lands, made:currentState?currentState.madeCount:0 };
-      if (selected && selected.type==="player" && selected.id===key) renderActive();
+      const { lands, byTeam } = projectLanding(key, K);
+      projCache[key] = { lands, byTeam, made:currentState?currentState.madeCount:0 };
+      if ((selected && selected.type==="player" && selected.id===key) || VIEW==="clients" || VIEW==="best" || VIEW==="clock") renderActive();
     }, 20);
   }
+  // Full-board Monte Carlo: simulate the entire remaining draft K times, recording BOTH
+  // per-player landing distributions AND per-pick "who's in play" — one pass powers the
+  // client projections AND the board's in-play table (~15× cheaper than the old per-client
+  // loop). Chunked by run so the main thread yields (UI live, progress toast animates).
+  let projRun = 0;            // generation token — a newer run cancels older ones
+  let projProgress = null;    // { done, total } while a batch is in flight
+  function projectAll(K=80) {
+    if (!currentState) { updateProjToast(); return; }
+    const base = currentState.picks;
+    if (!base.some(p => !p.isDrafted && !p.isPass)) { projProgress=null; updateProjToast(); return; }
+    const myRun = ++projRun;
+    const teamAt = {}; base.forEach(p => teamAt[p.overall]=p.team);
+    const landing = {};   // key -> [overall]
+    const inPlay = {};    // overall -> { key: count }
+    const saved = mock.picks;
+    let k = 0;
+    const CHUNK = 4;
+    projProgress = { done:0, total:K };
+    updateProjToast();
+    function step() {
+      if (myRun !== projRun) return;                   // superseded by a newer run
+      const end = Math.min(K, k + CHUNK);
+      for (; k < end; k++) {
+        mock.picks = base.map(p => ({...p}));           // borrow (synchronous within chunk)
+        applyLocksTo(mock.picks);
+        for (let i=0;i<mock.picks.length;i++) {
+          const pk = mock.picks[i];
+          if (pk.isDrafted) continue;                   // settled / locked — not "in play"
+          applyPick(i, choosePick(pk));
+          const key = normName(mock.picks[i].player||"");
+          if (!key) continue;
+          const ov = mock.picks[i].overall;
+          (landing[key] = landing[key] || []).push(ov);
+          (inPlay[ov] = inPlay[ov] || {})[key] = (inPlay[ov][key] || 0) + 1;
+        }
+      }
+      mock.picks = saved;                               // restore before yielding
+      projProgress.done = k; updateProjToast();
+      if (k >= K) { finalizeBoardSim(landing, inPlay, teamAt, K); projProgress=null; updateProjToast(); renderActive(); return; }
+      setTimeout(step, 0);
+    }
+    setTimeout(step, 0);
+  }
+  function finalizeBoardSim(landing, inPlay, teamAt, K) {
+    inPlayByPick = inPlay; boardSimK = K;
+    const made = currentState ? currentState.madeCount : 0;
+    const cache = {};
+    for (const c of DATA.clientList) {
+      const lands = landing[c.key];
+      if (!lands || !lands.length) continue;
+      const byTeam = {};
+      lands.forEach(ov => { const t = teamAt[ov]; if (t) byTeam[t] = (byTeam[t]||0)+1; });
+      cache[c.key] = { lands, byTeam, made };
+    }
+    projCache = cache;
+    slotEntropyData = {};                               // entropy = distinct SV clients per pick
+    for (const [ov, m] of Object.entries(inPlay)) {
+      let n=0; for (const key in m) if (DATA.clients.has(key)) n++;
+      if (n) slotEntropyData[parseInt(ov)] = n;
+    }
+  }
+  function updateProjToast() {
+    const el = $("projToast"); if (!el) return;
+    if (projProgress && projProgress.total) {
+      const pct = Math.round(projProgress.done/projProgress.total*100);
+      el.innerHTML = `<span class="pulse"></span> Running simulations… <b>${projProgress.done}/${projProgress.total}</b>
+        <span class="pt-bar"><span class="pt-fill" style="width:${pct}%"></span></span>`;
+      el.style.display = "flex";
+    } else el.style.display = "none";
+  }
+  const slotEntropy = (overall) => slotEntropyData[overall] || 0;
   window.refreshProjection = (key) => { computeProjection(key); renderActive(); };
+
+  // ---------- LIVE INTEL CAPTURE (Supabase via /api/intel) ----------
+  let INTEL = { events: [], byKey: new Map(), loadedAt: 0 };
+  let armed = null;   // inline capture form currently open: { key, name, kind }
+  const agentName = () => { try { return localStorage.getItem("dd:agent") || ""; } catch (e) { return ""; } };
+  window.setAgent = (v) => { try { localStorage.setItem("dd:agent", v||""); } catch (e) {} renderActive(); };
+
+  async function loadIntel() {
+    try {
+      const r = await fetch("/api/intel", { cache:"no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      INTEL.events = Array.isArray(d.events) ? d.events : [];
+      INTEL.loadedAt = Date.now();
+      deriveIntel();
+      renderActive();
+    } catch (e) { /* best-effort; keep prior state */ }
+  }
+  // Collapse the append-only log into current state per player key (events come newest-first).
+  function deriveIntel() {
+    const byKey = new Map();
+    for (const ev of INTEL.events) {
+      const key = normName(ev.player_name||""); if (!key) continue;
+      let s = byKey.get(key);
+      if (!s) { s = { interest:new Map(), ruleOuts:[], window:null, offers:[], events:[] }; byKey.set(key, s); }
+      s.events.push(ev);
+      const team = ev.team || null;
+      if (ev.kind==="interest_sought" || ev.kind==="interest_received") {
+        const mk = (team||"") + "|" + ev.kind;
+        if (!s.interest.has(mk)) s.interest.set(mk, { team, dir: ev.kind==="interest_sought"?"sought":"received", strength: ev.strength, color: ev.color, date: ev.created_at });
+      } else if (ev.kind==="rule_out" && ev.status==="active") {
+        s.ruleOuts.push({ team, pick: ev.pick_overall, date: ev.created_at });
+      } else if (ev.kind==="strike_window" && ev.status==="active") {
+        if (!s.window) s.window = { lo: ev.window_lo, hi: ev.window_hi, date: ev.created_at };
+      } else if (ev.kind==="offer") {
+        s.offers.push({ team, type: ev.offer_type, amount: ev.amount, lo: ev.amount_lo, hi: ev.amount_hi, pick: ev.pick_overall, status: ev.status, date: ev.created_at });
+      }
+    }
+    INTEL.byKey = byKey;
+  }
+  const intelFor = (key) => INTEL.byKey.get(key) || null;
+
+  async function postIntel(ev) {
+    ev.agent = ev.agent || agentName() || "console";
+    try {
+      const r = await fetch("/api/intel", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(ev) });
+      if (!r.ok) throw new Error(await r.text());
+      await loadIntel();
+      if (ev.kind==="strike_window" || ev.kind==="rule_out") { projCache={}; slotEntropyData={}; projectAll(); }
+      return true;
+    } catch (e) { alert("Could not save intel: " + e.message); return false; }
+  }
+
+  // ---------- VIEW: BOARD — expand a pick to its in-play client table ----------
+  window.expandPick = (ov) => {
+    expandedPick = (expandedPick===ov ? null : ov); armed = null;
+    renderBoard(currentState);
+    if (expandedPick!=null) setTimeout(()=>document.getElementById("pickExpand")?.scrollIntoView({block:"start",behavior:"smooth"}), 30);
+  };
+  window.closeExpand = () => { expandedPick=null; armed=null; renderBoard(currentState); };
+  window.armAction = (key, name, kind) => { armed = { key, name, kind }; renderBoard(currentState); };
+  window.cancelArmed = () => { armed=null; renderBoard(currentState); };
+  window.quickRuleOut = (key, name, team, overall) => {
+    postIntel({ kind:"rule_out", player_name:name, team, pick_overall:overall, status:"active", note:"ruled out at slot" });
+  };
+  window.saveArmed = (team, overall) => {
+    if (!armed) return;
+    const k = armed.kind, ev = { kind:k, player_name:armed.name, team };
+    const val = (id) => { const el=$(id); return el ? el.value : ""; };
+    if (k==="interest_received" || k==="interest_sought") {
+      ev.strength = parseInt(val("afStrength"),10); ev.color = val("afColor")||null; ev.note = val("afNote")||null;
+    } else if (k==="strike_window") {
+      ev.window_lo = parseInt(val("afLo"),10)||null; ev.window_hi = parseInt(val("afHi"),10)||null; ev.note = val("afNote")||null;
+    } else if (k==="offer") {
+      ev.offer_type = val("afType")||"formal"; ev.pick_overall = overall;
+      if (ev.offer_type==="range") { ev.amount_lo = parseFloat(val("afLoAmt"))||null; ev.amount_hi = parseFloat(val("afHiAmt"))||null; }
+      else { ev.amount = parseFloat(val("afAmount"))||null; }
+      ev.note = val("afNote")||null;
+    }
+    armed = null; postIntel(ev);
+  };
+
+  function renderPickExpand(state) {
+    const el = $("pickExpand"); if (!el) return;
+    if (expandedPick==null) { el.innerHTML=""; return; }
+    const pk = (state.picks||[]).find(p=>p.overall===expandedPick);
+    if (!pk || pk.isDrafted) { el.innerHTML=""; return; }
+    const team = pk.team, K = boardSimK || 1, dist = inPlayByPick[expandedPick] || {}, pool = state.poolsMap[team];
+    const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
+
+    let clients = DATA.clientList.filter(c=>c.comp && !drafted.has(c.key)).map(c=>{
+      const prob = (dist[c.key]||0)/K;
+      const rec = latestIntel(c.key, team);
+      const cap = intelFor(c.key);
+      const f = fit(c.comp, team, c.key, state);
+      const lands = projCache[c.key]?.lands;
+      const med = lands&&lands.length ? pctOf(lands,0.5) : null;
+      const bonus = negBonus(c.comp, pk.slot, pk.overall);
+      const ou = bonus - pk.slot;
+      const moneyFits = pool ? pool.room >= bonus : true;     // does the team's pool actually accommodate him
+      // talent reach: don't surface a player far outside a plausible window for this slot
+      // (rank-7 floor keeps a top guy off picks that would be an implausibly early reach).
+      const reachOk = pk.overall >= c.comp.rank - 7 && pk.overall <= c.comp.rank + 45;
+      const ruledHere = !!(cap && cap.ruleOuts && cap.ruleOuts.some(r => r.team===team || r.pick===expandedPick));
+      return { c, prob, rec, cap, f, med, ou, bonus, moneyFits, reachOk, ruledHere };
+    }).filter(x => {
+      const teamCap = x.cap && (
+        [...x.cap.interest.values()].some(v => v.team===team) ||
+        (x.cap.offers||[]).some(o => o.team===team) ||
+        (x.cap.ruleOuts||[]).some(r => r.team===team)
+      );
+      // In play if: the sim places him here, OR we've captured team-specific intel, OR he's a
+      // genuine org fit within reach. orgScore is interest-dominant (full intel history), so a
+      // bare feed record (clients have one for ~every team) no longer counts — only real strength.
+      return x.prob>0 || teamCap || (x.reachOk && x.f.orgScore>=52);
+    });
+    clients.sort((a,b)=> (b.prob-a.prob) || (b.f.orgScore-a.f.orgScore));
+
+    const pub = Object.entries(dist).filter(([key])=>!DATA.clients.has(key))
+      .map(([key,cnt])=>({ key, prob:cnt/K, comp:DATA.compByName.get(key) }))
+      .sort((a,b)=>b.prob-a.prob).slice(0,6);
+
+    let h = `<div class="exp-wrap"><div class="exp-head">
+      <div><span class="exp-no">PICK #${pk.overall}</span> <b>${teamLink(team)}</b>
+        <span class="exp-sub">${pk.teamName||""} · Round ${pk.round} · slot ${fmtM(pk.slot)}${pool?` · ammo ${fmtM(pool.room)}`:""}</span></div>
+      <button class="ctl" onclick="closeExpand()">✕ Close</button></div>`;
+
+    const away = state.onClock ? (pk.overall - state.onClock.overall) : null;
+    if (away!=null && away>=0 && away<=3)
+      h += `<div class="exp-approach">⚡ ${away===0?"ON THE CLOCK NOW":away+" pick"+(away>1?"s":"")+" away"} — initiate floor / range / formal offers on true-fit clients.</div>`;
+
+    h += `<div class="exp-section">Our clients — in play &amp; true fit <span class="exp-hint">declining probability at this pick</span></div>`;
+    h += clients.length ? `<div class="exp-table">${clients.map(x=>renderClientRow(x, team, pk)).join("")}</div>`
+                        : `<div class="placeholder">No clients project here and none logged a fit for ${team}.</div>`;
+
+    if (pub.length) {
+      h += `<div class="exp-section">Other names in play <span class="exp-hint">public projection</span></div>
+        <div class="exp-pub">${pub.map(p=>`<span class="pub-chip">${Math.round(p.prob*100)}% ${p.comp?p.comp.name:p.key}${p.comp?` <span class="pub-rk">#${p.comp.rank}</span>`:""}</span>`).join("")}</div>`;
+    }
+    h += `</div>`;
+    el.innerHTML = h;
+  }
+
+  function renderClientRow(x, team, pk) {
+    const c = x.c, key = c.key;
+    const bits = [];
+    if (x.cap && x.cap.interest.size) for (const v of x.cap.interest.values())
+      bits.push(`<span class="ib ${v.dir}">${v.dir==="sought"?"▲ sought":"▼ rec'd"}${v.strength!=null?` ${v.strength>0?"+":""}${v.strength}`:""}</span>`);
+    if (x.rec && x.rec.score!=null)
+      bits.push(`<span class="ib feed"><span class="idot" style="background:${COLOR_HEX[(x.rec.color||"").toLowerCase()]||"#ccc"}"></span>feed ${x.rec.score>0?"+":""}${x.rec.score}${x.rec.workout?" · PDW":""}</span>`);
+    if (x.cap && x.cap.window) bits.push(`<span class="ib win">◎ #${x.cap.window.lo||"?"}–#${x.cap.window.hi||"?"}</span>`);
+    if (x.cap && x.cap.offers) for (const o of x.cap.offers.filter(o=>o.team===team))
+      bits.push(`<span class="ib offer">$ ${o.type}${o.amount?" "+fmtM(o.amount):(o.lo||o.hi)?` ${fmtM(o.lo)}–${fmtM(o.hi)}`:""}</span>`);
+    const timing = x.med==null ? "" : (Math.abs(x.med-pk.overall)<=3 ? `<span class="tg fit">fits ~#${x.med}</span>`
+      : x.med<pk.overall ? `<span class="tg early">likely gone #${x.med}</span>` : `<span class="tg late">later #${x.med}</span>`);
+    const money = x.moneyFits ? `<span class="tg over">$ fits pool</span>` : `<span class="tg under">$ over pool</span>`;
+    const qk = key.replace(/'/g,"\\'"), qn = (c.name||"").replace(/'/g,"\\'");
+    let row = `<div class="exp-row ${x.ruledHere?"ruled":""}">
+      <span class="er-prob">${Math.round(x.prob*100)}%</span>
+      <span class="er-name">${playerLink(c.name)} <span class="er-rk">#${c.comp.rank} ${c.comp.pos}</span></span>
+      <span class="grade" data-org="${team}" title="org fit (money excluded)" style="background:${x.f.color2}">${x.f.orgGrade}</span>
+      <span class="er-bits">${bits.join("")}${timing}${money}${x.ruledHere?'<span class="tg ruledtag">⊘ ruled out</span>':""}</span>
+      <span class="er-act">
+        <button class="mini" onclick="armAction('${qk}','${qn}','interest_received')">▼ Rec'd</button>
+        <button class="mini" onclick="armAction('${qk}','${qn}','interest_sought')">▲ Sought</button>
+        <button class="mini" onclick="armAction('${qk}','${qn}','strike_window')">◎ Window</button>
+        <button class="mini" onclick="armAction('${qk}','${qn}','offer')">$ Offer</button>
+        <button class="mini ${x.ruledHere?'on':''}" title="Rule out at this slot" onclick="quickRuleOut('${qk}','${qn}','${team}',${pk.overall})">⊘</button>
+      </span></div>`;
+    if (armed && armed.key===key) row += renderArmedForm(team, pk);
+    return row;
+  }
+
+  function renderArmedForm(team, pk) {
+    const k = armed.kind, labels = { interest_received:"Interest received", interest_sought:"Interest sought", strike_window:"Strike window", offer:"Offer" };
+    let inner = "";
+    if (k==="interest_received" || k==="interest_sought") {
+      inner = `<label>Strength <select id="afStrength">${[6,5,4,3,2,1,0,-1,-2,-3,-4,-5,-6].map(n=>`<option ${n===4?"selected":""}>${n>0?"+"+n:n}</option>`).join("")}</select></label>
+        <label>Color <select id="afColor"><option value="">—</option><option>green</option><option>yellow</option><option>orange</option><option>red</option></select></label>
+        <input id="afNote" placeholder="note (optional)">`;
+    } else if (k==="strike_window") {
+      const cur = intelFor(armed.key)?.window;
+      inner = `<label>earliest #<input id="afLo" type="number" min="1" value="${cur?.lo||""}" style="width:60px"></label>
+        <label>latest #<input id="afHi" type="number" min="1" value="${cur?.hi||""}" style="width:60px"></label>
+        <input id="afNote" placeholder="note (optional)">`;
+    } else if (k==="offer") {
+      inner = `<label>Type <select id="afType" onchange="var r=this.value==='range';document.getElementById('afRange').style.display=r?'inline-flex':'none';document.getElementById('afOne').style.display=r?'none':'inline-flex'">
+          <option value="formal">formal</option><option value="floor">floor</option><option value="range">range</option></select></label>
+        <span id="afOne" style="display:inline-flex;gap:4px;align-items:center">$<input id="afAmount" type="number" placeholder="amount" style="width:120px"></span>
+        <span id="afRange" style="display:none;gap:4px;align-items:center">$<input id="afLoAmt" type="number" placeholder="low" style="width:96px">–<input id="afHiAmt" type="number" placeholder="high" style="width:96px"></span>
+        <input id="afNote" placeholder="note (optional)">`;
+    }
+    return `<div class="exp-form"><span class="ef-label">${armed.name} · ${labels[k]}${team?(" · "+team):""}</span>
+      ${inner}
+      <button class="ctl primary" onclick="saveArmed('${team}',${pk.overall})">Save</button>
+      <button class="ctl" onclick="cancelArmed()">Cancel</button></div>`;
+  }
 
   function renderLandingCard(c, state) {
     const comp = c.comp;
@@ -811,7 +1488,7 @@
       ${rg?`<div style="margin-top:8px"><span class="outag over">🔒 Locked ${rg.lo?"#"+rg.lo:"—"}–${rg.hi?"#"+rg.hi:"—"}${rg.lo&&rg.hi?` (R${roundOfPick(rg.lo)}–R${roundOfPick(rg.hi)})`:""}</span> <span style="color:#9aa0a6;font-size:12px">engine + mocks obey this</span></div>`:`<div style="margin-top:6px;color:#9aa0a6;font-size:12px">No range set — projection uses the engine's own estimate.</div>`}</div>`;
 
     const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
-      .map(t => { const rec=latestIntel(c.key,t); return { t, rec, f:fit(comp,t,rec,state), nx:teamNextPick(state,t) }; })
+      .map(t => { const rec=latestIntel(c.key,t); return { t, rec, f:fit(comp,t,c.key,state), nx:teamNextPick(state,t) }; })
       .sort((a,b)=>b.f.score-a.f.score);
 
     h += `<div class="panel" style="margin-top:14px"><h3>Interested teams (${teams.length})</h3>`;
@@ -859,7 +1536,7 @@
 
     const clients = DATA.clientList.filter(c=>latestIntel(c.key,t)).map(c => {
       const rec=latestIntel(c.key,t); const dr=state.picks.find(p=>p.isDrafted&&normName(p.player)===c.key);
-      return { c, rec, dr, f:fit(c.comp,t,rec,state) };
+      return { c, rec, dr, f:fit(c.comp,t,c.key,state) };
     }).sort((a,b)=>b.f.score-a.f.score);
     h += `<div class="panel"><h3>Our clients they like (${clients.length})</h3>`;
     h += clients.length ? clients.map(x => {
@@ -910,10 +1587,18 @@
 
   // ---------- state plumbing ----------
   function setState(s) {
+    const prevMade = currentState ? currentState.madeCount : 0;
     currentState = s;
     if (s) $("yearBadge").textContent = `${s.year} MLB DRAFT`;
     if (s && s.onClock) { if (s.onClock.overall !== timer.pick) setClockForPick(s.onClock); }
     else timer.pick = null;
+    // Invalidate projection cache when a new pick comes in
+    if (s && s.madeCount !== prevMade) {
+      projCache = {}; slotEntropyData = {};
+      projectAll(50);
+    } else if (s && Object.keys(projCache).length === 0) {
+      projectAll(50); // warm up on initial load
+    }
     renderActive();
   }
   const VIEWS = [["tabClients","viewClients","clients"],["tabClock","viewClock","clock"],
@@ -928,18 +1613,29 @@
     if (VIEW==="clients") renderClients(currentState);
     else if (VIEW==="clock") renderClock(currentState);
     else if (VIEW==="pools") renderPools();
-    else if (VIEW==="board") renderBoard(currentState);
+    else if (VIEW==="board") {
+      const ae = document.activeElement;   // don't wipe an open capture form while typing
+      if (armed && ae && (ae.tagName==="INPUT" || ae.tagName==="SELECT")) return;
+      renderBoard(currentState);
+    }
     else renderBest();
   }
   function setView(v) { selected=null; VIEW=v; applyViewVis(); renderActive(); }
 
   // ---------- mock engine ----------
-  async function ensureSkeleton() {
+  // Seeds mock from live state if available, so the simulation picks up exactly where reality left off.
+  async function seedFromLive() {
     if (mock.picks || mock.seeding) return;
     mock.seeding = true;
     try {
       const o = await loadOrder();
-      mock.picks = o.picks.map(p => ({ ...p, isDrafted:false, isPass:false, player:null, playerId:null, school:null, schoolClass:null, bucket:"UNK", bonus:null, rank:null }));
+      if (lastLive && lastLive.picks && lastLive.picks.length) {
+        // Start from live draft state — already-made picks stay made
+        mock.picks = lastLive.picks.map(p => ({...p}));
+      } else {
+        // Pre-draft or no live data: blank skeleton
+        mock.picks = o.picks.map(p => ({ ...p, isDrafted:false, isPass:false, player:null, playerId:null, school:null, schoolClass:null, bucket:"UNK", bonus:null, rank:null }));
+      }
     } catch (e) { $("pickNo").textContent = "Couldn't load board — serve via a web server (vercel dev / python3 -m http.server)"; }
     mock.seeding = false;
   }
@@ -987,8 +1683,10 @@
       if (pk.slot > 0 && b > headroom) continue;        // can't afford -> he slides
       let v = (350 - c.rank) - lamEff*(b/1e6);
       v += (isPitcher(c.pos) ? (lean-.5) : (.5-lean)) * ENG.POS_LEAN;
+      // Banking: a spreader values the pool saved by an under-slot grab (fuels an over-slot pick later).
+      if (pk.slot > 0 && b < pk.slot) v += spreadOf(team) * ENG.SAVE_W * ((pk.slot - b)/1e6);
       const nm = normName(c.name);
-      if (DATA.clients.has(nm)) { const rec = latestIntel(nm, team); if (rec && rec.score>0) v += Math.min(rec.score*0.7, ENG.INTEREST_MAX); }
+      if (DATA.clients.has(nm)) { const ti = teamInterest(nm, team); if (ti.strength>0) v += Math.min(ti.strength*6*0.7, ENG.INTEREST_MAX); }
       v += Math.random()*jit;
       if (v > bestVal) { bestVal=v; best=c; bestBonus=b; }
     }
@@ -1040,8 +1738,9 @@
   function stepOnce() { if (MODE==="mock" && mock.picks) { autoPickOne(); mock.nextAt=0; pushMock(); } }
   function resetMock() {
     mock.running=false; mock.picks=null; mock.nextAt=0; timer.pick=null;
+    whatIfLocks=[]; whatIfBaseline=null; projCache={}; slotEntropyData={};
     $("btnRun").textContent="▶ Start"; $("btnRun").classList.add("primary");
-    ensureSkeleton().then(pushMock);
+    seedFromLive().then(pushMock);
   }
   function onSpeed() { mock.speed = $("speed").value; mock.nextAt = 0; }
   const speedDelay = () => mock.speed==="turbo" ? 300 : 1200;
@@ -1093,7 +1792,10 @@
     $("mLive").classList.toggle("on", m==="live"); $("mMock").classList.toggle("on", m==="mock");
     $("mockBar").classList.toggle("hidden", m!=="mock");
     $("conn").className = m==="mock" ? "dot" : "dot live";
-    if (m==="mock") { await ensureSkeleton(); pushMock(); } else { pollLive(); }
+    if (m==="mock") {
+      projCache={}; slotEntropyData={};
+      await seedFromLive(); pushMock();
+    } else { pollLive(); }
   }
 
   // ---------- org-review hover tooltip (on fit grades) ----------
@@ -1144,8 +1846,10 @@
     initOrgTooltip();
     await loadStatic();
     try { await loadOrder(); } catch (e) {}   // slot table for demandFor() in all views
+    loadIntel();                              // captured intel from Supabase (best-effort)
     pollLive();
     setInterval(pollLive, 3000);
+    setInterval(loadIntel, 12000);            // refresh shared intel so the war room stays in sync
     setInterval(tick, 250);
   })();
 </script>
