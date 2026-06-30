@@ -250,6 +250,25 @@
   .exp-pub { display:flex; gap:6px; flex-wrap:wrap; }
   .pub-chip { font-size:12px; font-weight:600; background:#f1f3f5; border-radius:999px; padding:3px 10px; color:#374151; }
   .pub-chip .pub-rk { color:var(--muted); font-weight:700; }
+
+  /* ── Board: client panel (distribution at scale + color fit) ── */
+  .cp-wrap { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .cp-pills { display:flex; flex-wrap:wrap; gap:6px; }
+  .cp-pill { font-size:12px; font-weight:700; border:1px solid var(--line); border-radius:999px; padding:4px 11px; cursor:pointer; background:#fff; color:#374151; }
+  .cp-pill:hover { border-color:var(--red); } .cp-pill.on { background:var(--red); color:#fff; border-color:var(--red); }
+  .cp-pill.dr { opacity:.5; } .cp-pill .pr { opacity:.65; font-weight:600; }
+  .cp-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:12px 0 8px; }
+  .cp-head .rk { color:var(--red); font-weight:900; } .cp-head .nm { font-weight:900; font-size:18px; } .cp-head .meta { color:var(--muted); font-size:13px; }
+  .cp-stat { display:flex; gap:16px; flex-wrap:wrap; }
+  .cp-stat .k { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; } .cp-stat .v { font-weight:800; font-variant-numeric:tabular-nums; }
+  .cp-sec { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:16px 0 8px; }
+  .cp-hist { display:flex; align-items:flex-end; gap:5px; height:130px; }
+  .cp-bar { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; justify-content:flex-end; height:100%; min-width:28px; }
+  .cp-bar .bar { width:100%; background:linear-gradient(#ff6a63,#ff2a22); border-radius:4px 4px 0 0; min-height:2px; }
+  .cp-bar .pct { font-size:11px; font-weight:800; } .cp-bar .lab { font-size:10px; color:var(--muted); font-weight:700; white-space:nowrap; }
+  .cp-fitgrid { display:flex; flex-wrap:wrap; gap:7px; }
+  .cp-fit { display:flex; flex-direction:column; gap:1px; min-width:88px; border:1px solid var(--line); border-left-width:4px; border-radius:8px; padding:7px 10px; }
+  .cp-fit .t { font-weight:900; font-size:14px; } .cp-fit .p { font-size:14px; font-weight:800; } .cp-fit .d { font-size:11px; color:var(--muted); }
 </style>
 
 <header>
@@ -330,10 +349,12 @@
       <label><input type="checkbox" id="bSv" onchange="renderBoard(currentState)"> SV picks only</label>
       <button class="ctl" onclick="jumpCurrent()">↧ Jump to current pick</button>
       <span class="seg"><button id="btnBList" class="on" onclick="setBoardView('list')">≡ List</button><button id="btnBGrid" onclick="setBoardView('grid')">⊞ Grid</button></span>
+      <button class="ctl" id="btnClients" onclick="toggleClients()" style="font-weight:800">👤 Clients</button>
       <button class="ctl" id="btnWhatIf" onclick="toggleWhatIf()" style="background:#f4f2ff;border-color:#c7c3f4;color:#6366f1;font-weight:800">✦ Scenario</button>
       <span class="ent-legend" id="entLegend" style="display:none"><span class="ent-dot" style="background:#e8820e"></span>Contested&nbsp;<span class="ent-dot" style="background:#1a7f37"></span>Chalk</span>
       <span class="count" id="boardCount"></span>
     </div>
+    <div id="clientPanel"></div>
     <div id="wiPanel"></div>
     <div id="pickExpand"></div>
     <div id="boardList" class="board"></div>
@@ -447,13 +468,17 @@
 
   let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null };
   let whatIfLocks = [];        // [{overall, playerKey}]
-  let whatIfBaseline = null;   // projCache snapshot before locks applied
+  let whatIfBaseline = null;   // (legacy) projCache snapshot before locks applied
+  let boardLanding = {};       // key -> [overall] for ALL players from the last full-board sim
+  let whatIfBaseBoard = null;  // boardLanding snapshot before locks — for board-wide ripple
   let whatIfOpen = false;
   let boardView = "list";      // "list" | "grid"
   let slotEntropyData = {};    // overall -> distinct SV client count across sims
   let inPlayByPick = {};       // overall -> { playerKey: count }  (board "who's in play")
   let boardSimK = 0;           // K of the last board sim (denominator for probabilities)
   let expandedPick = null;     // overall # whose in-play list is expanded, or null
+  let clientsOpen = false;     // Board "Clients" panel toggle (works in live + mock)
+  let boardClient = null;      // selected client key for the distribution/color-fit panel
   let projInvalid = false;
 
   // ----- bonus / leverage model: expected bonus = slot-at-rank × leverage multiplier -----
@@ -891,6 +916,7 @@
     const hasEntropy = Object.keys(slotEntropyData).length > 0;
     $("entLegend").style.display = hasEntropy ? "" : "none";
     $("boardCount").textContent = `${state.madeCount} of ${state.picks.length} picks made`;
+    renderClientPanel(state);
     renderPickExpand(state);
     if (boardView === "grid") { renderBoardGrid(state); return; }
     const svOnly = $("bSv").checked;
@@ -997,40 +1023,46 @@
       </div>`;
     }).join("");
 
-    // Build delta table if baseline exists
+    // Board ripple: how this pick reshapes the WHOLE board (all players move), with our clients flagged.
     let deltaHtml = "";
-    if (whatIfBaseline) {
-      const drafted = new Set((state.picks||[]).filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
-      const rows = DATA.clientList.filter(c=>!drafted.has(c.key)&&projCache[c.key]&&!projCache[c.key].computing&&whatIfBaseline[c.key]&&!whatIfBaseline[c.key].computing).map(c=>{
-        const base = whatIfBaseline[c.key], cur = projCache[c.key];
-        const bMed = base.lands&&base.lands.length?pctOf(base.lands,0.5):null;
-        const nMed = cur.lands&&cur.lands.length?pctOf(cur.lands,0.5):null;
-        if (bMed==null||nMed==null) return null;
-        const delta = nMed - bMed; // negative = picked earlier
-        return { name:c.name, bMed, nMed, delta };
-      }).filter(Boolean).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
-      if (rows.length) {
-        deltaHtml = `<div class="wi-delta">
-          <div class="wi-delta-hdr"><span class="dn">Client</span><span class="db">Baseline</span><span class="dn2">Scenario</span><span class="dd">Δ median</span></div>`
-          + rows.map(r=>`<div class="wi-drow">
-            <span class="dn">${r.name}</span>
-            <span class="db">#${r.bMed}</span>
-            <span class="dn2">#${r.nMed}</span>
-            <span class="dd ${r.delta<0?"pos":r.delta>0?"neg":""}">${r.delta===0?"±0":r.delta>0?"+"+r.delta:r.delta} picks</span>
-          </div>`).join("")
-          + `</div>`;
+    if (whatIfBaseBoard) {
+      const med = arr => (arr && arr.length>=5) ? pctOf(arr,0.5) : null;
+      const lockedKeys = new Set(whatIfLocks.map(l=>l.playerKey));
+      const keys = new Set([...Object.keys(whatIfBaseBoard), ...Object.keys(boardLanding)]);
+      const movers = [];
+      for (const k of keys) {
+        if (lockedKeys.has(k)) continue;                 // the locked player itself isn't "influenced"
+        const bm = med(whatIfBaseBoard[k]), nm = med(boardLanding[k]);
+        if (bm==null || nm==null) continue;
+        const d = nm - bm;                               // + = pushed later, − = pulled earlier
+        if (!d) continue;
+        const comp = DATA.compByName.get(k);
+        movers.push({ k, name: comp?comp.name:k, rank: comp?comp.rank:null, bm, nm, d, sv: DATA.clients.has(k) });
       }
+      const ripple = movers.filter(m=>Math.abs(m.d)>=2).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,12);
+      const clients = movers.filter(m=>m.sv).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
+      const row = (r) => `<div class="wi-drow">
+        <span class="dn">${r.sv?'<span class="svtag">SV</span> ':''}${r.name}${r.rank?` <span style="color:#9aa0a6;font-weight:600">#${r.rank}</span>`:''}</span>
+        <span class="db">#${r.bm}</span><span class="dn2">#${r.nm}</span>
+        <span class="dd ${r.d<0?"pos":"neg"}">${r.d>0?"+"+r.d:r.d} ${r.d<0?"↑ earlier":"↓ later"}</span></div>`;
+      const hdr = `<div class="wi-delta-hdr"><span class="dn">Player</span><span class="db">Base</span><span class="dn2">Scenario</span><span class="dd">Δ median</span></div>`;
+      deltaHtml = `<div class="wi-delta">
+        <div class="cp-sec" style="margin-top:14px">How this pick reshapes the board <span style="font-weight:600;text-transform:none;letter-spacing:0;color:#9aa0a6">— biggest landing shifts across all players</span></div>
+        ${ripple.length ? hdr + ripple.map(row).join("") : '<div class="placeholder">No material board shifts (≥2 picks).</div>'}
+        <div class="cp-sec" style="margin-top:14px">Impact on our clients</div>
+        ${clients.length ? hdr + clients.map(row).join("") : '<div class="placeholder">No client shifts.</div>'}
+      </div>`;
     }
 
     return `<div class="wi-wrap">
-      <h3>✦ Scenario<span style="font-weight:400;font-size:11px;color:#9aa0a6;text-transform:none;letter-spacing:0">— lock picks and re-run sims to see impact on client draft positions</span></h3>
+      <h3>✦ Scenario<span style="font-weight:400;font-size:11px;color:#9aa0a6;text-transform:none;letter-spacing:0">— lock a pick, re-run sims, and see how the whole board reshapes (cascade), clients flagged</span></h3>
       ${lockRows || `<div style="color:var(--muted);font-size:13px;margin-bottom:10px">No overrides yet. Add a pick lock below.</div>`}
       <div class="wi-controls">
         <select id="wiSlot">${slotOpts}</select>
         <select id="wiPlayer">${playerOpts}</select>
         <button class="ctl" onclick="addWhatIfLock()" style="background:#6366f1;color:#fff;border-color:#6366f1">+ Lock</button>
         <button class="ctl primary" onclick="runWhatIf()" ${whatIfLocks.length?"":'disabled style="opacity:.5"'}>▶ Run 200 sims</button>
-        ${whatIfBaseline?`<button class="ctl" onclick="resetWhatIf()">↺ Reset to baseline</button>`:""}
+        ${whatIfBaseBoard?`<button class="ctl" onclick="resetWhatIf()">↺ Reset to baseline</button>`:""}
       </div>
       ${deltaHtml}
     </div>`;
@@ -1047,14 +1079,13 @@
   }
   function runWhatIf() {
     if (!whatIfLocks.length || !currentState) return;
-    whatIfBaseline = {};
-    for (const [k,v] of Object.entries(projCache)) whatIfBaseline[k] = v;
+    whatIfBaseBoard = boardLanding;        // snapshot baseline board (all players) before locks
     projCache = {}; slotEntropyData = {};
     projectAll(200);
     renderBoard(currentState);
   }
   function resetWhatIf() {
-    whatIfLocks=[]; whatIfBaseline=null; projCache={}; slotEntropyData={};
+    whatIfLocks=[]; whatIfBaseBoard=null; whatIfBaseline=null; projCache={}; slotEntropyData={};
     projectAll(50); renderBoard(currentState);
   }
 
@@ -1142,7 +1173,7 @@
     setTimeout(() => {
       const { lands, byTeam } = projectLanding(key, K);
       projCache[key] = { lands, byTeam, made:currentState?currentState.madeCount:0 };
-      if ((selected && selected.type==="player" && selected.id===key) || VIEW==="clients" || VIEW==="best" || VIEW==="clock") renderActive();
+      if ((selected && selected.type==="player" && selected.id===key) || VIEW==="clients" || VIEW==="best" || VIEW==="clock" || VIEW==="board") renderActive();
     }, 20);
   }
   // Full-board Monte Carlo: simulate the entire remaining draft K times, recording BOTH
@@ -1189,7 +1220,7 @@
     setTimeout(step, 0);
   }
   function finalizeBoardSim(landing, inPlay, teamAt, K) {
-    inPlayByPick = inPlay; boardSimK = K;
+    inPlayByPick = inPlay; boardSimK = K; boardLanding = landing;
     const made = currentState ? currentState.madeCount : 0;
     const cache = {};
     for (const c of DATA.clientList) {
@@ -1268,6 +1299,79 @@
       if (ev.kind==="strike_window" || ev.kind==="rule_out") { projCache={}; slotEntropyData={}; projectAll(); }
       return true;
     } catch (e) { alert("Could not save intel: " + e.message); return false; }
+  }
+
+  // ---------- VIEW: BOARD — client panel: landing distribution at scale + color fit ----------
+  function toggleClients() {
+    clientsOpen = !clientsOpen;
+    $("btnClients").classList.toggle("on", clientsOpen);
+    $("btnClients").style.background = clientsOpen ? "var(--red)" : "";
+    $("btnClients").style.color = clientsOpen ? "#fff" : "";
+    if (clientsOpen && !boardClient && currentState) {
+      const drafted = new Set(currentState.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
+      const first = DATA.clientList.find(c => c.comp && !drafted.has(c.key));
+      if (first) { boardClient = first.key; computeProjection(boardClient, 500); }
+    }
+    renderBoard(currentState);
+  }
+  window.selectBoardClient = (key) => { boardClient = key; computeProjection(key, 500); renderBoard(currentState); };
+
+  function renderClientPanel(state) {
+    const el = $("clientPanel"); if (!el) return;
+    if (!clientsOpen) { el.innerHTML = ""; return; }
+    const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
+    const clients = DATA.clientList.filter(c=>c.comp).sort((a,b)=>a.comp.rank-b.comp.rank);
+    const pills = clients.map(c=>{
+      const dr = drafted.has(c.key);
+      return `<span class="cp-pill ${boardClient===c.key?'on':''} ${dr?'dr':''}" onclick="selectBoardClient('${c.key.replace(/'/g,"\\'")}')">${surnameOf(c.name)} <span class="pr">#${c.comp.rank}</span>${dr?' ✓':''}</span>`;
+    }).join("");
+
+    let body = `<div class="placeholder" style="margin-top:12px">Select a client to see their landing distribution &amp; color fit.</div>`;
+    if (boardClient) {
+      const c = clients.find(x=>x.key===boardClient);
+      const pk = state.picks.find(p=>p.isDrafted && normName(p.player)===boardClient);
+      if (pk) {
+        body = `<div class="cp-head"><span class="rk">#${c.comp.rank}</span><span class="nm">${c.name}</span>
+          <span class="meta">DRAFTED #${pk.overall} · ${teamLink(pk.team)} · ${moneyCell(pk)}</span></div>`;
+      } else {
+        const cache = projCache[boardClient];
+        if (!cache || cache.computing) body = `<div class="placeholder" style="margin-top:12px">Running 500 simulations…</div>`;
+        else if (!cache.lands || !cache.lands.length) body = `<div class="placeholder" style="margin-top:12px">No projection. <span class="tlink" onclick="refreshProjection('${boardClient.replace(/'/g,"\\'")}')">retry</span></div>`;
+        else {
+          const lands = cache.lands, K = lands.length;
+          const med=pctOf(lands,0.5), p10=pctOf(lands,0.1), p90=pctOf(lands,0.9), mn=Math.min(...lands);
+          const spread=p90-p10, certainty = spread<=6?"very tight":spread<=20?"tight":spread<=60?"moderate":"wide open";
+          // pick-level distribution across his realistic range — reveals the true shape at scale
+          const lo=pctOf(lands,0.02), hi=pctOf(lands,0.98), span=Math.max(1,hi-lo);
+          const NB=Math.min(12, Math.max(4, span+1)), binW=Math.max(1, Math.ceil((span+1)/NB));
+          const bins=[]; for (let b=0; lo+b*binW<=hi; b++) bins.push({s:lo+b*binW, e:lo+b*binW+binW-1, c:0});
+          lands.forEach(o=>{ let i=Math.floor((o-lo)/binW); if(i<0)i=0; if(i>=bins.length)i=bins.length-1; bins[i].c++; });
+          const maxc=Math.max(...bins.map(b=>b.c),1);
+          const bars=bins.map(b=>{ const pv=Math.round(b.c/K*100), lab=binW===1?`#${b.s}`:`${b.s}–${b.e}`;
+            return `<div class="cp-bar"><span class="pct">${pv?pv+'%':''}</span><div class="bar" style="height:${Math.round(b.c/maxc*100)}%"></div><span class="lab">${lab}</span></div>`; }).join("");
+          // color fit x landing probability per team
+          const teams=new Set([...DATA.intel.filter(r=>normName(r.player)===boardClient).map(r=>teamAlias(r.team)), ...Object.keys(cache.byTeam||{})]);
+          const chips=[...teams].map(t=>{ const f=fit(c.comp,t,boardClient,state); const p=(cache.byTeam?.[t]||0)/K; const nx=teamNextPick(state,t); return {t,f,p,nx}; })
+            .filter(x=>x.p>0 || x.f.score>=46).sort((a,b)=> (b.p-a.p) || (b.f.score-a.f.score)).slice(0,14)
+            .map(x=>`<div class="cp-fit" style="border-left-color:${x.f.color}"><span class="t">${teamLink(x.t)}</span>
+              <span class="p" style="color:${x.f.color}">${Math.round(x.p*100)}%</span>
+              <span class="d">fit ${x.f.grade}${x.nx?` · #${x.nx.overall}`:""}</span></div>`).join("");
+          body = `<div class="cp-head"><span class="rk">#${c.comp.rank}</span><span class="nm">${c.name}</span>
+              <span class="meta">${c.comp.pos} · ${levelClass(c.comp).replace('College-','Col ')}</span></div>
+            <div class="cp-stat">
+              <span><div class="k">Most likely</div><div class="v" style="color:var(--red)">#${med}</div></span>
+              <span><div class="k">Range P10–P90</div><div class="v">#${p10}–#${p90}</div></span>
+              <span><div class="k">Earliest</div><div class="v">#${mn}</div></span>
+              <span><div class="k">Certainty</div><div class="v">${certainty}</div></span>
+              <span><div class="k">Sims</div><div class="v">${K}</div></span></div>
+            <div class="cp-sec">Landing distribution by round <span style="font-weight:600;text-transform:none;letter-spacing:0;color:#9aa0a6">— where ${surnameOf(c.name)} comes off, across ${K} sims</span></div>
+            <div class="cp-hist">${bars}</div>
+            <div class="cp-sec">Color fit × landing probability <span style="font-weight:600;text-transform:none;letter-spacing:0;color:#9aa0a6">— team fit grade (bar color) vs how often he lands there</span></div>
+            <div class="cp-fitgrid">${chips||'<div class="placeholder">No team fits in range.</div>'}</div>`;
+        }
+      }
+    }
+    el.innerHTML = `<div class="cp-wrap"><div class="cp-pills">${pills}</div>${body}</div>`;
   }
 
   // ---------- VIEW: BOARD — expand a pick to its in-play client table ----------
@@ -1733,7 +1837,7 @@
   function stepOnce() { if (MODE==="mock" && mock.picks) { autoPickOne(); mock.nextAt=0; pushMock(); } }
   function resetMock() {
     mock.running=false; mock.picks=null; mock.nextAt=0; timer.pick=null;
-    whatIfLocks=[]; whatIfBaseline=null; projCache={}; slotEntropyData={};
+    whatIfLocks=[]; whatIfBaseline=null; whatIfBaseBoard=null; projCache={}; slotEntropyData={};
     $("btnRun").textContent="▶ Start"; $("btnRun").classList.add("primary");
     seedFromLive().then(pushMock);
   }
