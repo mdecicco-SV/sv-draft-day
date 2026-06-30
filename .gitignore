@@ -8,3 +8,5 @@ scratch/
 
 .DS_Store
 .vercel
+.env.*.local
+.sv-draft-console-pat
