@@ -473,7 +473,7 @@
     if (val === "unknown") delete MEDICALS[key]; else MEDICALS[key] = val;
     try { localStorage.setItem("dd:medicals", JSON.stringify(MEDICALS)); } catch (e) {}
     renderActive();
-    postIntel({ kind:"medical", player_name:clientName(key), note:val });   // share across the war room
+    postIntel({ kind:"medical", player_name:clientName(key), note:val }, true);   // share (best-effort)
   };
 
   // Known landing range (your intel) — HARD lock: a player can't be drafted before
@@ -496,11 +496,12 @@
     lo = parseInt(lo,10) || null; hi = parseInt(hi,10) || null;
     if (!lo && !hi) delete RANGES[key]; else RANGES[key] = { lo, hi };
     saveRanges(key);
-    postIntel({ kind:"range", player_name:clientName(key), window_lo:lo, window_hi:hi });   // share
+    // Share as a strike_window (an allowed kind rangeOf already reads) so teammates get the window.
+    postIntel({ kind:"strike_window", player_name:clientName(key), window_lo:lo, window_hi:hi }, true);
   };
   window.setRangeByRound = (key, rLo, rHi) => { const a=roundSpan(rLo), b=roundSpan(rHi); if(a&&b) window.setRange(key, a.first, b.last); };
   window.clearRange = (key) => { delete RANGES[key]; saveRanges(key);
-    postIntel({ kind:"range", player_name:clientName(key), window_lo:null, window_hi:null }); };
+    postIntel({ kind:"strike_window", player_name:clientName(key), window_lo:null, window_hi:null }, true); };
   const TEAMINTEL_URL = "https://sv-teamintel.vercel.app/teamintel.json";
   const SUFFIX = /\b(jr|sr|ii|iii|iv|v)\b/g;
   const normName = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
@@ -1214,14 +1215,14 @@
   }
   const intelFor = (key) => INTEL.byKey.get(key) || null;
 
-  async function postIntel(ev) {
+  async function postIntel(ev, silent) {
     ev.agent = ev.agent || agentName() || "console";
     try {
       const r = await fetch("/api/intel", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(ev) });
       if (!r.ok) throw new Error(await r.text());
       await loadIntel();
       return true;
-    } catch (e) { alert("Could not save intel: " + e.message); return false; }
+    } catch (e) { if (!silent) alert("Could not save intel: " + e.message); return false; }
   }
 
   // ---------- VIEW: BOARD — expand a pick to its in-play client table ----------
@@ -1788,14 +1789,14 @@
     if (_backfilled) return; _backfilled = true;
     for (const key of Object.keys(RANGES)) {
       const s = INTEL.byKey.get(key);
-      if (s && s.range !== undefined) continue;                 // already shared — leave it
+      if (s && s.window !== undefined) continue;                // already shared (as a strike window)
       const rg = RANGES[key];
-      postIntel({ kind:"range", player_name:clientName(key), window_lo:rg.lo||null, window_hi:rg.hi||null });
+      postIntel({ kind:"strike_window", player_name:clientName(key), window_lo:rg.lo||null, window_hi:rg.hi||null }, true);
     }
     for (const key of Object.keys(MEDICALS)) {
       const s = INTEL.byKey.get(key);
       if (s && s.medical !== undefined) continue;
-      postIntel({ kind:"medical", player_name:clientName(key), note:MEDICALS[key] });
+      postIntel({ kind:"medical", player_name:clientName(key), note:MEDICALS[key] }, true);
     }
   }
 
