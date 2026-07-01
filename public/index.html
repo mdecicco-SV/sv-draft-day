@@ -293,6 +293,7 @@
   /* ── Board: heat layout (left rail + heat-colored master grid) ── */
   /* player toggle as a dropdown multi-select (lives in the board toolbar) */
   .board-players { display:inline-flex; align-items:center; }
+  .board-selnames { font-size:13px; font-weight:700; color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .pdrop { position:relative; display:inline-block; }
   .pdrop-btn { font:inherit; border:1px solid var(--line); border-radius:8px; background:#fff; padding:4px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:10px; }
   .pdrop-btn:hover { border-color:var(--red); }
@@ -438,6 +439,7 @@
       <label><input type="checkbox" id="bSv" onchange="renderBoard(currentState)"> SV picks only</label>
       <span id="boardPlayers" class="board-players"></span>
       <button class="ctl" onclick="jumpCurrent()">↧ Jump to current pick</button>
+      <span id="boardSelNames" class="board-selnames"></span>
       <span class="count" id="boardCount"></span>
     </div>
     <div class="board-split">
@@ -1134,6 +1136,9 @@
           <span class="caret">▾</span></button>
         <div class="pdrop-menu" style="display:${playerMenuOpen?'block':'none'}">${big}${list}</div>
       </div>`;
+    // Selected players' last names inline in the toolbar's open space.
+    const names = clients.filter(c=>sel.has(c.key)).map(c=>(c.name||"").trim().split(/\s+/).pop());
+    const sn = $("boardSelNames"); if (sn) sn.textContent = names.join(", ");
   }
   window.togglePlayerMenu = (e) => { if(e) e.stopPropagation(); playerMenuOpen = !playerMenuOpen; renderBoardPlayers(currentState); };
   document.addEventListener("click", (e) => {
