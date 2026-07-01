@@ -67,6 +67,7 @@
   .cc .status.av { color:var(--muted); } .cc .status.dr { color:var(--good); }
   .ct { display:flex; align-items:center; gap:8px; padding:5px 0; border-top:1px solid var(--line); font-size:13px; }
   .ct .tm { font-weight:800; min-width:38px; } .ct .nx { color:var(--muted); margin-left:auto; text-align:right; font-variant-numeric:tabular-nums; }
+  .ct .ov { min-width:34px; color:var(--red); font-weight:800; font-variant-numeric:tabular-nums; }
 
   /* clock view */
   .clock-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
@@ -153,11 +154,13 @@
   }
 
   /* ── Scenario Engine: probability bars ── */
-  .proj-strip { margin:10px 0 2px; }
-  .proj-bar { position:relative; height:6px; background:#f0f1f3; border-radius:3px; }
+  .proj-head { display:flex; align-items:baseline; gap:6px; font-size:12px; font-weight:700; margin:8px 0 6px; }
+  .proj-head b { color:var(--red); }
+  .proj-head .sims { margin-left:auto; color:var(--muted); font-weight:600; font-size:11px; }
+  .proj-wait { font-size:11px; color:var(--muted); margin-top:8px; }
+  .proj-bar { position:relative; height:6px; background:#f0f1f3; border-radius:3px; margin-bottom:8px; }
   .proj-bar .pb-fill { position:absolute; height:100%; background:#e8ddf9; border-radius:3px; }
   .proj-bar .pb-med { position:absolute; width:10px; height:10px; top:-2px; background:var(--red); border-radius:50%; transform:translateX(-50%); box-shadow:0 0 0 2px #fff; }
-  .proj-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); font-weight:700; margin-top:3px; }
 
   /* ── Pick probability section on Clock ── */
   .prob-section { margin-top:12px; }
@@ -741,51 +744,73 @@
       const comp = c.comp, pk = drafted.get(c.key);
       const rkTxt = comp ? `#${comp.rank}` : "NR";
       const plTxt = comp ? `${comp.pos} · ${comp.level}` : "";
-      let status, teamsHtml = "";
+      let status, body = "";
       if (pk) {
         const f = fit(comp, pk.team, c.key, state);
         status = `<span class="status dr">DRAFTED #${pk.overall} · ${pk.team} · ${moneyCell(pk)}
                   <span class="grade" data-org="${pk.team}" style="background:${f.color}">${f.grade}</span></span>`;
-      } else {
-        // interested teams, ranked by fit
+      } else if (!comp) {
+        // Unranked — no landing projection; show logged interest compactly (intel dot + fit grade)
         const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
-          .map(t => { const rec = latestIntel(c.key, t); return { t, rec, f:fit(comp, t, c.key, state), nx:teamNextPick(state, t) }; })
+          .map(t => ({ t, rec:latestIntel(c.key,t), f:fit(comp,t,c.key,state) }))
           .sort((a,b)=> b.f.score - a.f.score).slice(0,4);
+        status = `<span class="status av">On the board · unranked</span>`;
+        body = teams.map(x => `<div class="ct"><span class="ov"></span>
+            <span class="tm">${x.t}</span>
+            <span class="idot" style="background:${COLOR_HEX[(x.rec?.color||"").toLowerCase()]||"#ccc"}"></span>
+            <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>
+            ${x.rec?.workout?'<span class="pdw">PDW</span>':""}</div>`).join("")
+          || `<div class="ct" style="color:#9aa0a6">No logged team interest yet.</div>`;
+      } else {
+        // Ranked & on the board — deterministic draft card (intel + each interested team's next
+        // pick + slot money) that's useful instantly; landing % / range bar layer in once the
+        // background sim is ready. Nothing here blocks on simulations.
         const dem = demandFor(comp);
         status = `<span class="status av">On the board${dem!=null?` · est. value ~${fmt$(dem)} (${levelClass(comp).replace("College-","Col ")} ${comp.posGroup})`:""}</span>`;
-        teamsHtml = teams.map(x => {
-          const pool = state.poolsMap[x.t];
-          const ou = (comp && x.nx) ? negBonus(comp, x.nx.slot, x.nx.overall) - x.nx.slot : null;  // floor-aware est. over/under
-          return `<div class="ct"><span class="idot" style="background:${COLOR_HEX[(x.rec?.color||"").toLowerCase()]||"#ccc"}"></span>
-            <span class="tm">${x.t}</span>${x.rec?.workout?'<span class="pdw">PDW</span>':""}
-            <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>
-            <span class="nx">${x.nx?`#${x.nx.overall} ${fmtM(x.nx.slot)}${ou!=null?` · ${fmtVsSlot(ou)}`:""}`:"no picks left"}${pool?` · ammo ${fmtM(pool.room)}`:""}</span></div>`;
-        }).join("") || `<div class="ct" style="color:#9aa0a6">No logged team interest yet.</div>`;
-      }
-      // Probability bar for undrafted clients
-      let probHtml = "";
-      if (!pk && comp) {
         const cache = projCache[c.key];
-        if (!cache) { computeProjection(c.key); }
-        else if (!cache.computing && cache.lands && cache.lands.length) {
-          const p10=pctOf(cache.lands,0.1), med=pctOf(cache.lands,0.5), p90=pctOf(cache.lands,0.9);
-          const SCALE = 90; // picks 1-90 mapped to 100% width
-          const pct = (n) => Math.min(100, Math.round((n-1)/(SCALE-1)*100));
-          const fillL = pct(p10), fillR = pct(p90), medPct = pct(med);
-          probHtml = `<div class="proj-strip">
-            <div class="proj-bar">
-              <div class="pb-fill" style="left:${fillL}%;width:${fillR-fillL}%"></div>
-              <div class="pb-med" style="left:${medPct}%"></div>
-            </div>
-            <div class="proj-labels"><span>P10 #${p10}</span><span>med #${med}</span><span>P90 #${p90}</span></div>
-          </div>`;
-        } else if (cache.computing) {
-          probHtml = `<div style="font-size:11px;color:var(--muted);margin-top:8px">Projecting…</div>`;
+        if (!cache) computeProjection(c.key);            // kick off in background; card is useful without it
+        const ready = cache && !cache.computing && cache.lands && cache.lands.length;
+        const lands = ready ? cache.lands : null;
+        const dens = ready ? (N) => lands.filter(l => Math.abs(l-N)<=2).length / lands.length : null;
+        // Interested teams (logged score>0) and the next pick each one currently holds — all deterministic
+        const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
+          .map(t => ({ t, rec:latestIntel(c.key,t), f:fit(comp,t,c.key,state), nx:teamNextPick(state,t) }))
+          .filter(x => (x.rec?.score||0) > 0);
+        // Teams with an upcoming pick first; then by landing likelihood (when known) else fit
+        teams.sort((a,b) => {
+          if (!!a.nx !== !!b.nx) return a.nx ? -1 : 1;
+          if (ready && a.nx && b.nx) return dens(b.nx.overall) - dens(a.nx.overall);
+          return b.f.score - a.f.score;
+        });
+        const top = teams.slice(0,5);
+        let head;
+        if (ready) {
+          const p10=pctOf(lands,0.1), med=pctOf(lands,0.5), p90=pctOf(lands,0.9);
+          const SCALE=90, pct=(n)=>Math.min(100,Math.max(0,Math.round((n-1)/(SCALE-1)*100)));
+          head = `<div class="proj-head">Projected landing <b>#${med}</b> · #${p10}–#${p90}<span class="sims">${lands.length} sims</span></div>
+            <div class="proj-bar"><div class="pb-fill" style="left:${pct(p10)}%;width:${pct(p90)-pct(p10)}%"></div><div class="pb-med" style="left:${pct(med)}%"></div></div>`;
+        } else {
+          head = `<div class="proj-head">Upcoming picks with interest<span class="sims">landing %…</span></div>`;
         }
+        const rows = top.length
+          ? top.map(x => {
+              const ou = x.nx ? negBonus(comp,x.nx.slot,x.nx.overall)-x.nx.slot : null;
+              const landPct = (ready && x.nx) ? Math.round(dens(x.nx.overall)*100) : null;
+              const money = x.nx ? `${fmtM(x.nx.slot)}${ou!=null?` · ${fmtVsSlot(ou)}`:""}` : "no picks left";
+              return `<div class="ct">
+                <span class="ov">${x.nx?`#${x.nx.overall}`:"—"}</span>
+                <span class="tm">${x.t}</span>
+                <span class="idot" style="background:${COLOR_HEX[(x.rec?.color||"").toLowerCase()]||"#ccc"}"></span>
+                <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>
+                ${x.rec?.workout?'<span class="pdw">PDW</span>':""}
+                <span class="nx">${landPct!=null?`lands ~${landPct}% · `:""}${money}</span></div>`;
+            }).join("")
+          : `<div class="ct" style="color:#9aa0a6">No logged team interest yet.</div>`;
+        body = head + rows;
       }
       return `<div class="cc clickable ${pk?"drafted":""}" onclick="openPlayer('${c.key.replace(/'/g,"\\'")}')">
         <div class="top"><span class="rk">${rkTxt}</span><span class="nm">${c.name}</span><span class="pl">${plTxt} ›</span></div>
-        ${status}${teamsHtml}${probHtml}</div>`;
+        ${status}${body}</div>`;
     }).join("");
   }
   // rough slot for a board rank: use the order's slot at that overall pick (approx draft stock -> $)
@@ -1762,9 +1787,10 @@
     if (s) $("yearBadge").textContent = `${s.year} MLB DRAFT`;
     if (s && s.onClock) { if (s.onClock.overall !== timer.pick) setClockForPick(s.onClock); }
     else timer.pick = null;
-    // Invalidate projection cache when a new pick comes in
+    // Re-run projections when a new pick comes in — but DON'T wipe the cache first. The prior
+    // (one-pick-stale) projection stays on screen and finalizeBoardSim swaps in the fresh run
+    // atomically, so cards never flash a blank "recomputing" gap during a live draft.
     if (s && s.madeCount !== prevMade) {
-      projCache = {}; slotEntropyData = {};
       projectAll(50);
     } else if (s && Object.keys(projCache).length === 0) {
       projectAll(50); // warm up on initial load
