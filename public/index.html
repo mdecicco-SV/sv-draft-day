@@ -42,6 +42,7 @@
   h2 { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:22px 0 8px; }
   .placeholder { color:var(--muted); font-size:13px; border:1px dashed var(--line); border-radius:10px; padding:12px; background:#fff; }
   .idot { width:12px; height:12px; border-radius:50%; border:1px solid rgba(0,0,0,.15); display:inline-block; }
+  .idot[data-intel-key] { cursor:help; }
   .pdw { font-size:10px; font-weight:800; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:1px 5px; }
   .pdw.cmb { color:#3949ab; border-color:#3949ab; margin-left:4px; }
   .grade { font-size:12px; font-weight:800; color:#fff; border-radius:6px; padding:2px 7px; }
@@ -668,6 +669,30 @@
                           .sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0];
     return COLOR_HEX[(rec?.color||"").toLowerCase()] || "#ccc";
   }
+  const _esc = (s) => (s||"").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  // The interest color dot, tagged so hovering it shows the latest teamintel message (below).
+  function intelDot(clientKey, team) {
+    return `<span class="idot" data-intel-key="${clientKey}" data-intel-team="${team}" style="background:${intelColorHex(clientKey, team)}"></span>`;
+  }
+  // Hover card for an interest dot: latest logged signal + the most recent actual message
+  // (Slack note / manual entry), with its date and source — mirrors what's in sv-teamintel.
+  function intelMsgHtml(clientKey, team) {
+    const recs = DATA.intel.filter(r => teamAlias(r.team)===team && normName(r.player)===clientKey)
+                           .sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+    if (!recs.length) return `<div class="ot-h">${team}</div><div style="color:#aaa">No intel on file.</div>`;
+    const latest = recs[0];
+    const colorRec = recs.find(r => r.color);
+    const msgRec = recs.find(r => (r.note || r.full_text)) || latest;
+    const raw = (msgRec.note || msgRec.full_text || "").trim();
+    const msg = raw.length > 400 ? raw.slice(0,400) + "…" : raw;
+    const src = msgRec.is_manual ? "manual override" : (msgRec.channel ? "#"+msgRec.channel : "Slack");
+    let h = `<div class="ot-h">${team} · latest intel</div>`;
+    h += `<div class="ot-row"><span>Date</span><b>${latest.date||"—"}</b></div>`;
+    h += `<div class="ot-row"><span>Interest</span><b>${latest.score!=null?(latest.score>0?"+":"")+latest.score:"—"}${colorRec?" · "+colorRec.color:""}</b></div>`;
+    h += `<div class="ot-row"><span>Source</span><b>${msgRec.tier_label?msgRec.tier_label+" · ":""}${src}</b></div>`;
+    if (msg) h += `<div class="ot-sec">Latest message${msgRec!==latest&&msgRec.date?` · ${msgRec.date}`:""}</div><div style="color:#ddd;white-space:pre-wrap">${_esc(msg)}</div>`;
+    return h;
+  }
   // Aggregate a team's interest in a client across the FULL intel history — recency- and
   // source-tier-weighted, with a small boost for sustained volume. Returns strength 0..1.
   // (Months of repeated, recent, director-level interest should outweigh one stale score.)
@@ -761,7 +786,7 @@
         status = `<span class="status av">On the board · unranked</span>`;
         body = teams.map(x => `<div class="ct"><span class="ov"></span>
             <span class="tm">${x.t}</span>
-            <span class="idot" style="background:${intelColorHex(c.key, x.t)}"></span>
+            ${intelDot(c.key, x.t)}
             <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>
             ${contactBadges(c.key, x.t)}</div>`).join("")
           || `<div class="ct" style="color:#9aa0a6">No logged team interest yet.</div>`;
@@ -785,7 +810,7 @@
               return `<div class="ct">
                 <span class="ov">${x.nx?`#${x.nx.overall}`:"—"}</span>
                 <span class="tm">${x.t}</span>
-                <span class="idot" style="background:${intelColorHex(c.key, x.t)}"></span>
+                ${intelDot(c.key, x.t)}
                 <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>
                 ${contactBadges(c.key, x.t)}
                 <span class="nx">${money}</span></div>`;
@@ -881,7 +906,7 @@
     const list = [...byPlayer.values()].sort((a,b)=>(b.score||0)-(a.score||0));
     $("intelList").innerHTML = list.length ? list.map(r => {
       const gone = drafted.has(normName(r.player));
-      return `<div class="row"><span class="idot" style="background:${intelColorHex(normName(r.player), team)}"></span>
+      return `<div class="row">${intelDot(normName(r.player), team)}
         <span class="nm" style="${gone?"text-decoration:line-through;color:#9aa0a6":""}">${r.player}</span>
         ${contactBadges(normName(r.player), team)}${gone?'<span style="font-size:11px;color:#9aa0a6">drafted</span>':""}
         <span class="sc">${r.score>0?"+":""}${r.score??""}</span></div>`;
@@ -1154,7 +1179,7 @@
     if (x.cap && x.cap.interest.size) for (const v of x.cap.interest.values())
       bits.push(`<span class="ib ${v.dir}">${v.dir==="sought"?"▲ sought":"▼ rec'd"}${v.strength!=null?` ${v.strength>0?"+":""}${v.strength}`:""}</span>`);
     if (x.rec && x.rec.score!=null)
-      bits.push(`<span class="ib feed"><span class="idot" style="background:${intelColorHex(key, team)}"></span>feed ${x.rec.score>0?"+":""}${x.rec.score}${cf.workout?" · PDW":""}${cf.combine?" · CMB":""}</span>`);
+      bits.push(`<span class="ib feed">${intelDot(key, team)}feed ${x.rec.score>0?"+":""}${x.rec.score}${cf.workout?" · PDW":""}${cf.combine?" · CMB":""}</span>`);
     if (x.cap && x.cap.window) bits.push(`<span class="ib win">◎ #${x.cap.window.lo||"?"}–#${x.cap.window.hi||"?"}</span>`);
     if (x.cap && x.cap.offers) for (const o of x.cap.offers.filter(o=>o.team===team))
       bits.push(`<span class="ib offer">$ ${o.type}${o.amount?" "+fmtM(o.amount):(o.lo||o.hi)?` ${fmtM(o.lo)}–${fmtM(o.hi)}`:""}</span>`);
@@ -1200,27 +1225,6 @@
       <button class="ctl" onclick="cancelArmed()">Cancel</button></div>`;
   }
 
-  function renderLandingCard(c, state) {
-    const comp = c.comp;
-    if (!comp) return `<div class="placeholder">Unranked — no interest data.</div>`;
-    const pk = state.picks.find(p => p.isDrafted && normName(p.player)===c.key);
-    if (pk) return `<div class="ct"><span class="ov" style="color:var(--good);font-weight:800;min-width:64px">DRAFTED</span> #${pk.overall} ${teamLink(pk.team)} · ${moneyCell(pk)}</div>`;
-    // Interested teams (logged score>0) and the next pick each one currently holds — deterministic
-    const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
-      .map(t => ({ t, rec:latestIntel(c.key,t), f:fit(comp,t,c.key,state), nx:teamNextPick(state,t) }))
-      .filter(x => (x.rec?.score||0) > 0)
-      .sort((a,b)=> (!!a.nx !== !!b.nx) ? (a.nx?-1:1) : (b.f.score-a.f.score));
-    if (!teams.length) return `<div class="placeholder">No logged team interest yet.</div>`;
-    return teams.map(x => {
-      const ou = x.nx ? negBonus(comp,x.nx.slot,x.nx.overall)-x.nx.slot : null;
-      return `<div class="ct">
-        <span class="ov" style="min-width:46px;color:var(--red);font-weight:800">${x.nx?`#${x.nx.overall}`:"—"}</span>
-        <span class="idot" style="background:${intelColorHex(c.key, x.t)}"></span>
-        <span class="tm">${teamLink(x.t)}</span>
-        <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>${contactBadges(c.key, x.t)}
-        <span class="nx">${x.nx?`slot ${fmtM(x.nx.slot)}${ou!=null?` · ${ouTag(ou,true)}`:""}`:"no picks left"}</span></div>`;
-    }).join("");
-  }
 
   function renderPlayerDetail(state) {
     const c = DATA.clientList.find(x => x.key===selected.id) || { name:selected.id, key:selected.id, comp:DATA.compByName.get(selected.id) };
@@ -1260,30 +1264,26 @@
       </div>
       ${rg?`<div style="margin-top:8px"><span class="outag over">🔒 Locked ${rg.lo?"#"+rg.lo:"—"}–${rg.hi?"#"+rg.hi:"—"}${rg.lo&&rg.hi?` (R${roundOfPick(rg.lo)}–R${roundOfPick(rg.hi)})`:""}</span> <span style="color:#9aa0a6;font-size:12px">engine + mocks obey this</span></div>`:`<div style="margin-top:6px;color:#9aa0a6;font-size:12px">No range set — projection uses the engine's own estimate.</div>`}</div>`;
 
+    // One consolidated view: every org with logged intel, in draft order of their next pick,
+    // showing how they view him (interest color + fit grade) and the money — negatives included.
     const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
-      .map(t => { const rec=latestIntel(c.key,t); return { t, rec, f:fit(comp,t,c.key,state), nx:teamNextPick(state,t) }; })
-      .sort((a,b)=>b.f.score-a.f.score);
+      .map(t => ({ t, rec:latestIntel(c.key,t), f:fit(comp,t,c.key,state), nx:teamNextPick(state,t) }))
+      .sort((a,b) => (!!a.nx !== !!b.nx) ? (a.nx?-1:1) : (a.nx ? a.nx.overall-b.nx.overall : b.f.score-a.f.score));
 
-    h += `<div class="panel" style="margin-top:14px"><h3>Interested teams (${teams.length})</h3>`;
+    h += `<div class="panel" style="margin-top:14px"><h3>Upcoming picks — how each org views him
+      <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9aa0a6">· sorted by their next pick · dot = interest, grade = fit</span></h3>`;
     h += teams.length ? teams.map(x => {
       const pool = state.poolsMap[x.t];
       const ou = (comp && x.nx) ? negBonus(comp, x.nx.slot, x.nx.overall) - x.nx.slot : null;
-      return `<div class="ct"><span class="idot" style="background:${intelColorHex(c.key, x.t)}"></span>
+      return `<div class="ct">
+        <span class="ov" style="min-width:44px;color:var(--red);font-weight:800">${x.nx?`#${x.nx.overall}`:"—"}</span>
+        ${intelDot(c.key, x.t)}
         <span class="tm">${teamLink(x.t)}</span>
         <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>${contactBadges(c.key, x.t)}
-        <span class="nx">${x.nx?`next #${x.nx.overall} ${fmtM(x.nx.slot)}`:"no picks left"}${ou!=null?" · "+ouTag(ou,true):""}${pool?` · ammo ${fmtM(pool.room)}`:""}</span></div>`;
+        <span class="nx">${x.nx?`${fmtM(x.nx.slot)}${ou!=null?` · ${ouTag(ou,true)}`:""}${pool?` · ammo ${fmtM(pool.room)}`:""}`:"no picks left"}</span></div>`;
     }).join("") : `<div class="placeholder">No logged team interest.</div>`;
     h += `</div>`;
 
-    const windows = teams.filter(x=>x.nx).sort((a,b)=>a.nx.overall-b.nx.overall).slice(0,8);
-    h += `<div class="panel" style="margin-top:14px"><h3>Upcoming windows — when he could come off</h3>`;
-    h += windows.length ? windows.map(x =>
-      `<div class="ct"><span class="ov" style="min-width:46px;color:var(--red);font-weight:800">#${x.nx.overall}</span>
-       <span class="tm">${teamLink(x.t)}</span><span class="nx">slot ${fmtM(x.nx.slot)} · fit ${x.f.grade}</span></div>`).join("")
-      : `<div class="placeholder">No interested teams with upcoming picks.</div>`;
-    h += `</div>`;
-
-    h += `<div class="panel" style="margin-top:14px"><h3>Interested teams &amp; upcoming picks</h3>${renderLandingCard(c, state)}</div>`;
     $("detailBody").innerHTML = h;
   }
 
@@ -1314,7 +1314,7 @@
     h += `<div class="panel"><h3>Our clients they like (${clients.length})</h3>`;
     h += clients.length ? clients.map(x => {
       const nx=teamNextPick(state,t); const ou=(x.c.comp&&nx)?negBonus(x.c.comp,nx.slot,nx.overall)-nx.slot:null;
-      return `<div class="ct"><span class="idot" style="background:${intelColorHex(x.c.key, t)}"></span>
+      return `<div class="ct">${intelDot(x.c.key, t)}
         <span class="nm">${playerLink(x.c.name)}</span>
         <span class="grade" data-org="${t}" style="background:${x.f.color}">${x.f.grade}</span>${contactBadges(x.c.key, t)}
         <span class="nx">${x.dr?`drafted #${x.dr.overall}`:(ou!=null?ouTag(ou,true):"")}</span></div>`;
@@ -1603,9 +1603,11 @@
   function initOrgTooltip() {
     const tip = document.getElementById("orgTip");
     document.addEventListener("mouseover", (e) => {
-      const el = e.target.closest && e.target.closest("[data-org]");
-      if (!el) return;
-      tip.innerHTML = orgTipHtml(el.getAttribute("data-org"));
+      const org = e.target.closest && e.target.closest("[data-org]");
+      const dot = e.target.closest && e.target.closest("[data-intel-key]");
+      if (org) tip.innerHTML = orgTipHtml(org.getAttribute("data-org"));
+      else if (dot) tip.innerHTML = intelMsgHtml(dot.getAttribute("data-intel-key"), dot.getAttribute("data-intel-team"));
+      else return;
       tip.style.display = "block";
     });
     document.addEventListener("mousemove", (e) => {
@@ -1616,7 +1618,7 @@
       tip.style.left = Math.max(6,x) + "px"; tip.style.top = Math.max(6,y) + "px";
     });
     document.addEventListener("mouseout", (e) => {
-      if (e.target.closest && e.target.closest("[data-org]")) tip.style.display = "none";
+      if (e.target.closest && (e.target.closest("[data-org]") || e.target.closest("[data-intel-key]"))) tip.style.display = "none";
     });
   }
 
