@@ -550,8 +550,17 @@
       c.forEach(p => { p._key = normName(p.name); });   // cache normalized key (hot in sims)
       DATA.compByName = new Map(c.map(p => [p._key, p]));
     } catch (e) {}
+    await loadTeamIntel();
+  }
+  // Pull the shared teamintel feed (colors + scores). Polled on an interval so a mid-draft
+  // update in sv-teamintel shows up live; only re-renders when the feed actually changed.
+  let _tiRaw = "";
+  async function loadTeamIntel(rerender) {
     try {
-      const ti = await fetch(TEAMINTEL_URL, { cache:"no-store" }).then(r=>r.json());
+      const txt = await fetch(TEAMINTEL_URL, { cache:"no-store" }).then(r=>r.text());
+      if (txt === _tiRaw) return false;                 // unchanged — skip rebuild + re-render
+      _tiRaw = txt;
+      const ti = JSON.parse(txt);
       DATA.intel = Array.isArray(ti) ? ti : (ti.records || []);
       DATA.clients = new Set(DATA.intel.map(r => normName(r.player)));
       // distinct clients, attach composite entry
@@ -559,7 +568,9 @@
       DATA.clientList = names.map(name => ({ name, key:normName(name), comp:DATA.compByName.get(normName(name)) || null }))
         .sort((a,b) => (a.comp?.rank || 9999) - (b.comp?.rank || 9999));
       _tiCache.clear();   // recompute interest aggregates against fresh feed
-    } catch (e) {}
+      if (rerender) renderActive();
+      return true;
+    } catch (e) { return false; }
   }
   async function loadOrder() {
     if (ORDER) return ORDER;
@@ -1655,6 +1666,7 @@
     pollLive();
     setInterval(pollLive, 3000);
     setInterval(loadIntel, 12000);            // refresh shared intel so the war room stays in sync
+    setInterval(() => loadTeamIntel(true), 15000);   // re-pull teamintel colors/scores live
     setInterval(tick, 250);
   })();
 </script>
