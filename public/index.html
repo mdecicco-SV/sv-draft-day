@@ -447,10 +447,13 @@
   let MEDICALS = {};            // normName -> "yes" | "no"  (absent = unknown)
   try { MEDICALS = JSON.parse(localStorage.getItem("dd:medicals") || "{}"); } catch (e) {}
   const medicalOf = (comp) => comp ? (MEDICALS[normName(comp.name)] || "unknown") : "unknown";
+  // display name for a normalized key — needed to log medical/range to the shared intel store
+  const clientName = (key) => DATA.compByName.get(key)?.name || DATA.clientList.find(c=>c.key===key)?.name || key;
   window.setMedical = (key, val) => {
     if (val === "unknown") delete MEDICALS[key]; else MEDICALS[key] = val;
     try { localStorage.setItem("dd:medicals", JSON.stringify(MEDICALS)); } catch (e) {}
     renderActive();
+    postIntel({ kind:"medical", player_name:clientName(key), note:val });   // share across the war room
   };
 
   // Known landing range (your intel) — HARD lock: a player can't be drafted before
@@ -473,9 +476,11 @@
     lo = parseInt(lo,10) || null; hi = parseInt(hi,10) || null;
     if (!lo && !hi) delete RANGES[key]; else RANGES[key] = { lo, hi };
     saveRanges(key);
+    postIntel({ kind:"range", player_name:clientName(key), window_lo:lo, window_hi:hi });   // share
   };
   window.setRangeByRound = (key, rLo, rHi) => { const a=roundSpan(rLo), b=roundSpan(rHi); if(a&&b) window.setRange(key, a.first, b.last); };
-  window.clearRange = (key) => { delete RANGES[key]; saveRanges(key); };
+  window.clearRange = (key) => { delete RANGES[key]; saveRanges(key);
+    postIntel({ kind:"range", player_name:clientName(key), window_lo:null, window_hi:null }); };
   const TEAMINTEL_URL = "https://sv-teamintel.vercel.app/teamintel.json";
   const SUFFIX = /\b(jr|sr|ii|iii|iv|v)\b/g;
   const normName = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
@@ -1119,9 +1124,20 @@
         if (!s.window) s.window = { lo: ev.window_lo, hi: ev.window_hi, date: ev.created_at };
       } else if (ev.kind==="offer") {
         s.offers.push({ team, type: ev.offer_type, amount: ev.amount, lo: ev.amount_lo, hi: ev.amount_hi, pick: ev.pick_overall, status: ev.status, date: ev.created_at });
+      } else if (ev.kind==="medical") {                 // newest-first, so first seen wins
+        if (s.medical===undefined) s.medical = ev.note || "unknown";
+      } else if (ev.kind==="range") {
+        if (s.range===undefined) s.range = (ev.window_lo || ev.window_hi) ? { lo: ev.window_lo, hi: ev.window_hi } : null;
       }
     }
     INTEL.byKey = byKey;
+    // Overlay shared settings onto local caches so medical/range sync across the war room.
+    // (shared wins; local-only values not present in the feed are left intact)
+    for (const [key, s] of byKey) {
+      if (s.medical!==undefined) { if (s.medical && s.medical!=="unknown") MEDICALS[key]=s.medical; else delete MEDICALS[key]; }
+      if (s.range!==undefined) { if (s.range) RANGES[key]=s.range; else delete RANGES[key]; }
+    }
+    try { localStorage.setItem("dd:medicals", JSON.stringify(MEDICALS)); localStorage.setItem("dd:ranges", JSON.stringify(RANGES)); } catch (e) {}
   }
   const intelFor = (key) => INTEL.byKey.get(key) || null;
 

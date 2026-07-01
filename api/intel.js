@@ -10,7 +10,9 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TABLE = "draft_intel_events";
-const KINDS = ["interest_sought", "interest_received", "rule_out", "strike_window", "offer"];
+// medical (note = "yes"|"no"|"unknown") and range (window_lo/window_hi) are player-scoped
+// settings shared across the war room; latest event per player wins.
+const KINDS = ["interest_sought", "interest_received", "rule_out", "strike_window", "offer", "medical", "range"];
 
 function rest(path, opts = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
