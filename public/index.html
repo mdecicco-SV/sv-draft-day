@@ -48,6 +48,18 @@
   td.sr-col, th.sr-col { text-align:center; font-variant-numeric:tabular-nums; }
   td.sr-col { font-weight:700; color:#374151; }
   .ct .nx .mlab { font-size:10px; text-transform:uppercase; letter-spacing:.3px; opacity:.6; font-weight:800; }
+  /* ESPN-style pick ticker — bottom, slides up on each new pick (live + mock), any page */
+  #ticker { position:fixed; left:0; right:0; bottom:0; z-index:80; transform:translateY(115%); transition:transform .38s cubic-bezier(.2,.7,.3,1); pointer-events:none; }
+  #ticker.show { transform:translateY(0); }
+  #ticker .tk-inner { margin:0 auto; max-width:920px; display:flex; align-items:center; gap:13px; background:#141414; color:#fff; border-top:3px solid var(--red); border-radius:12px 12px 0 0; padding:12px 20px; box-shadow:0 -8px 26px rgba(0,0,0,.28); font-size:16px; }
+  #ticker .tk-inner.sv { border-top-color:#1a7f37; }
+  #ticker .tk-badge { background:var(--red); color:#fff; font-weight:900; font-size:12px; letter-spacing:.5px; padding:4px 9px; border-radius:6px; font-variant-numeric:tabular-nums; }
+  #ticker .tk-inner.sv .tk-badge { background:#1a7f37; }
+  #ticker .tk-team { font-weight:900; font-size:20px; }
+  #ticker .tk-sel { color:#9aa0a6; font-size:12px; text-transform:uppercase; letter-spacing:.6px; }
+  #ticker .tk-player { font-weight:800; }
+  #ticker .tk-meta { color:#aaa; font-size:13px; }
+  #ticker .tk-sv { margin-left:auto; background:#1a7f37; color:#fff; font-weight:900; font-size:11px; letter-spacing:.5px; padding:3px 8px; border-radius:5px; }
   .grade { font-size:12px; font-weight:800; color:#fff; border-radius:6px; padding:2px 7px; }
   .grade[data-org] { cursor:help; }
   #orgTip { position:fixed; z-index:60; max-width:270px; background:#141414; color:#fff; border-radius:10px;
@@ -401,6 +413,7 @@
 </main>
 
 <div id="orgTip"></div>
+<div id="ticker"></div>
 
 <script>
   const $ = (id) => document.getElementById(id);
@@ -1421,7 +1434,38 @@
     if (s) $("yearBadge").textContent = `${s.year} MLB DRAFT`;
     if (s && s.onClock) { if (s.onClock.overall !== timer.pick) setClockForPick(s.onClock); }
     else timer.pick = null;
+    if (s) detectNewPicks(s);
     renderActive();
+  }
+  // Fire the ESPN-style ticker for any pick newly drafted since the last update (live or mock).
+  // First state after load/mode-switch seeds silently so we don't replay the whole board.
+  let announcedPicks = null;
+  function detectNewPicks(s) {
+    const drafted = s.picks.filter(p => p.isDrafted && p.player);
+    if (announcedPicks === null) { announcedPicks = new Set(drafted.map(p => p.overall)); return; }
+    drafted.filter(p => !announcedPicks.has(p.overall))
+      .sort((a,b) => a.overall - b.overall)
+      .forEach(p => { announcedPicks.add(p.overall); enqueueTicker(p); });
+  }
+  let tickerQueue = [], tickerShowing = false;
+  function enqueueTicker(pick) { tickerQueue.push(pick); if (!tickerShowing) nextTicker(); }
+  function nextTicker() {
+    const el = $("ticker"); if (!el) return;
+    if (!tickerQueue.length) { tickerShowing = false; el.classList.remove("show"); return; }
+    tickerShowing = true;
+    const p = tickerQueue.shift();
+    const key = normName(p.player||""), ours = DATA.clients.has(key), comp = DATA.compByName.get(key);
+    const meta = comp ? `${comp.pos} · ${levelClass(comp).replace("College-","Col ")}` : (p.pos||"");
+    el.innerHTML = `<div class="tk-inner ${ours?"sv":""}">
+      <span class="tk-badge">PICK #${p.overall}</span>
+      <span class="tk-team">${p.team||""}</span>
+      <span class="tk-sel">selects</span>
+      <span class="tk-player">${p.player||"—"}</span>
+      ${meta?`<span class="tk-meta">${meta}</span>`:""}
+      ${ours?'<span class="tk-sv">SV CLIENT</span>':""}</div>`;
+    el.classList.add("show");
+    const hold = tickerQueue.length > 4 ? 800 : 4500;   // drain bursts (mock turbo) fast
+    setTimeout(() => { el.classList.remove("show"); setTimeout(nextTicker, 420); }, hold);
   }
   const VIEWS = [["tabClients","viewClients","clients"],["tabBoard","viewBoard","board"],["tabClock","viewClock","clock"],
                  ["tabPools","viewPools","pools"],["tabBest","viewBest","best"]];
@@ -1576,6 +1620,7 @@
   function stepOnce() { if (MODE==="mock" && mock.picks) { autoPickOne(); mock.nextAt=0; pushMock(); } }
   function resetMock() {
     mock.running=false; mock.picks=null; mock.nextAt=0; timer.pick=null;
+    announcedPicks = null; tickerQueue = [];   // re-seed the ticker silently on the fresh board
     $("btnRun").textContent="▶ Start"; $("btnRun").classList.add("primary");
     seedFromLive().then(pushMock);
   }
@@ -1629,6 +1674,7 @@
     $("mLive").classList.toggle("on", m==="live"); $("mMock").classList.toggle("on", m==="mock");
     $("mockBar").classList.toggle("hidden", m!=="mock");
     $("conn").className = m==="mock" ? "dot" : "dot live";
+    announcedPicks = null; tickerQueue = [];   // don't replay the board when switching modes
     if (m==="mock") {
       await seedFromLive(); pushMock();
     } else { pollLive(); }
