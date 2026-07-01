@@ -102,6 +102,15 @@ def pos_group(pos):
     return "Other"
 
 
+def _src_rank(v):
+    """A per-source rank -> int, or None if the source didn't rank the player."""
+    try:
+        n = int(float(v))
+        return n if n > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
 def build_composite():
     rows = []
     with open(COMPOSITE, newline="", encoding="utf-8-sig") as f:
@@ -124,6 +133,11 @@ def build_composite():
                 "school": school,
                 "age": age,
                 "sources": int(float(r.get("Num_Sources") or 0)),
+                # per-source board ranks (null = not ranked by that source)
+                "ba": _src_rank(r.get("BA_Rank")),
+                "mlb": _src_rank(r.get("MLB_Rank")),
+                "overslot": _src_rank(r.get("OverSlot_Rank")),
+                "espn": _src_rank(r.get("ESPN_Rank")),
             })
     rows.sort(key=lambda x: x["rank"])
     return rows

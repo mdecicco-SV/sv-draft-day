@@ -45,6 +45,9 @@
   .idot[data-intel-key] { cursor:help; }
   .pdw { font-size:10px; font-weight:800; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:1px 5px; }
   .pdw.cmb { color:#3949ab; border-color:#3949ab; margin-left:4px; }
+  .src-ranks { white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .src-ranks .sr { display:inline-block; margin-right:11px; font-weight:700; font-size:12px; }
+  .src-ranks .sr .sr-l { color:#9aa0a6; font-weight:800; font-size:10px; letter-spacing:.3px; }
   .grade { font-size:12px; font-weight:800; color:#fff; border-radius:6px; padding:2px 7px; }
   .grade[data-org] { cursor:help; }
   #orgTip { position:fixed; z-index:60; max-width:270px; background:#141414; color:#fff; border-radius:10px;
@@ -391,7 +394,7 @@
       <span class="count" id="baCount"></span>
     </div>
     <table class="ba">
-      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Age</th></tr></thead>
+      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Age</th><th>Board ranks</th></tr></thead>
       <tbody id="baBody"></tbody>
     </table>
   </section>
@@ -953,6 +956,9 @@
   }
 
   // ---------- VIEW: BEST AVAILABLE ----------
+  // Per-source board ranks (BA / MLB / OverSlot / ESPN); "—" where a source didn't rank him.
+  const srcRankCell = (p) => [["BA",p.ba],["MLB",p.mlb],["OS",p.overslot],["ESPN",p.espn]]
+    .map(([l,v]) => `<span class="sr"><span class="sr-l">${l}</span> ${v!=null?"#"+v:"—"}</span>`).join("");
   function renderBest() {
     if (!currentState) return;
     const drafted = new Set(currentState.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
@@ -972,8 +978,9 @@
       return `<tr class="${ours?"sv":""} ${clickable?"draftable":""}" ${clickable?`onclick="draftManual('${p.name.replace(/'/g,"\\'")}')"`:""}>
         <td class="rk">#${p.rank}</td><td>${p.name} ${ours?'<span class="svtag">SV</span>':""}</td>
         <td>${p.pos}</td><td><span class="lvl ${p.level}">${p.level}</span></td>
-        <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${fmtAge(p.age)}</td></tr>`;
-    }).join("") || `<tr><td colspan="6" style="color:#9aa0a6;padding:14px">No players match these filters.</td></tr>`;
+        <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${fmtAge(p.age)}</td>
+        <td class="src-ranks">${srcRankCell(p)}</td></tr>`;
+    }).join("") || `<tr><td colspan="7" style="color:#9aa0a6;padding:14px">No players match these filters.</td></tr>`;
   }
 
   // ---------- VIEW: BOARD (running log + card grid) ----------
