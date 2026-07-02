@@ -307,6 +307,12 @@
   .tc-nav-btn:disabled { opacity:.25; cursor:default; }
   .tc-nav-lbl { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); white-space:nowrap; }
   .tc-nav-lbl .sep { color:var(--muted); margin:0 3px; }
+  .tc-nav-num { font:inherit; letter-spacing:inherit; border:none; background:none; cursor:pointer; color:var(--ink); padding:0 1px; text-decoration:underline dotted; text-underline-offset:3px; }
+  .tc-nav-num:hover, .tc-nav-num.open { color:var(--red); }
+  .tc-nav-num .nvc { font-size:8px; color:var(--muted); margin-left:2px; vertical-align:1px; }
+  .tc-nav-menu { top:calc(100% + 8px); left:50%; transform:translateX(-50%); z-index:95; min-width:250px; max-height:320px; white-space:nowrap; }
+  .tc-nav-menu .pdrop-item { font-size:12px; }
+  .tc-nav-menu .pi-rk { padding-left:18px; }
   .tc-top .tc-ttl { font-size:15px; font-weight:900; letter-spacing:.3px; text-transform:uppercase; color:var(--ink); }
   .tc-top .tc-abbr { font-weight:900; background:var(--ink); color:#fff; border-radius:7px; padding:3px 8px; font-size:12px; letter-spacing:.5px; }
   .tlogo { vertical-align:middle; object-fit:contain; }
@@ -352,6 +358,8 @@
   .tc-kv:first-of-type { border-top:none; }
   .tc-kv .k { font-size:12px; color:var(--muted); font-weight:700; }
   .tc-kv .v { font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .tc-kv .v.hg-line { font-size:12px; white-space:nowrap; }
+  .hg-sep { color:var(--muted); font-weight:400; margin:0 5px; }
   .tc-upc { width:100%; border-collapse:collapse; margin-top:4px; }
   .tc-upc th { text-align:left; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); padding:4px 6px; }
   .tc-upc td { font-size:13px; font-weight:700; padding:5px 6px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
@@ -825,6 +833,7 @@
   let cardPick = null;         // overall # of the pick whose team-card modal is open, or null
   let evalPlayer = null;       // client key currently being evaluated inside the team card, or null
   let tcMenuOpen = false;      // team-card player dropdown open state (survives card re-renders)
+  let tcNavMenu = null;        // header round/pick dropdown: null | 'round' | 'pick'
   let tcRangeMode = "profile"; // Q4 comps: 'profile' (same level×pos) or 'all' (everyone in the range)
   // TV mode: per-device (localStorage). The wall TV turns it on once; laptops stay interactive.
   // TV ON = bigger board type + team card suppressed unless the "card" sub-toggle is enabled.
@@ -892,12 +901,17 @@
 
   async function loadStatic() {
     try {
-      const [c, o, lev] = await Promise.all([
+      const [c, o, lev, hg] = await Promise.all([
         fetch("/data/composite.json").then(r=>r.json()),
         fetch("/data/orgs.json").then(r=>r.json()),
         fetch("/data/leverage.json").then(r=>r.json()).catch(()=>null),
+        fetch("/data/homegrown.json").then(r=>r.json()).catch(()=>null),
       ]);
       DATA.composite = c; DATA.orgs = o; DATA.leverage = lev;
+      // homegrown-by-level (baked from MLB StatsAPI, keyed by team id) → org records
+      if (hg) for (const [ab, id] of Object.entries(ABBR_TO_ID)) {
+        if (o[ab] && hg[String(id)]) o[ab].hgLevels = hg[String(id)];
+      }
       c.forEach(p => { p._key = normName(p.name); });   // cache normalized key (hot in sims)
       DATA.compByName = new Map(c.map(p => [p._key, p]));
     } catch (e) {}
@@ -1840,7 +1854,7 @@
     if (TV && !tvShowCard) return;   // TV screens stay a passive market map by default
     const st = currentState; if (!st) return;
     const pk = pickByOverall(st, ov); if (!pk || pk.isDrafted) return;
-    cardPick = ov; armed = null; tcMenuOpen = false; tcRangeMode = "profile";
+    cardPick = ov; armed = null; tcMenuOpen = false; tcNavMenu = null; tcRangeMode = "profile";
     evalPlayer = null;   // open in team-profile mode; user picks a player to go player-specific
     loadSlotHistory();   // lazy-load historical signings for Q4 (no-op once cached)
     renderTeamCard(st);
@@ -1848,26 +1862,45 @@
     document.body.style.overflow = "hidden";
   };
   window.closeTeamCard = () => {
-    cardPick = null; evalPlayer = null; armed = null; tcMenuOpen = false;
+    cardPick = null; evalPlayer = null; armed = null; tcMenuOpen = false; tcNavMenu = null;
     const bd = $("teamCard"); if (bd) { bd.classList.remove("on"); bd.innerHTML = ""; }
     document.body.style.overflow = "";
   };
   window.closeExpand = () => window.closeTeamCard();   // legacy alias
-  // Step the open card to the adjacent undrafted pick (drafted picks can't render here)
+  // Retarget the open card to another undrafted pick (drafted picks can't render here).
+  // evalPlayer intentionally survives so a selected player stays under evaluation while
+  // stepping across picks (renderTeamCard drops it only if he's off the new roster).
+  function goCardPick(ov, keepNavMenu) {
+    const st = currentState; if (!st) return;
+    const pk = pickByOverall(st, ov); if (!pk || pk.isDrafted) return;
+    cardPick = ov; armed = null; tcMenuOpen = false; tcRangeMode = "profile";
+    tcNavMenu = keepNavMenu || null;
+    renderTeamCard(st);
+    const bd = $("teamCard"); if (bd) bd.scrollTop = 0;
+  }
+  // Step to the adjacent undrafted pick
   window.navCardPick = (dir) => {
     const st = currentState; if (!st || cardPick==null) return;
     const up = st.picks.filter(p=>!p.isDrafted).sort((a,b)=>a.overall-b.overall);
     const i = up.findIndex(p=>p.overall===cardPick);
     const tgt = i<0 ? null : up[i+dir];
-    if (!tgt) return;
-    cardPick = tgt.overall; evalPlayer = null; armed = null; tcMenuOpen = false; tcRangeMode = "profile";
-    renderTeamCard(st);
-    const bd = $("teamCard"); if (bd) bd.scrollTop = 0;
+    if (tgt) goCardPick(tgt.overall);
   };
+  window.toggleTcNavMenu = (which, e) => { if (e) e.stopPropagation(); tcNavMenu = tcNavMenu===which?null:which; renderTeamCard(currentState); };
+  // Round jump lands on the round's first available pick and opens the pick list
+  // so the selecting team can be chosen in the same motion.
+  window.tcNavGoRound = (r, e) => {
+    if (e) e.stopPropagation();
+    const st = currentState; if (!st) return;
+    const tgt = st.picks.filter(p=>!p.isDrafted && String(p.round)===String(r)).sort((a,b)=>a.overall-b.overall)[0];
+    if (tgt) goCardPick(tgt.overall, "pick");
+  };
+  window.tcNavGoPick = (ov, e) => { if (e) e.stopPropagation(); goCardPick(ov); };
   window.selectEval = (key, e) => { if (e) e.stopPropagation(); evalPlayer = key || null; armed = null; tcMenuOpen = false; tcRangeMode = "profile"; renderTeamCard(currentState); };
   window.toggleTcMenu = (e) => { if (e) e.stopPropagation(); tcMenuOpen = !tcMenuOpen; renderTeamCard(currentState); };
   document.addEventListener("click", (e) => {
     if (tcMenuOpen && cardPick!=null && !(e.target.closest && e.target.closest(".tc-pdrop"))) { tcMenuOpen = false; renderTeamCard(currentState); }
+    if (tcNavMenu && cardPick!=null && !(e.target.closest && e.target.closest(".tc-nav"))) { tcNavMenu = null; renderTeamCard(currentState); }
   });
   window.armAction = (key, name, kind) => { armed = { key, name, kind }; cardPick!=null ? renderTeamCard(currentState) : renderBoard(currentState); };
   window.cancelArmed = () => { armed = null; cardPick!=null ? renderTeamCard(currentState) : renderBoard(currentState); };
@@ -1975,6 +2008,22 @@
     const navPicks = state.picks.filter(p=>!p.isDrafted);
     const navIdx = navPicks.findIndex(p=>p.overall===pk.overall);
     const hasPrev = navIdx > 0, hasNext = navIdx >= 0 && navIdx < navPicks.length-1;
+    // Dropdowns off the round / pick numbers: round jumps rounds, pick lists that
+    // round's remaining picks with the selecting team.
+    const navRounds = [...new Set(navPicks.map(p=>String(p.round)))];
+    let navMenu = "";
+    if (tcNavMenu === "round") {
+      navMenu = `<div class="pdrop-menu tc-nav-menu">${navRounds.map(r=>{
+        const n = navPicks.filter(p=>String(p.round)===r).length;
+        return `<div class="pdrop-item ${r===String(pk.round)?'on':''}" onclick="tcNavGoRound('${r}',event)">
+          <span class="pi-nm">Round ${r}</span><span class="pi-rk">${n} pick${n===1?"":"s"} left</span></div>`;
+      }).join("")}</div>`;
+    } else if (tcNavMenu === "pick") {
+      navMenu = `<div class="pdrop-menu tc-nav-menu">${navPicks.filter(p=>String(p.round)===String(pk.round)).map(p=>
+        `<div class="pdrop-item ${p.overall===pk.overall?'on':''}" onclick="tcNavGoPick(${p.overall},event)">
+          ${teamLogo(p.team,16)}<span class="pi-nm">Pick ${p.roundPick} · ${p.team}</span><span class="pi-rk">${p.teamName||""}</span></div>`
+      ).join("")}</div>`;
+    }
 
     let h = `<div class="tc-card">`;
     h += `<div class="tc-top">
@@ -1984,8 +2033,9 @@
       ${onClockHere?`<span class="tc-live">● On the clock</span>`:`<span class="tc-round">Round ${pk.round}</span>`}
       <div class="tc-nav">
         <button class="tc-nav-btn" onclick="navCardPick(-1)" ${hasPrev?"":"disabled"} title="Previous pick">‹</button>
-        <span class="tc-nav-lbl">Round ${pk.round}<span class="sep">·</span>Pick ${pk.roundPick}</span>
+        <span class="tc-nav-lbl">Round <button class="tc-nav-num ${tcNavMenu==='round'?'open':''}" onclick="toggleTcNavMenu('round',event)">${pk.round}<span class="nvc">▾</span></button><span class="sep">·</span>Pick <button class="tc-nav-num ${tcNavMenu==='pick'?'open':''}" onclick="toggleTcNavMenu('pick',event)">${pk.roundPick}<span class="nvc">▾</span></button></span>
         <button class="tc-nav-btn" onclick="navCardPick(1)" ${hasNext?"":"disabled"} title="Next pick">›</button>
+        ${navMenu}
       </div>
       <button class="tc-x" onclick="closeTeamCard()">✕</button></div>`;
 
@@ -2167,13 +2217,20 @@
     return h + `</tbody></table></div>`;
   }
 
-  // Q3 Historical Team Habits — org rank/homegrown/tendencies + bonus posture + recent 1st-rounders;
+  // Q3 Historical Team Habits — homegrown-by-level/tendencies + bonus posture + recent 1st-rounders;
   // profile-aware + projected signing $ for the selected player.
   function renderTcHabits(state, team, pk, pool, o, sel) {
     let h = `<div class="tc-panel"><h4><span class="n">3</span> Historical Team Habits</h4>`;
     if (!o || o.orgRank==null) return h + `<div class="placeholder">No org profile for ${team}.</div></div>`;
     const dev = o.dev || {}, spread = spreadOf(team);
-    h += `<div class="tc-kv"><span class="k">Org dev rank · homegrown</span><span class="v">#${o.orgRank} / 30 · ${o.homegrown!=null?o.homegrown:"—"} in system</span></div>`;
+    // homegrown = drafted by this org & still in system, split by current level (MLB StatsAPI bake)
+    const hg = o.hgLevels;
+    const hgVal = hg
+      ? [["MLB",hg.MLB],["AAA",hg.AAA],["AA",hg.AA],["A+",hg["A+"]],["A",hg.A],["RK",hg.RK]]
+          .filter(([,n])=>n>0).map(([l,n])=>`${n} ${l}`).join('<span class="hg-sep">|</span>')
+        + `<span class="hg-sep">|</span><b>${hg.total} in Org</b>`
+      : (o.homegrown!=null ? `${o.homegrown} in system` : "—");
+    h += `<div class="tc-kv"><span class="k">Homegrown</span><span class="v hg-line">${hgVal}</span></div>`;
     h += `<div class="tc-kv"><span class="k">Early-pick pitchers</span><span class="v">${o.earlyPitcherPct!=null?o.earlyPitcherPct+"%":"—"}</span></div>`;
     h += `<div class="tc-kv"><span class="k">HS / College mix</span><span class="v">${o.hsPct!=null?o.hsPct:"—"}% / ${o.collegePct!=null?o.collegePct:"—"}%</span></div>`;
     h += `<div class="tc-kv"><span class="k">MLB-debut rate (dev)</span><span class="v">${dev.mlbDebut!=null?Math.round(dev.mlbDebut*100)+"%":"—"}</span></div>`;
