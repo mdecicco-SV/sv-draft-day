@@ -209,7 +209,7 @@
   .bcard.ent-hot { border-color:#e8820e; background:#fffaf5; }
   .bcard.ent-chalk { border-color:#1a7f37; background:#f5fff7; }
   .bcard .bc-no { font-size:10px; font-weight:700; color:var(--muted); }
-  .bcard .bc-team { font-weight:900; font-size:14px; line-height:1.1; }
+  .bcard .bc-team { font-weight:900; font-size:14px; line-height:1.1; display:flex; align-items:center; gap:4px; }
   .bcard .bc-slot { font-size:10px; color:var(--muted); }
   .bcard .bc-player { font-weight:700; font-size:11px; flex:1; margin-top:3px; line-height:1.3; }
   .bcard .bc-ti { display:flex; flex-wrap:wrap; gap:2px; margin-top:auto; padding-top:3px; }
@@ -291,6 +291,127 @@
   .pub-chip { font-size:12px; font-weight:600; background:#f1f3f5; border-radius:999px; padding:3px 10px; color:#374151; }
   .pub-chip .pub-rk { color:var(--muted); font-weight:700; }
 
+  /* ── Board team-card modal ── */
+  .tc-backdrop { display:none; position:fixed; inset:0; z-index:90; background:rgba(0,0,0,.42); padding:24px; overflow-y:auto; }
+  .tc-backdrop.on { display:flex; align-items:flex-start; justify-content:center; }
+  .tc-card { background:var(--card); border-radius:16px; width:100%; max-width:1180px; margin:auto; box-shadow:0 24px 70px rgba(0,0,0,.3); display:flex; flex-direction:column; overflow:hidden; }
+  .tc-top { display:flex; align-items:center; gap:12px; padding:16px 22px; border-bottom:1px solid var(--line); }
+  .tc-top .tc-ttl { font-size:15px; font-weight:900; letter-spacing:.3px; text-transform:uppercase; color:var(--ink); }
+  .tc-top .tc-abbr { font-weight:900; background:var(--ink); color:#fff; border-radius:7px; padding:3px 8px; font-size:12px; letter-spacing:.5px; }
+  .tlogo { vertical-align:middle; object-fit:contain; }
+  .tc-top .tlogo { margin-right:2px; }
+  .detail-head .tlogo { align-self:center; }
+  .tc-top .tc-live { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--red); }
+  .tc-top .tc-round { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
+  .tc-x { margin-left:auto; border:none; background:none; font-size:22px; line-height:1; cursor:pointer; color:var(--muted); padding:2px 6px; }
+  .tc-x:hover { color:var(--ink); }
+  .tc-stats { display:flex; flex-wrap:wrap; gap:2px 0; padding:14px 22px; border-bottom:1px solid var(--line); }
+  .tc-stat { flex:1 1 130px; min-width:120px; padding:2px 14px; border-left:1px solid var(--line); }
+  .tc-stat:first-child { border-left:none; padding-left:0; }
+  .tc-stat .k { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+  .tc-stat .v { font-size:18px; font-weight:900; font-variant-numeric:tabular-nums; margin-top:2px; }
+  .tc-stat .v.big { color:var(--red); font-size:22px; }
+  .tc-stat .sub { font-size:10px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  .tc-sec-lbl { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); padding:14px 22px 8px; }
+  .tc-selrow { padding:0 22px 14px; }
+  .tc-inplay { font-size:8px; font-weight:800; color:var(--good); border:1px solid var(--good); border-radius:3px; padding:0 3px; margin-left:5px; letter-spacing:.3px; vertical-align:middle; }
+  .tc-cdot { width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block; }
+  .tc-pdrop .pdrop-btn { padding:8px 14px; min-width:280px; }
+  .tc-pdrop .pdrop-menu { min-width:340px; max-height:300px; }
+  .tc-pdrop .pdrop-item .pi-nm { display:flex; align-items:center; }
+  .tc-panels { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:0 22px 18px; }
+  .tc-panel { border:1px solid var(--line); border-radius:12px; padding:15px 16px; }
+  .tc-panel h4 { margin:0 0 12px; font-size:12px; font-weight:900; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); display:flex; align-items:center; gap:8px; }
+  .tc-panel h4 .n { color:var(--muted); font-weight:900; }
+  .tc-intel-grid { display:grid; grid-template-columns:auto 1fr; gap:14px; }
+  .tc-score .big { font-size:40px; font-weight:900; line-height:1; }
+  .tc-score .lbl { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; margin-top:4px; }
+  .tc-mini-k { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); margin-top:12px; }
+  .tc-mini-v { font-size:13px; font-weight:700; }
+  .tc-chart-h { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); margin-bottom:6px; }
+  .tc-spark { width:100%; height:auto; display:block; }
+  .tc-tier { margin-top:14px; }
+  .tc-tierbar { display:flex; height:8px; border-radius:4px; overflow:hidden; background:#f0f1f3; }
+  .tc-tierbar span { height:100%; }
+  .tc-tierleg { display:flex; flex-wrap:wrap; gap:10px; margin-top:7px; font-size:10px; font-weight:700; color:var(--muted); }
+  .tc-tierleg i { width:8px; height:8px; border-radius:2px; display:inline-block; margin-right:4px; vertical-align:middle; }
+  .tc-kv { display:flex; justify-content:space-between; align-items:baseline; padding:6px 0; border-top:1px solid var(--line); }
+  .tc-kv:first-of-type { border-top:none; }
+  .tc-kv .k { font-size:12px; color:var(--muted); font-weight:700; }
+  .tc-kv .v { font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .tc-upc { width:100%; border-collapse:collapse; margin-top:4px; }
+  .tc-upc th { text-align:left; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); padding:4px 6px; }
+  .tc-upc td { font-size:13px; font-weight:700; padding:5px 6px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  .tc-upc td.cur { color:var(--red); }
+  .tc-cur-tag { font-size:9px; font-weight:800; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:1px 5px; margin-left:6px; }
+  .tc-fit-strip { margin:0 22px 16px; border:1px solid var(--line); border-radius:12px; padding:13px 16px; display:flex; gap:22px; align-items:center; flex-wrap:wrap; background:#fbfbfc; }
+  .tc-fit-name { font-size:14px; font-weight:900; line-height:1.25; }
+  .tc-fit-name .sub { font-size:11px; color:var(--muted); font-weight:700; }
+  .tc-fit-score { text-align:center; }
+  .tc-fit-score .s { font-size:26px; font-weight:900; line-height:1; }
+  .tc-fit-score .l { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); margin-top:3px; }
+  .tc-drivers { display:flex; gap:14px; }
+  .tc-drv { min-width:62px; }
+  .tc-drv .dk { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); margin-bottom:4px; }
+  .tc-drv .db { height:6px; border-radius:3px; background:#ececec; overflow:hidden; }
+  .tc-drv .db i { display:block; height:100%; border-radius:3px; }
+  .tc-fit-land { margin-left:auto; text-align:right; }
+  .tc-fit-land .k { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); }
+  .tc-fit-land .v { font-size:15px; font-weight:900; margin-top:2px; }
+  .tc-hab-note { font-size:11px; color:var(--muted); font-weight:600; margin-top:10px; line-height:1.45; border-top:1px solid var(--line); padding-top:8px; }
+  .tc-fitline { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:2px 0 12px; border-bottom:1px solid var(--line); margin-bottom:11px; }
+  .tc-fitline.sm { font-size:12px; font-weight:700; color:var(--muted); padding:0 0 9px; gap:8px; }
+  .tc-fitline.sm b { color:var(--ink); }
+  .tc-fitline .tc-nextland { margin-left:auto; text-align:right; }
+  .tc-fitscore { display:flex; flex-direction:column; line-height:1; }
+  .tc-fitscore b { font-size:22px; font-weight:900; }
+  .tc-fitscore small { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); margin-top:3px; }
+  .tc-fitline .tc-drivers { gap:11px; margin-left:auto; }
+  .tc-fitline .tc-drv { min-width:50px; }
+  .tc-toggle { display:inline-flex; gap:4px; margin:2px 0 9px; }
+  .tc-toggle button { font:inherit; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; border:1px solid var(--line); background:#fff; border-radius:6px; padding:3px 9px; cursor:pointer; color:var(--muted); }
+  .tc-toggle button.on { background:var(--red); color:#fff; border-color:var(--red); }
+  /* neutral fit-grade badge — teamintel colors are the only player-tied chroma on the board */
+  .grade.gradeN { background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .fr-src { font-size:9px; font-weight:800; text-transform:uppercase; color:var(--muted); }
+  /* ── mock-side operator modules ── */
+  .mock-mod { background:#fff; border:1px solid #f1b8c1; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+  .mock-mod-h { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); margin-bottom:8px; }
+  .radar-row { display:flex; align-items:center; gap:9px; padding:5px 7px; border-radius:8px; cursor:pointer; }
+  .radar-row:hover { background:#fdeef0; }
+  .radar-row .rr-no { font-weight:900; color:var(--red); min-width:38px; font-variant-numeric:tabular-nums; }
+  .radar-row .rr-away { font-size:10px; font-weight:800; color:var(--muted); min-width:32px; }
+  .radar-row .rr-tm { font-weight:900; min-width:56px; display:inline-flex; align-items:center; gap:4px; }
+  .radar-row .rr-slot { font-size:12px; font-weight:700; color:#374151; min-width:58px; font-variant-numeric:tabular-nums; }
+  .radar-row .rr-chips { display:flex; gap:5px; flex-wrap:wrap; }
+  .rr-chip { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; border:1px solid var(--line); border-radius:999px; padding:1px 8px; background:#fff; }
+  .rr-chip .idot { width:9px; height:9px; }
+  .rr-none { color:var(--muted); font-size:11px; }
+  .dig-bar { display:flex; gap:6px; margin-bottom:8px; }
+  .dig-bar input { flex:1; font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; }
+  .dig-h { font-size:13px; font-weight:900; margin:10px 0 4px; display:flex; align-items:center; gap:6px; }
+  #digResults .tc-kv .v { font-size:13px; }
+  /* ── TV mode: wall-screen scale for the live board (per-device toggle) ── */
+  body.tv .bcard { min-width:132px; }
+  body.tv .bcard .bc-no { font-size:13px; }
+  body.tv .bcard .bc-team { font-size:18px; }
+  body.tv .bcard .bc-slot { font-size:14px; }
+  body.tv .bcard .bc-player { font-size:15px; font-weight:800; }
+  body.tv .bcard .bc-in { font-size:12px; }
+  body.tv .bcard .idot { width:14px; height:14px; }
+  body.tv .bc-rnd { font-size:15px; }
+  body.tv .feed-row .fr-no { font-size:13px; }
+  body.tv .feed-row .fr-tm { font-size:15px; }
+  body.tv .feed-row .fr-who { font-size:15px; }
+  body.tv .feed-row .fr-sub { font-size:12px; }
+  body.tv .feed-row .fr-val { font-size:13px; }
+  body.tv #ticker { font-size:1.25em; }
+  .tc-foot { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:14px 22px; border-top:1px solid var(--line); background:#fafafa; }
+  .tc-foot .tc-qa { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-right:4px; }
+  .tc-foot .spacer { margin-left:auto; }
+  .tc-onpace { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); }
+  @media (max-width:820px){ .tc-panels { grid-template-columns:1fr; } .tc-stat { flex-basis:45%; } }
+
   /* ── Board: heat layout (left rail + heat-colored master grid) ── */
   /* player toggle as a dropdown multi-select (lives in the board toolbar) */
   .board-players { display:inline-flex; align-items:center; }
@@ -326,7 +447,7 @@
   .feed-row.oc { background:#fff0f1; }
   .feed-row.sv { background:#fff5f6; }
   .feed-row .fr-no { font-size:11px; font-weight:800; color:var(--muted); min-width:26px; font-variant-numeric:tabular-nums; }
-  .feed-row .fr-tm { font-size:12px; font-weight:900; min-width:34px; }
+  .feed-row .fr-tm { font-size:12px; font-weight:900; min-width:46px; display:inline-flex; align-items:center; gap:4px; }
   .feed-row .fr-body { flex:1; min-width:0; }
   .feed-row .fr-who { font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .feed-row.up .fr-who { color:#9aa0a6; font-weight:600; }
@@ -440,12 +561,28 @@
       <label><input type="checkbox" id="bSv" onchange="renderBoard(currentState)"> SV picks only</label>
       <span id="boardPlayers" class="board-players"></span>
       <button class="ctl" onclick="jumpCurrent()">↧ Jump to current pick</button>
+      <span id="tvCtl"></span>
       <span id="boardSelNames" class="board-selnames"></span>
       <span class="count" id="boardCount"></span>
     </div>
     <div class="board-split">
       <div class="board-left">
-        <div id="pickExpand"></div>
+        <!-- Mock-side operator modules: anticipatory radar + cold-fact precedent digger.
+             Static container (not re-rendered wholesale) so the digger input survives live ticks. -->
+        <div id="mockOps" style="display:none">
+          <div class="mock-mod">
+            <div class="mock-mod-h">Forward radar <span class="exp-hint">next picks × our clients — colors are live teamintel</span></div>
+            <div id="mockRadar"></div>
+          </div>
+          <div class="mock-mod">
+            <div class="mock-mod-h">Precedent digger <span class="exp-hint">player, team, or pick # — comps, habits, logged intel</span></div>
+            <div class="dig-bar">
+              <input id="digQ" placeholder="e.g. Condon · SF · 41" onkeydown="if(event.key==='Enter')digGo()">
+              <button class="ctl" onclick="digGo()">Dig</button>
+            </div>
+            <div id="digResults"></div>
+          </div>
+        </div>
         <div id="boardList" class="board"></div>
       </div>
       <aside id="boardFeed" class="board-feed"></aside>
@@ -476,6 +613,7 @@
 
 <div id="orgTip"></div>
 <div id="ticker"></div>
+<div id="teamCard" class="tc-backdrop" onclick="if(event.target===this)closeTeamCard()"></div>
 
 <script>
   const $ = (id) => document.getElementById(id);
@@ -561,18 +699,82 @@
   window.clearRange = (key) => { delete RANGES[key]; saveRanges(key);
     postIntel({ kind:"strike_window", player_name:clientName(key), window_lo:null, window_hi:null }, true); };
   const TEAMINTEL_URL = "https://sv-teamintel.vercel.app/teamintel.json";
+  // Historical draft-slot signings (2018–25): per-pick bonus vs slot. CORS-open, so fetch directly.
+  const SLOT_HISTORY_URL = "https://mdecicco-sv.github.io/draft-slot-tracker/data.csv";
+  const posGroupOf = (pos) => { const p=(pos||"").toUpperCase();
+    if (/P|RHP|LHP|SP|RP/.test(p)) return "P"; if (p==="C") return "C";
+    if (/1B|2B|3B|SS|IF|INF/.test(p)) return "IF"; if (/OF|CF|LF|RF/.test(p)) return "OF"; return "?"; };
+  function parseCsvLine(line) {
+    const out=[]; let cur="", q=false;
+    for (let i=0;i<line.length;i++){ const ch=line[i];
+      if (q) { if (ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+      else { if (ch===","){out.push(cur);cur="";} else if (ch==='"'){q=true;} else cur+=ch; } }
+    out.push(cur); return out;
+  }
+  async function loadSlotHistory() {
+    if (DATA.slotHistory.length) return;
+    try {
+      const txt = await fetch(SLOT_HISTORY_URL, { cache:"force-cache" }).then(r=>r.text());
+      const lines = txt.split(/\r?\n/);
+      const num = s => { const n=parseFloat((s||"").replace(/[",]/g,"")); return Number.isFinite(n)?n:null; };
+      const rows=[];
+      for (let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const f=parseCsvLine(lines[i]); if(f.length<23) continue;
+        const bonus=num(f[20]), slot=num(f[21]);
+        rows.push({ year:+f[1], round:f[2], overall:+f[3], first:f[6], last:f[7], pos:f[8], group:posGroupOf(f[8]),
+          level:(f[13]==="HS"?"HS":"College"), school:f[14], team:f[17], bonus, slot,
+          diff:(f[22]!==""&&f[22]!=null?num(f[22]):(bonus!=null&&slot!=null?bonus-slot:null)) });
+      }
+      DATA.slotHistory = rows;
+      // name index for looking up a specific player's signing (e.g. a team's recent 1st-rounders)
+      DATA.slotByName = new Map();
+      for (const r of rows) { const k = normName(r.first + " " + r.last); if (!DATA.slotByName.has(k)) DATA.slotByName.set(k, []); DATA.slotByName.get(k).push(r); }
+      if (cardPick!=null) renderTeamCard(currentState);
+    } catch (e) {}
+  }
+  // Look up a historical signing by player name (preferring a matching year).
+  function slotSign(name, year) {
+    const arr = DATA.slotByName && DATA.slotByName.get(normName(name)); if (!arr) return null;
+    return arr.find(r=>r.year===year) || arr[0] || null;
+  }
+  // Historical signings near a pick's slot (overall band), optionally filtered to a player's profile.
+  function slotComps(pk, filt) {
+    const H = DATA.slotHistory; if (!H.length) return [];
+    const lo = Math.max(1, pk.overall-4), hi = pk.overall+8;
+    let rows = H.filter(r => r.overall>=lo && r.overall<=hi && r.bonus!=null);
+    if (filt && filt.level) rows = rows.filter(r => r.level===filt.level);
+    if (filt && filt.group) rows = rows.filter(r => r.group===filt.group);
+    return rows.sort((a,b)=> (b.year-a.year) || (Math.abs(a.overall-pk.overall)-Math.abs(b.overall-pk.overall)));
+  }
   const SUFFIX = /\b(jr|sr|ii|iii|iv|v)\b/g;
   const normName = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
       .replace(/[.''`\-]/g," ").replace(SUFFIX,"").replace(/[^a-z\s]/g," ").replace(/\s+/g," ").trim();
   const teamAlias = (t) => (t === "OAK" ? "ATH" : t);
+  // abbrev -> MLBAM id (mirrors lib/teams.js) so we can pull official team logos from the MLB CDN
+  const ABBR_TO_ID = { LAA:108,ARI:109,BAL:110,BOS:111,CHC:112,CIN:113,CLE:114,COL:115,DET:116,HOU:117,KC:118,LAD:119,WSH:120,NYM:121,ATH:133,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,TEX:140,TOR:141,MIN:142,PHI:143,ATL:144,CHW:145,MIA:146,NYY:147,MIL:158 };
+  const teamLogo = (t, size=20) => { const id = ABBR_TO_ID[teamAlias(t)]; return id ? `<img class="tlogo" src="https://www.mlbstatic.com/team-logos/${id}.svg" alt="${t}" width="${size}" height="${size}" loading="lazy" onerror="this.style.display='none'">` : ""; };
   const isPitcher = (pos) => /(^|\b)(P|RHP|LHP|SP|RP)\b/i.test(pos || "");
   const COLOR_HEX = { green:"#1a7f37","light green":"#86c98b", yellow:"#e3b505", orange:"#e8820e", red:"#C8102E" };
 
-  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null };
+  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[] };
   let boardSelClients = new Set(); // empty = Big Board (show every pick's in-play cluster);
                                    // non-empty = focus these clients' intel across the board
   let playerMenuOpen = false;      // Players dropdown open state (survives board re-renders)
-  let expandedPick = null;     // overall # whose in-play list is expanded, or null
+  let cardPick = null;         // overall # of the pick whose team-card modal is open, or null
+  let evalPlayer = null;       // client key currently being evaluated inside the team card, or null
+  let tcMenuOpen = false;      // team-card player dropdown open state (survives card re-renders)
+  let tcRangeMode = "profile"; // Q4 comps: 'profile' (same level×pos) or 'all' (everyone in the range)
+  // TV mode: per-device (localStorage). The wall TV turns it on once; laptops stay interactive.
+  // TV ON = bigger board type + team card suppressed unless the "card" sub-toggle is enabled.
+  let TV = false; try { TV = localStorage.getItem("dd:tv") === "1"; } catch (e) {}
+  let tvShowCard = false;   // TV sub-toggle: allow the card on the TV (session-only, off by default)
+  function applyTv() {
+    document.body.classList.toggle("tv", TV);
+    const el = $("tvCtl");
+    if (el) el.innerHTML = `<button class="ctl ${TV?'primary':''}" onclick="toggleTv()">📺 TV</button>`
+      + (TV ? ` <button class="ctl ${tvShowCard?'primary':''}" onclick="toggleTvCard()" title="allow the team card on this screen">card</button>` : "");
+  }
+  window.toggleTv = () => { TV = !TV; try { localStorage.setItem("dd:tv", TV?"1":"0"); } catch (e) {} if (!TV) tvShowCard = false; if (TV) closeTeamCard(); applyTv(); };
+  window.toggleTvCard = () => { tvShowCard = !tvShowCard; if (!tvShowCard) closeTeamCard(); applyTv(); };
 
   // ----- bonus / leverage model: expected bonus = slot-at-rank × leverage multiplier -----
   function levelClass(comp) {
@@ -653,6 +855,19 @@
       const names = [...new Set(DATA.intel.map(r => r.player))];
       DATA.clientList = names.map(name => ({ name, key:normName(name), comp:DATA.compByName.get(normName(name)) || null }))
         .sort((a,b) => (a.comp?.rank || 9999) - (b.comp?.rank || 9999));
+      // Tolerant bonus intake from the feed: any record carrying a bonus amount folds into the
+      // store (fields optional today — sv-teamintel may start shipping them at any point).
+      DATA.feedBonuses = new Map();
+      for (const r of DATA.intel) {
+        const amt = r.bonus_amount!=null ? r.bonus_amount : (typeof r.bonus==="number" ? r.bonus : null);
+        if (amt==null || !r.player) continue;
+        const k = normName(r.player);
+        const kind = String(r.bonus_status||r.bonus_kind||"rumored").toLowerCase()==="confirmed" ? "confirmed" : "rumored";
+        const cur = DATA.feedBonuses.get(k);
+        const beats = !cur || (kind==="confirmed" && cur.kind!=="confirmed")
+          || ((kind==="confirmed")===(cur.kind==="confirmed") && (r.date||"")>(cur.date||""));
+        if (beats) DATA.feedBonuses.set(k, { kind, amount:amt, date:r.date, team:teamAlias(r.team) });
+      }
       _tiCache.clear();   // recompute interest aggregates against fresh feed
       if (rerender) renderActive();
       return true;
@@ -686,18 +901,22 @@
     $("cdTime").classList.toggle("low", left <= 15);
   }
 
-  // Actual bonus if known (mock engine, or live once signed); otherwise our model
-  // estimate. Live drafts have no bonus at pick time -> we project, flagged est.
+  // Actual bonus if known (mock engine, or live once signed); else a LOGGED bonus
+  // (war-room confirmed beats rumored); otherwise our model estimate, flagged est.
   function effectiveBonus(p) {
     if (!p.isDrafted) return { bonus:null, est:false };
     if (p.bonus != null) return { bonus:p.bonus, est:false };
-    const comp = DATA.compByName.get(normName(p.player||""));
+    const key = normName(p.player||"");
+    const lb = bonusFor(key);
+    if (lb) return { bonus: lb.amount, est: lb.kind!=="confirmed", src: lb.kind };
+    const comp = DATA.compByName.get(key);
     if (comp) return { bonus: negBonus(comp, p.slot||0, p.overall), est:true };
     return { bonus:null, est:false };
   }
-  function ouTag(over, est) {
+  function ouTag(over, est) {          // est: falsy | true ("EST") | string label ("RUM")
     const cls = over>50000 ? "over" : over<-50000 ? "under" : "atslot";
-    const lab = (est?"EST ":"") + (over>50000?"OVER":over<-50000?"UNDER":"AT SLOT") + (Math.abs(over)>50000?" "+fmtM(Math.abs(over)):"");
+    const pre = est ? ((typeof est==="string" ? est : "EST") + " ") : "";
+    const lab = pre + (over>50000?"OVER":over<-50000?"UNDER":"AT SLOT") + (Math.abs(over)>50000?" "+fmtM(Math.abs(over)):"");
     return `<span class="outag ${cls}${est?" est":""}">${lab}</span>`;
   }
   function moneyCell(p) {            // "slot $X · $Y OVER $Z" with the slot kept visible
@@ -705,7 +924,7 @@
     if (p.slot > 0) parts.push(`slot ${fmtM(p.slot)}`);
     if (eb.bonus != null) parts.push(fmtM(eb.bonus));
     let s = parts.join(" · ");
-    if (eb.bonus != null && p.slot > 0) s += " " + ouTag(eb.bonus - p.slot, eb.est);
+    if (eb.bonus != null && p.slot > 0) s += " " + ouTag(eb.bonus - p.slot, eb.src==="rumored" ? "RUM" : eb.est);
     return s;
   }
 
@@ -1106,10 +1325,90 @@
     if (!state) return;
     $("boardCount").textContent = `${state.madeCount} of ${state.picks.length} picks made`;
     renderBoardPlayers(state);
-    renderPickExpand(state);
+    const ops = $("mockOps");
+    if (ops) { ops.style.display = MODE==="mock" ? "" : "none"; if (MODE==="mock") renderMockRadar(state); }
     renderBoardGrid(state);
     renderBoardFeed(state);
   }
+
+  // ---------- Mock-side operator modules (radar + digger) ----------
+  // Next N undrafted picks × our clients. A chip appears where a client has a live teamintel
+  // color with that team OR is in play at that pick; chip color is strictly teamintel.
+  function renderMockRadar(state) {
+    const el = $("mockRadar"); if (!el) return;
+    const next = state.picks.filter(p=>!p.isDrafted).slice(0, 8);
+    if (!next.length) { el.innerHTML = `<div class="placeholder">Draft complete.</div>`; return; }
+    const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
+    const first = next[0].overall;
+    el.innerHTML = next.map(p=>{
+      const inPlay = new Set(clientsInPlay(p, state).map(x=>x.c.key));
+      const chips = DATA.clientList.filter(c=>c.comp && !drafted.has(c.key))
+        .filter(c => inPlay.has(c.key) || intelColorRank(c.key, p.team) < 5)
+        .sort((a,b)=> intelColorRank(a.key,p.team)-intelColorRank(b.key,p.team))
+        .slice(0, 6);
+      const away = p.overall - first;
+      return `<div class="radar-row" onclick="expandPick(${p.overall})">
+        <span class="rr-no">#${p.overall}</span>
+        <span class="rr-away">${away===0?"now":"+"+away}</span>
+        <span class="rr-tm">${teamLogo(p.team,15)}${p.team}</span>
+        <span class="rr-slot">${p.slot>0?fmtM(p.slot):"—"}</span>
+        <span class="rr-chips">${chips.map(c=>`<span class="rr-chip" data-intel-key="${c.key}" data-intel-team="${p.team}">
+          <span class="idot" style="background:${intelColorHex(c.key,p.team)}"></span>${initials(c.name)}${inPlay.has(c.key)?"·IP":""}</span>`).join("") || '<span class="rr-none">—</span>'}</span></div>`;
+    }).join("");
+  }
+
+  // Cold-fact lookup: a player (comps/profile/logged intel), a team (habits/pool), or a pick #
+  // (slot + who signed there 2018-25). No projections — precedent and logged facts only.
+  window.digGo = () => {
+    const el = $("digResults"), q = ($("digQ")?.value||"").trim(); if (!el) return;
+    if (!q) { el.innerHTML=""; return; }
+    const state = currentState; let h = "";
+    const kvRow = (k,v) => `<div class="tc-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    const compsTable = (comps) => comps.length ? `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Bonus</th><th>vs slot</th></tr></thead><tbody>${
+      comps.slice(0,6).map(r=>`<tr><td>'${String(r.year).slice(2)}</td>
+        <td style="font-size:11px">${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos}·#${r.overall}</span></td>
+        <td>${r.bonus!=null?fmtM(r.bonus):"—"}</td>
+        <td>${r.diff!=null?`<span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`).join("")}</tbody></table>` : `<div class="placeholder">No signings in range.</div>`;
+
+    const asNum = parseInt(q, 10);
+    const teamQ = teamAlias(q.toUpperCase());
+    if (Number.isFinite(asNum) && String(asNum)===q) {
+      // pick # → slot value + who actually signed in this range
+      const pk = state ? pickByOverall(state, asNum) : null;
+      h += `<div class="dig-h">Pick #${asNum}${pk?` · ${pk.team} · ${roundLabel(pk.round)}`:""}</div>`;
+      if (pk && pk.slot>0) h += kvRow("Slot value", fmtM(pk.slot));
+      h += `<div class="tc-chart-h" style="margin-top:8px">Signings near #${asNum} (2018–25)</div>` + compsTable(slotComps({overall:asNum}));
+    } else if (DATA.orgs[teamQ] || (state && state.poolsMap[teamQ])) {
+      // team → habits + pool + recent R1s with real bonuses
+      const o = DATA.orgs[teamQ]||{}, pool = state ? state.poolsMap[teamQ] : null;
+      h += `<div class="dig-h">${teamLogo(teamQ,18)} ${teamQ} — habits &amp; pool</div>`;
+      if (o.orgRank!=null) h += kvRow("Org dev rank", `#${o.orgRank} / 30`);
+      if (o.earlyPitcherPct!=null) h += kvRow("Early pitchers · HS/College", `${o.earlyPitcherPct}% · ${o.hsPct??"—"}%/${o.collegePct??"—"}%`);
+      h += kvRow("Pool-spreader tendency", Math.round(spreadOf(teamQ)*100)+"%");
+      if (pool) h += kvRow("Pool room · over/under", `${fmt$(pool.room)} · ${fmtOU(pool.overUnder)}`);
+      for (const r of (o.recentR1||[])) {
+        const sg = slotSign(r.player, r.year);
+        h += kvRow(`${r.year} · ${r.player} (${r.pos})`, sg&&sg.bonus!=null?`${fmtM(sg.bonus)}${sg.diff!=null?` <span class="tg ${sg.diff>0?'over':sg.diff<0?'under':'fit'}" style="font-size:9px">${sg.diff>0?"+":""}${fmtM(sg.diff)}</span>`:""}`:(r.school||"—"));
+      }
+    } else {
+      // player → profile, logged intel facts, comps at his rank neighborhood
+      const qn = normName(q);
+      const matches = DATA.composite.filter(c=>normName(c.name).includes(qn)).slice(0,3);
+      if (!matches.length) h = `<div class="placeholder">No player, team, or pick matches “${q}”.</div>`;
+      for (const c of matches) {
+        const key = normName(c.name), cap = intelFor(key), lb = bonusFor(key), lev = leverageFor(c);
+        h += `<div class="dig-h">${c.name} <span style="color:var(--muted)">#${c.rank} ${c.pos} · ${c.school||""}</span></div>`;
+        h += kvRow("Profile · agent", `${levelClass(c).replace("College-","Col ")} ${c.posGroup||c.pos} · ${c.agent||"—"}`);
+        h += kvRow("Market value · sign floor", `${fmt$(demandFor(c))} · ${fmt$(signFloor(c))}`);
+        if (lev) h += kvRow(`Profile signs (hist.)`, `${lev.mult.toFixed(2)}× slot${lev.n!=null?` <span class="tc-onpace">${lev.n} comps</span>`:""}`);
+        if (cap?.window) h += kvRow("Logged window", `#${cap.window.lo||"?"}–#${cap.window.hi||"?"}`);
+        for (const ofr of (cap?.offers||[]).slice(0,3)) h += kvRow(`Offer · ${ofr.team||"?"} (${ofr.type||"—"})`, ofr.amount!=null?fmtM(ofr.amount):(ofr.lo||ofr.hi)?`${fmtM(ofr.lo)}–${fmtM(ofr.hi)}`:"—");
+        if (lb) h += kvRow(`Bonus (${lb.kind})`, `${fmtM(lb.amount)}${lb.pick?` <span class="tc-onpace">at #${lb.pick}</span>`:""}`);
+        h += `<div class="tc-chart-h" style="margin-top:8px">Signings near his rank (#${c.rank})</div>` + compsTable(slotComps({overall:c.rank}));
+      }
+    }
+    el.innerHTML = h;
+  };
   // Readable text color for a filled intel-color card.
   function textOn(hex) {
     const h=(hex||"").replace("#",""); if (h.length<6) return "#111";
@@ -1207,10 +1506,10 @@
         body = onclock ? "⏱ OTC" : (shown.length ? "" : "—");
       }
       const onclick = p.isDrafted ? `openPlayer('${normName(p.player||"").replace(/'/g,"\\'")}')` : `expandPick(${p.overall})`;
-      const expSel = expandedPick===p.overall ? " expanded" : "";
+      const expSel = cardPick===p.overall ? " expanded" : "";
       html += `<div class="${cardCls.trim().replace(/\s+/g," ")}${expSel}"${cardStyle} ${onclock?'id="ocRow"':""} onclick="${onclick}">
         <div class="bc-no">#${p.overall}</div>
-        <div class="bc-team">${p.team||"—"}</div>
+        <div class="bc-team">${teamLogo(p.team,15)}${p.team||"—"}</div>
         <div class="bc-slot">${p.slot>0?fmtM(p.slot):"—"}</div>
         <div class="bc-player">${body}</div>${dotsHtml}</div>`;
     }
@@ -1235,10 +1534,16 @@
       } else if (onclock) { cls += " oc"; who = "On the clock"; sub = "● NOW"; }
       else { cls += " up"; who = "Upcoming"; sub = ""; }
       const onclick = p.isDrafted ? `openPlayer('${normName(p.player||"").replace(/'/g,"\\'")}')` : `expandPick(${p.overall})`;
+      // Drafted rows show the best-known money (official > confirmed > rumored > est) vs slot.
+      let val = p.slot>0?fmtM(p.slot):"—";
+      if (p.isDrafted) {
+        const eb = effectiveBonus(p);
+        if (eb.bonus!=null && (p.bonus!=null || eb.src)) val = `${fmtM(eb.bonus)}${eb.src?` <span class="fr-src">${eb.src==="confirmed"?"✓":"rum"}</span>`:""}`;
+      }
       rows += `<div class="${cls}" onclick="${onclick}">
-        <span class="fr-no">#${p.overall}</span><span class="fr-tm">${p.team||"—"}</span>
+        <span class="fr-no">#${p.overall}</span><span class="fr-tm">${teamLogo(p.team,16)}${p.team||"—"}</span>
         <div class="fr-body"><div class="fr-who">${who}${ours?' <span class="svtag">SV</span>':""}</div>${sub?`<div class="fr-sub">${sub}</div>`:""}</div>
-        <span class="fr-val">${p.slot>0?fmtM(p.slot):"—"}</span></div>`;
+        <span class="fr-val">${val}</span></div>`;
     }
     el.innerHTML = `<div class="feed-hd"><span class="live"></span>Live Pick Feed</div><div class="feed-scroll">${rows}</div>`;
   }
@@ -1312,7 +1617,7 @@
     for (const ev of INTEL.events) {
       const key = normName(ev.player_name||""); if (!key) continue;
       let s = byKey.get(key);
-      if (!s) { s = { interest:new Map(), ruleOuts:[], window:null, offers:[], events:[] }; byKey.set(key, s); }
+      if (!s) { s = { interest:new Map(), ruleOuts:[], window:null, offers:[], bonuses:[], events:[] }; byKey.set(key, s); }
       s.events.push(ev);
       const team = ev.team || null;
       if (ev.kind==="interest_sought" || ev.kind==="interest_received") {
@@ -1324,6 +1629,8 @@
         if (!s.window) s.window = { lo: ev.window_lo, hi: ev.window_hi, date: ev.created_at };
       } else if (ev.kind==="offer") {
         s.offers.push({ team, type: ev.offer_type, amount: ev.amount, lo: ev.amount_lo, hi: ev.amount_hi, pick: ev.pick_overall, status: ev.status, date: ev.created_at });
+      } else if (ev.kind==="bonus") {                   // rumored/confirmed signing bonus (newest first)
+        s.bonuses.push({ team, kind: ev.offer_type||"rumored", amount: ev.amount, pick: ev.pick_overall, note: ev.note, date: ev.created_at });
       } else if (ev.kind==="medical") {                 // newest-first, so first seen wins
         if (s.medical===undefined) s.medical = ev.note || "unknown";
       } else if (ev.kind==="range") {
@@ -1340,6 +1647,16 @@
     try { localStorage.setItem("dd:medicals", JSON.stringify(MEDICALS)); localStorage.setItem("dd:ranges", JSON.stringify(RANGES)); } catch (e) {}
   }
   const intelFor = (key) => INTEL.byKey.get(key) || null;
+  // Best-known signing bonus for a player, across war-room captures AND the teamintel feed:
+  // any confirmed beats any rumor; within a tier, war-room capture wins.
+  function bonusFor(key) {
+    const s = intelFor(key);
+    const logged = s && s.bonuses && s.bonuses.length
+      ? (s.bonuses.find(b=>b.kind==="confirmed" && b.amount!=null) || s.bonuses.find(b=>b.amount!=null) || null) : null;
+    const feed = DATA.feedBonuses ? (DATA.feedBonuses.get(key) || null) : null;
+    if (logged && feed) return (feed.kind==="confirmed" && logged.kind!=="confirmed") ? feed : logged;
+    return logged || feed || null;
+  }
 
   async function postIntel(ev, silent) {
     ev.agent = ev.agent || agentName() || "console";
@@ -1351,15 +1668,33 @@
     } catch (e) { if (!silent) alert("Could not save intel: " + e.message); return false; }
   }
 
-  // ---------- VIEW: BOARD — expand a pick to its in-play client table ----------
-  window.expandPick = (ov) => {
-    expandedPick = (expandedPick===ov ? null : ov); armed = null;
-    renderBoard(currentState);
-    if (expandedPick!=null) setTimeout(()=>document.getElementById("pickExpand")?.scrollIntoView({block:"start",behavior:"smooth"}), 30);
+  // ---------- VIEW: BOARD — team-card modal (opens on a board tile click) ----------
+  const pickByOverall = (state, ov) => (state.picks||[]).find(p=>p.overall===ov) || null;
+  window.expandPick = (ov) => openTeamCard(ov);
+  window.openTeamCard = (ov) => {
+    if (TV && !tvShowCard) return;   // TV screens stay a passive market map by default
+    const st = currentState; if (!st) return;
+    const pk = pickByOverall(st, ov); if (!pk || pk.isDrafted) return;
+    cardPick = ov; armed = null; tcMenuOpen = false; tcRangeMode = "profile";
+    evalPlayer = null;   // open in team-profile mode; user picks a player to go player-specific
+    loadSlotHistory();   // lazy-load historical signings for Q4 (no-op once cached)
+    renderTeamCard(st);
+    const bd = $("teamCard"); if (bd) { bd.classList.add("on"); bd.scrollTop = 0; }
+    document.body.style.overflow = "hidden";
   };
-  window.closeExpand = () => { expandedPick=null; armed=null; renderBoard(currentState); };
-  window.armAction = (key, name, kind) => { armed = { key, name, kind }; renderBoard(currentState); };
-  window.cancelArmed = () => { armed=null; renderBoard(currentState); };
+  window.closeTeamCard = () => {
+    cardPick = null; evalPlayer = null; armed = null; tcMenuOpen = false;
+    const bd = $("teamCard"); if (bd) { bd.classList.remove("on"); bd.innerHTML = ""; }
+    document.body.style.overflow = "";
+  };
+  window.closeExpand = () => window.closeTeamCard();   // legacy alias
+  window.selectEval = (key, e) => { if (e) e.stopPropagation(); evalPlayer = key || null; armed = null; tcMenuOpen = false; tcRangeMode = "profile"; renderTeamCard(currentState); };
+  window.toggleTcMenu = (e) => { if (e) e.stopPropagation(); tcMenuOpen = !tcMenuOpen; renderTeamCard(currentState); };
+  document.addEventListener("click", (e) => {
+    if (tcMenuOpen && cardPick!=null && !(e.target.closest && e.target.closest(".tc-pdrop"))) { tcMenuOpen = false; renderTeamCard(currentState); }
+  });
+  window.armAction = (key, name, kind) => { armed = { key, name, kind }; cardPick!=null ? renderTeamCard(currentState) : renderBoard(currentState); };
+  window.cancelArmed = () => { armed = null; cardPick!=null ? renderTeamCard(currentState) : renderBoard(currentState); };
   window.quickRuleOut = (key, name, team, overall) => {
     postIntel({ kind:"rule_out", player_name:name, team, pick_overall:overall, status:"active", note:"ruled out at slot" });
   };
@@ -1376,61 +1711,368 @@
       if (ev.offer_type==="range") { ev.amount_lo = parseFloat(val("afLoAmt"))||null; ev.amount_hi = parseFloat(val("afHiAmt"))||null; }
       else { ev.amount = parseFloat(val("afAmount"))||null; }
       ev.note = val("afNote")||null;
+    } else if (k==="bonus") {
+      ev.offer_type = val("afBonusKind")||"rumored"; ev.amount = parseFloat(val("afAmount"))||null;
+      ev.pick_overall = parseInt(val("afPick"),10)||null; ev.note = val("afNote")||null;
     }
-    armed = null; postIntel(ev);
+    armed = null; postIntel(ev);   // loadIntel() -> renderActive() refreshes the open card
   };
 
-  function renderPickExpand(state) {
-    const el = $("pickExpand"); if (!el) return;
-    if (expandedPick==null) { el.innerHTML=""; return; }
-    const pk = (state.picks||[]).find(p=>p.overall===expandedPick);
-    if (!pk || pk.isDrafted) { el.innerHTML=""; return; }
-    const team = pk.team, pool = state.poolsMap[team];
-    const clients = clientsInPlay(pk, state);
+  // "Roch Cholowsky" -> "R. Cholowsky" for compact chips
+  function tcInitialName(name) {
+    const parts = (name||"").trim().split(/\s+/);
+    return parts.length < 2 ? (name||"") : parts[0][0] + ". " + parts.slice(1).join(" ");
+  }
+  // Tiny inline-SVG line chart — no external lib, auto-scales y to the data range.
+  // Each point is {v, hex}; segments are colored by the report's interest color at that time,
+  // so the line literally shifts color (green→yellow→red…) as the signal changes over the window.
+  function tcSparkline(points, fallback) {
+    const W = 360, H = 90, pad = 7;
+    if (!points || !points.length) return `<div class="placeholder" style="height:${H}px;display:flex;align-items:center;justify-content:center">No signal history.</div>`;
+    let pts = points.map(p => (typeof p === "number") ? { v:p, hex:fallback } : p);
+    if (pts.length === 1) pts = [pts[0], pts[0]];
+    const vals = pts.map(p=>p.v);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi === lo) { hi += 1; lo -= 1; }
+    const n = pts.length;
+    const x = i => pad + (i/(n-1))*(W-2*pad);
+    const y = v => pad + (1-(v-lo)/(hi-lo))*(H-2*pad);
+    const areaPts = `${pad.toFixed(1)},${(H-pad).toFixed(1)} ` + pts.map((p,i)=>`${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ") + ` ${(W-pad).toFixed(1)},${(H-pad).toFixed(1)}`;
+    let segs = "";
+    for (let i=1;i<n;i++) segs += `<polyline points="${x(i-1).toFixed(1)},${y(pts[i-1].v).toFixed(1)} ${x(i).toFixed(1)},${y(pts[i].v).toFixed(1)}" fill="none" stroke="${pts[i].hex}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>`;
+    const dots = pts.map((p,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.6" fill="${p.hex}"></circle>`).join("");
+    return `<svg class="tc-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <polyline points="${areaPts}" fill="${fallback}14" stroke="none"></polyline>
+      ${segs}${dots}</svg>`;
+  }
+  const TC_TIER_COLORS = { DIRECTOR:"#7a1220", "ASST_DIRECTOR":"#c8102e", "CROSS_CHECKER":"#e8820e", CROSSCHECKER:"#e8820e", SCOUT:"#c9ccd1", GM:"#3949ab", MANUAL:"#9aa0a6" };
+  const tcTierColor = (lbl) => TC_TIER_COLORS[(lbl||"").toUpperCase().replace(/[\s-]/g,"_")] || "#9aa0a6";
 
-    let h = `<div class="exp-wrap"><div class="exp-head">
-      <div><span class="exp-no">PICK #${pk.overall}</span> <b>${teamLink(team)}</b>
-        <span class="exp-sub">${pk.teamName||""} · Round ${pk.round} · slot ${fmtM(pk.slot)}${pool?` · ammo ${fmtM(pool.room)}`:""}</span></div>
-      <button class="ctl" onclick="closeExpand()">✕ Close</button></div>`;
-
-    h += `<div class="exp-section">Our clients — fit &amp; intel <span class="exp-hint">interested teams and org fit for this pick</span></div>`;
-    h += clients.length ? `<div class="exp-table">${clients.map(x=>renderClientRow(x, team, pk)).join("")}</div>`
-                        : `<div class="placeholder">No clients logged a fit for ${team} at this pick.</div>`;
-    h += `</div>`;
-    el.innerHTML = h;
+  // Landing fit for one player at one specific pick: is this a plausible slot for his talent,
+  // and does the team's money work? Reuses the same reach window as clientsInPlay.
+  function tcPickFit(comp, pick, state) {
+    const rank = comp.rank;
+    const early = pick.overall < rank - 7;      // reaching (taking him earlier than his value)
+    const late  = pick.overall > rank + 45;     // he'd be a faller/steal — unlikely to last
+    const bonus = negBonus(comp, pick.slot, pick.overall);
+    const pool = state.poolsMap[pick.team];
+    const moneyFits = pool ? pool.room >= bonus : true;
+    let label, cls;
+    if (early)          { label = "reach";     cls = "early"; }
+    else if (late)      { label = "value";     cls = "late"; }
+    else if (!moneyFits){ label = "over pool"; cls = "under"; }
+    else                { label = "fits";      cls = "fit"; }
+    return { reachOk: !early && !late, moneyFits, bonus, label, cls };
   }
 
-  function renderClientRow(x, team, pk) {
-    const c = x.c, key = c.key;
-    const cf = contactFlags(key, team);
-    const bits = [];
-    if (x.cap && x.cap.interest.size) for (const v of x.cap.interest.values())
-      bits.push(`<span class="ib ${v.dir}">${v.dir==="sought"?"▲ sought":"▼ rec'd"}${v.strength!=null?` ${v.strength>0?"+":""}${v.strength}`:""}</span>`);
-    if (x.rec && x.rec.score!=null)
-      bits.push(`<span class="ib feed">${intelDot(key, team)}feed ${x.rec.score>0?"+":""}${x.rec.score}${cf.workout?" · PDW":""}${cf.combine?" · CMB":""}</span>`);
-    if (x.cap && x.cap.window) bits.push(`<span class="ib win">◎ #${x.cap.window.lo||"?"}–#${x.cap.window.hi||"?"}</span>`);
-    if (x.cap && x.cap.offers) for (const o of x.cap.offers.filter(o=>o.team===team))
-      bits.push(`<span class="ib offer">$ ${o.type}${o.amount?" "+fmtM(o.amount):(o.lo||o.hi)?` ${fmtM(o.lo)}–${fmtM(o.hi)}`:""}</span>`);
-    const money = x.moneyFits ? `<span class="tg over">$ fits pool</span>` : `<span class="tg under">$ over pool</span>`;
-    const qk = key.replace(/'/g,"\\'"), qn = (c.name||"").replace(/'/g,"\\'");
-    let row = `<div class="exp-row ${x.ruledHere?"ruled":""}">
-      <span class="er-name">${playerLink(c.name)} <span class="er-rk">#${c.comp.rank} ${c.comp.pos}</span></span>
-      <span class="grade" data-org="${team}" title="org fit (money excluded)" style="background:${x.f.color2}">${x.f.orgGrade}</span>
-      <span class="er-bits">${bits.join("")}${money}${x.ruledHere?'<span class="tg ruledtag">⊘ ruled out</span>':""}</span>
-      <span class="er-act">
-        <button class="mini" onclick="armAction('${qk}','${qn}','interest_received')">▼ Rec'd</button>
-        <button class="mini" onclick="armAction('${qk}','${qn}','interest_sought')">▲ Sought</button>
-        <button class="mini" onclick="armAction('${qk}','${qn}','strike_window')">◎ Window</button>
-        <button class="mini" onclick="armAction('${qk}','${qn}','offer')">$ Offer</button>
-        <button class="mini ${x.ruledHere?'on':''}" title="Rule out at this slot" onclick="quickRuleOut('${qk}','${qn}','${team}',${pk.overall})">⊘</button>
-      </span></div>`;
-    if (armed && armed.key===key) row += renderArmedForm(team, pk);
-    return row;
+  // The four fit drivers as compact bars (was the fit strip; now lives inside Team Intel).
+  function tcDrivers(f) {
+    const dcol = (v)=> v>=0.66?"#1a7f37":v>=0.4?"#e3b505":"#e8820e";
+    const drivers = [["Interest", f.interestN], ["Org / dev", f.devN], ["Type", f.typeN], ["Money", f.moneyN]];
+    return `<div class="tc-drivers">${drivers.map(([k,v])=>`<div class="tc-drv"><div class="dk">${k}</div><div class="db"><i style="width:${Math.round(v*100)}%;background:${dcol(v)}"></i></div></div>`).join("")}</div>`;
+  }
+  // The player's earliest realistic landing on this team (money-fitting pick preferred).
+  function tcNextLanding(state, team, comp) {
+    const up = teamUpcoming(state, team);
+    return up.find(p => { const pf = tcPickFit(comp, p, state); return pf.reachOk && pf.moneyFits; })
+        || up.find(p => tcPickFit(comp, p, state).reachOk) || null;
+  }
+
+  function renderTeamCard(state) {
+    const bd = $("teamCard"); if (!bd || cardPick==null || !state) return;
+    const pk = pickByOverall(state, cardPick);
+    if (!pk || pk.isDrafted) { closeTeamCard(); return; }
+    const team = pk.team, pool = state.poolsMap[team] || null, o = DATA.orgs[team] || {};
+    const onClockHere = !!(state.onClock && state.onClock.overall === pk.overall);
+    // Full roster of our undrafted clients, each scored against THIS team; in-play ones surface first.
+    const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
+    const inPlayKeys = new Set(clientsInPlay(pk, state).map(x=>x.c.key));
+    const roster = DATA.clientList.filter(c=>c.comp && !drafted.has(c.key)).map(c=>({
+      c, f: fit(c.comp, team, c.key, state), inPlay: inPlayKeys.has(c.key)
+    })).sort((a,b)=> (b.inPlay - a.inPlay) || (b.f.orgScore - a.f.orgScore));
+    // evalPlayer null = team-profile mode; a set key = player-specific mode
+    if (evalPlayer && !roster.some(x=>x.c.key===evalPlayer)) evalPlayer = null;
+    const sel = evalPlayer ? (roster.find(x=>x.c.key===evalPlayer) || null) : null;
+
+    let h = `<div class="tc-card">`;
+    h += `<div class="tc-top">
+      ${teamLogo(team,30)}
+      <span class="tc-abbr">${team||"—"}</span>
+      <span class="tc-ttl">Pick #${pk.overall} · ${pk.teamName||team||""}</span>
+      ${onClockHere?`<span class="tc-live">● On the clock</span>`:`<span class="tc-round">Round ${pk.round}</span>`}
+      <button class="tc-x" onclick="closeTeamCard()">✕</button></div>`;
+
+    const next = state.picks.find(p=>!p.isDrafted && p.overall>pk.overall);
+    const clockMs = (onClockHere && timer.pick===pk.overall && timer.endsAt!=null) ? (timer.endsAt-Date.now()) : allotment(pk.round)*1000;
+    const stats = [
+      ["Next pick", next?`#${next.overall} ${next.team}`:"—", ""],
+      ["On the clock", `<span id="tcClock">${fmtCountdown(clockMs)}</span>`, onClockHere?"time remaining":"time allotted"],
+      ["Available pool", pool?fmt$(pool.room):"—", "team bonus pool"],
+      ["Pick slot value", pk.slot>0?fmtM(pk.slot):"—", "slot value"],
+      ["Team spent", pool?fmt$(pool.poolCharge)+(pool.hasEst?" est":""):"—", "spent to date"],
+      ["Over / under", pool?fmtOU(pool.overUnder):"—", "vs slot"],
+    ];
+    h += `<div class="tc-stats">${stats.map(([k,v,sub])=>`<div class="tc-stat"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`).join("")}</div>`;
+
+    h += `<div class="tc-sec-lbl">Evaluate ${team} <span class="exp-hint">team profile by default — pick one of our clients to go player-specific</span></div>`;
+    if (roster.length) {
+      const teamItem = `<div class="pdrop-item ${!sel?'on':''}" onclick="selectEval('',event)">
+          <span class="tc-cdot" style="background:var(--ink)"></span>
+          <span class="pi-nm">▦ Team overview (no player)</span></div><div class="pdrop-sep"></div>`;
+      const items = roster.map(x=>{
+        const on = x.c.key===evalPlayer, qk = x.c.key.replace(/'/g,"\\'");
+        return `<div class="pdrop-item ${on?'on':''}" onclick="selectEval('${qk}',event)">
+          <span class="tc-cdot" style="background:${intelColorHex(x.c.key, team)}"></span>
+          <span class="pi-nm">${x.c.name}${x.inPlay?'<span class="tc-inplay">IN PLAY</span>':''}</span>
+          <span class="pi-rk">#${x.c.comp.rank} ${x.c.comp.pos}</span></div>`;
+      }).join("");
+      h += `<div class="tc-selrow"><div class="pdrop tc-pdrop">
+          <button class="pdrop-btn" onclick="toggleTcMenu(event)">
+            <span class="tc-cdot" style="background:${sel?intelColorHex(sel.c.key, team):'var(--ink)'}"></span>
+            <span class="pdrop-txt"><span class="pdrop-t">Player to evaluate</span><span class="pdrop-v ${sel?'sel':''}">${sel?sel.c.name:'Team overview'}${sel&&sel.inPlay?'<span class="tc-inplay">IN PLAY</span>':''}</span></span>
+            <span class="caret">▾</span></button>
+          <div class="pdrop-menu" style="display:${tcMenuOpen?'block':'none'}">${teamItem}${items}</div>
+        </div></div>`;
+    } else {
+      h += `<div class="tc-selrow"><div class="placeholder">No undrafted clients on file.</div></div>`;
+    }
+
+    h += `<div class="tc-panels">
+      ${sel ? renderTcIntel(state, team, pk, sel) : renderTcMatrix(state, team, o, roster)}
+      ${renderTcDraft(state, team, pk, pool, sel)}
+      ${renderTcHabits(state, team, pk, pool, o, sel)}
+      ${renderTcRangeHistory(state, team, pk, sel)}
+    </div>`;
+
+    const qk = sel?sel.c.key.replace(/'/g,"\\'"):"", qn = sel?(sel.c.name||"").replace(/'/g,"\\'"):"";
+    const dis = sel?"":"disabled";
+    h += `<div class="tc-foot"><span class="tc-qa">Quick actions</span>
+      <button class="ctl" ${dis} onclick="armAction('${qk}','${qn}','interest_received')">↕ Log Intel</button>
+      <button class="ctl" ${dis} onclick="armAction('${qk}','${qn}','offer')">$ Offer</button>
+      <button class="ctl" ${dis} onclick="armAction('${qk}','${qn}','bonus')">$ Bonus</button>
+      <button class="ctl" ${dis} onclick="quickRuleOut('${qk}','${qn}','${team}',${pk.overall})">⊘ Rule Out</button>
+      <span class="spacer"></span>
+      <button class="ctl" ${dis} onclick="openPlayer('${qk}');closeTeamCard()">View Player Profile ↗</button>
+      <button class="ctl primary" onclick="closeTeamCard()">Close</button></div>`;
+    h += `<div id="tcArmed">${(armed && sel && armed.key===sel.c.key)?renderArmedForm(team, pk):""}</div>`;
+    h += `</div>`;
+    bd.innerHTML = h;
+  }
+
+  // Panel 1 — Team Intel (reflexive to the selected player). Leads with the fit summary
+  // (landing/org fit + the four drivers) that used to live in the standalone strip.
+  function renderTcIntel(state, team, pk, sel) {
+    let h = `<div class="tc-panel"><h4><span class="n">1</span> Team Intel</h4>`;
+    if (!sel) return h + `<div class="placeholder">Select a player to view interest intel.</div></div>`;
+    const key = sel.c.key, f = sel.f, comp = sel.c.comp;
+    h += `<div class="tc-fitline">
+        <span class="tc-fitscore"><b>${f.score}</b><small>Landing · ${f.grade}</small></span>
+        <span class="tc-fitscore"><b>${f.orgScore}</b><small>Org · ${f.orgGrade}</small></span>
+        ${tcDrivers(f)}</div>`;
+    const ti = teamInterest(key, team);
+    const recs = DATA.intel.filter(r => teamAlias(r.team)===team && normName(r.player)===key)
+                           .sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+    const score10 = ti.strength*10;
+    const lbl = score10>=6?"Strong":score10>=3.5?"Moderate":score10>0?"Light":"Quiet";
+    const latest = ti.latest, cf = contactFlags(key, team);
+    const lastColored = [...recs].reverse().find(r=>r.color);   // newest record that carries a color
+    // The panel accent reflects the LATEST logged interest color, not the strength magnitude.
+    const col = lastColored ? (COLOR_HEX[(lastColored.color||"").toLowerCase()] || "#9aa0a6") : "#9aa0a6";
+    // Build colored points: carry the last known color forward so note-only records keep the signal.
+    let curHex = "#9aa0a6";
+    const points = recs.map(r=>{
+      if (r.color) curHex = COLOR_HEX[(r.color||"").toLowerCase()] || curHex;
+      return { v: (r.score!=null?r.score:0), hex: curHex };
+    });
+    h += `<div class="tc-intel-grid"><div class="tc-score">
+        <div class="big" style="color:${col}">${score10.toFixed(1)}</div>
+        <div class="lbl" style="color:${col}">${lbl}${lastColored?` · ${lastColored.color}`:""}</div>
+        <div class="tc-mini-k">Latest signal</div><div class="tc-mini-v" style="color:${col};text-transform:capitalize">${lastColored?lastColored.color:"—"}</div>
+        <div class="tc-mini-k">Signals on file</div><div class="tc-mini-v">${ti.n}</div>
+        <div class="tc-mini-k">Last updated</div><div class="tc-mini-v">${latest?.date||"—"}</div>
+      </div><div>
+        <div class="tc-chart-h">Interest strength over time <span style="font-weight:600;text-transform:none;letter-spacing:0">· line color = signal at that time</span></div>
+        ${tcSparkline(points, col)}`;
+    const tiers = {};
+    for (const r of recs) { const t=(r.tier_label||"").toUpperCase(); if (t) tiers[t]=(tiers[t]||0)+1; }
+    const tKeys = Object.keys(tiers), tTot = tKeys.reduce((s,k)=>s+tiers[k],0);
+    if (tTot) {
+      h += `<div class="tc-tier"><div class="tc-chart-h">Source tier breakdown</div>
+        <div class="tc-tierbar">${tKeys.map(k=>`<span style="width:${(100*tiers[k]/tTot).toFixed(0)}%;background:${tcTierColor(k)}"></span>`).join("")}</div>
+        <div class="tc-tierleg">${tKeys.map(k=>`<span><i style="background:${tcTierColor(k)}"></i>${k.replace(/_/g," ")} ${Math.round(100*tiers[k]/tTot)}%</span>`).join("")}</div></div>`;
+    }
+    if (cf.workout || cf.combine) h += `<div class="tc-tier"><div class="tc-chart-h">Contact flags</div>${contactBadges(key, team)}</div>`;
+    h += `</div></div></div>`;
+    return h;
+  }
+
+  // Panel 2 — This team's remaining picks: pool status + per-pick fit for the selected
+  // player AND the best-fitting client at each pick ("when are they next / who might fit").
+  function renderTcDraft(state, team, pk, pool, sel) {
+    let h = `<div class="tc-panel"><h4><span class="n">2</span> Picks &amp; Fit for This Team</h4>`;
+    if (!pool) return h + `<div class="placeholder">No pool data for ${team}.</div></div>`;
+    // player-mode: the placement insight moved out of the old strip (at-pick status + next landing)
+    if (sel) {
+      const here = tcPickFit(sel.c.comp, pk, state), land = tcNextLanding(state, team, sel.c.comp);
+      h += `<div class="tc-fitline sm">
+        <span>At <b>#${pk.overall}</b> <span class="tg ${here.cls}">${here.label}</span></span>
+        <span class="tc-nextland">Next realistic landing <b>${land?`#${land.overall} · ${roundLabel(land.round)}`:'—'}</b></span></div>`;
+    }
+    h += `<div class="tc-kv"><span class="k">Available / spent</span><span class="v">${fmt$(pool.room)} <span class="tc-onpace">of ${fmt$(pool.pool)}</span></span></div>`;
+    const pace = pool.overUnder>0?"OVER":pool.overUnder<0?"UNDER":"ON PACE";
+    h += `<div class="tc-kv"><span class="k">Over / under vs slot</span><span class="v">${fmtOU(pool.overUnder)} <span class="tc-onpace">${pace}</span></span></div>`;
+    const up = teamUpcoming(state, team);
+    const remSlot = up.reduce((s,p)=>s+(p.slot>0?p.slot:0),0);
+    // $ they can spend beyond paying every remaining pick at slot — the real over-slot cushion.
+    const cushion = pool.room - remSlot;
+    h += `<div class="tc-kv"><span class="k">Over-slot cushion</span><span class="v">${cushion>=0?"+":"−"}${fmtM(Math.abs(cushion))} <span class="tc-onpace">${cushion>=0?"to spend above slot":"must save vs slot"}</span></span></div>`;
+    // Player mode: show the selected player's fit at each pick. Team mode: show who might fit.
+    const selName = sel ? tcInitialName(sel.c.name).split(" ").slice(-1)[0] : "";
+    h += `<table class="tc-upc"><thead><tr><th>Pick</th><th>Slot</th><th>${sel?selName+" fit":"Who might fit"}</th></tr></thead><tbody>`;
+    h += up.slice(0,8).map(p=>{
+      const cur = p.overall===pk.overall;
+      let lastCol;
+      if (sel) {
+        const pf = tcPickFit(sel.c.comp, p, state);
+        lastCol = `<span class="tg ${pf.cls}">${pf.label}</span>`;
+      } else {
+        const cand = clientsInPlay(p, state)[0];
+        lastCol = cand ? `<span class="tc-cdot" style="background:${intelColorHex(cand.c.key, team)};display:inline-block;vertical-align:middle;margin-right:4px"></span>${tcInitialName(cand.c.name).split(" ").slice(-1)[0]} <span style="color:var(--muted)">${cand.f.orgGrade}</span>` : "—";
+      }
+      return `<tr>
+        <td class="${cur?'cur':''}">#${p.overall}${cur?'<span class="tc-cur-tag">Now</span>':''}</td>
+        <td>${p.slot>0?fmtM(p.slot):"—"}</td>
+        <td style="font-size:12px">${lastCol}</td></tr>`;
+    }).join("");
+    h += `</tbody></table>`;
+    h += `<div class="tc-kv" style="margin-top:6px"><span class="k">Total remaining (${up.length} picks)</span><span class="v">${fmtM(remSlot)}</span></div>`;
+    return h + `</div>`;
+  }
+
+  // Historical signing leverage for a player's profile (level × position), from 2021-25 data.
+  function leverageFor(comp) {
+    const L = DATA.leverage && DATA.leverage.mult, N = DATA.leverage && DATA.leverage.n;
+    if (!L || !comp) return null;
+    const lc = levelClass(comp), pg = comp.posGroup;
+    const cell = L[lc] || {};
+    const mult = (pg && cell[pg]!=null) ? cell[pg] : (cell["_"]!=null ? cell["_"] : L["_"]);
+    const n = (N && N[lc] && pg && N[lc][pg]!=null) ? N[lc][pg] : null;
+    return { mult, n, lc, pg };
+  }
+
+  // Q1 in team mode — org dev rank header + broad matrix of our clients' fit with this team.
+  function renderTcMatrix(state, team, o, roster) {
+    let h = `<div class="tc-panel"><h4><span class="n">1</span> Team Intel — Client Fit Matrix</h4>`;
+    h += `<div class="tc-fitline sm"><span>Org dev rank <b>${o.orgRank!=null?"#"+o.orgRank+" / 30":"—"}</b></span><span class="tc-nextland">${o.n||0} recent picks graded</span></div>`;
+    const top = roster.filter(x=>x.f.orgScore>=40).slice(0,8);
+    if (!top.length) return h + `<div class="placeholder">No notable client fits on file for ${team}.</div></div>`;
+    h += `<table class="tc-upc"><thead><tr><th>Client</th><th>Org fit</th><th>Intel</th><th>Next</th></tr></thead><tbody>`;
+    h += top.map(x=>{
+      const ti = teamInterest(x.c.key, team);
+      const land = teamUpcoming(state, team).find(p=>tcPickFit(x.c.comp, p, state).reachOk);
+      return `<tr>
+        <td style="font-size:12px">${intelDot(x.c.key, team)} ${tcInitialName(x.c.name)}${x.inPlay?'<span class="tc-inplay">IN PLAY</span>':''}</td>
+        <td><span class="grade gradeN" data-org="${team}">${x.f.orgGrade}</span></td>
+        <td>${(ti.strength*10).toFixed(1)}</td>
+        <td>${land?`#${land.overall}`:'—'}</td></tr>`;
+    }).join("");
+    return h + `</tbody></table></div>`;
+  }
+
+  // Q3 Historical Team Habits — org rank/homegrown/tendencies + bonus posture + recent 1st-rounders;
+  // profile-aware + projected signing $ for the selected player.
+  function renderTcHabits(state, team, pk, pool, o, sel) {
+    let h = `<div class="tc-panel"><h4><span class="n">3</span> Historical Team Habits</h4>`;
+    if (!o || o.orgRank==null) return h + `<div class="placeholder">No org profile for ${team}.</div></div>`;
+    const dev = o.dev || {}, spread = spreadOf(team);
+    h += `<div class="tc-kv"><span class="k">Org dev rank · homegrown</span><span class="v">#${o.orgRank} / 30 · ${o.homegrown!=null?o.homegrown:"—"} in system</span></div>`;
+    h += `<div class="tc-kv"><span class="k">Early-pick pitchers</span><span class="v">${o.earlyPitcherPct!=null?o.earlyPitcherPct+"%":"—"}</span></div>`;
+    h += `<div class="tc-kv"><span class="k">HS / College mix</span><span class="v">${o.hsPct!=null?o.hsPct:"—"}% / ${o.collegePct!=null?o.collegePct:"—"}%</span></div>`;
+    h += `<div class="tc-kv"><span class="k">MLB-debut rate (dev)</span><span class="v">${dev.mlbDebut!=null?Math.round(dev.mlbDebut*100)+"%":"—"}</span></div>`;
+    const posture = spread>=0.55 ? "spreads pool — pays over slot to bank picks" : spread<=0.25 ? "disciplined — pays at/under slot" : "balanced pool approach";
+    h += `<div class="tc-kv"><span class="k">Bonus posture</span><span class="v" style="font-size:12px;text-align:right">${Math.round(spread*100)}% spread · ${fmtOU(pool?pool.overUnder:0)}<br><span style="color:var(--muted);font-weight:600">${posture}</span></span></div>`;
+    const r1 = o.recentR1 || [];
+    if (r1.length) {
+      h += `<div class="tc-chart-h" style="margin-top:11px">Recent 1st-round picks <span style="font-weight:600;text-transform:none;letter-spacing:0">· signing bonus</span></div>`;
+      h += r1.map(r=>{
+        const rel = sel ? (isPitcher(sel.c.comp.pos)===isPitcher(r.pos||"")) : false;
+        const sg = slotSign(r.player, r.year);   // historical bonus from the slot tracker
+        const bonusCell = (sg && sg.bonus!=null)
+          ? `${fmtM(sg.bonus)}${sg.diff!=null?` <span class="tg ${sg.diff>0?'over':sg.diff<0?'under':'fit'}" style="font-size:9px">${sg.diff>0?"+":""}${fmtM(sg.diff)}</span>`:""}`
+          : `<span style="color:var(--muted);font-weight:600;font-size:11px">${r.school||"—"}</span>`;
+        return `<div class="tc-kv"><span class="k" style="color:var(--ink)">${r.year} · ${r.player} <span style="color:var(--muted)">(${r.pos})</span>${rel?' <span class="tc-inplay" style="border-color:#3949ab;color:#3949ab">≈ profile</span>':''}</span><span class="v">${bonusCell}</span></div>`;
+      }).join("");
+    }
+    if (sel) {
+      const c = sel.c.comp, isHS = c.level==="HS", p = isPitcher(c.pos);
+      const levPct = isHS ? o.hsPct : o.collegePct;
+      const withLean = (p && o.earlyPitcherPct>=50) || (!p && o.earlyPitcherPct<50);
+      const bonus = negBonus(c, pk.slot, pk.overall), ou = bonus - pk.slot;
+      const last = tcInitialName(sel.c.name).split(" ").slice(-1)[0];
+      const lb3 = bonusFor(sel.c.key);
+      if (lb3) h += `<div class="tc-kv" style="margin-top:8px"><span class="k">Logged ${last} bonus (${lb3.kind})</span><span class="v">${fmtM(lb3.amount)}${lb3.pick?` <span class="tc-onpace">at #${lb3.pick}</span>`:""}</span></div>`;
+      h += `<div class="tc-kv" ${lb3?'':'style="margin-top:8px"'}><span class="k">Projected ${last} bonus · ${team}</span><span class="v">${fmtM(bonus)} <span class="tg ${ou>0?'over':ou<0?'under':'fit'}">${ou>0?"over":ou<0?"under":"at"} slot</span></span></div>`;
+      h += `<div class="tc-kv"><span class="k">Agent · market value</span><span class="v" style="font-size:12px">${c.agent||"—"} · ${fmt$(demandFor(c))}</span></div>`;
+      h += `<div class="tc-hab-note">${last} is a ${isHS?"HS":"college"} ${p?"pitcher":"position player"}. ${team} takes ${levPct!=null?levPct+"%":"—"} ${isHS?"HS":"college"} and leans ${o.earlyPitcherPct>=50?"pitcher":"hitter"} early — this profile ${withLean?"fits":"runs against"} their early-pick habit.</div>`;
+    }
+    return h + `</div>`;
+  }
+
+  window.setTcRange = (mode) => { tcRangeMode = mode; renderTeamCard(currentState); };
+  // Q4 Pick Range History — real 2018-25 signings near this slot (draft-slot-tracker). Team mode:
+  // who signed in this spot. Player mode: comps matching the client's profile and how they fared.
+  function renderTcRangeHistory(state, team, pk, sel) {
+    const lastName = sel ? tcInitialName(sel.c.name).split(" ").slice(-1)[0] : "";
+    let h = `<div class="tc-panel"><h4><span class="n">4</span> Pick Range History${sel?' · '+lastName:''}</h4>`;
+    const H = DATA.slotHistory;
+    const lo = Math.max(1, pk.overall-4), hi = pk.overall+8;
+    const trackerUrl = SLOT_HISTORY_URL.replace("/data.csv","/");
+    h += `<div class="tc-fitline sm"><span>Signings at picks <b>#${lo}–#${hi}</b></span><span class="tc-nextland"><a href="${trackerUrl}" target="_blank" rel="noopener" style="color:var(--red);font-weight:800">full tracker ↗</a></span></div>`;
+    if (!H.length) return h + `<div class="placeholder">Loading historical signings…</div></div>`;
+
+    let filt = null, header = "In this spot (2018–25)";
+    if (sel) {
+      const c = sel.c.comp, useProfile = tcRangeMode !== "all";
+      const lvl = c.level==="HS" ? "HS" : "College";
+      if (useProfile) { filt = { level: lvl, group: c.posGroup }; header = `${lvl} ${c.posGroup||c.pos} comps`; }
+      else header = "All in this spot";
+      h += `<div class="tc-toggle"><button class="${useProfile?'on':''}" onclick="setTcRange('profile')">Same profile</button><button class="${!useProfile?'on':''}" onclick="setTcRange('all')">All in range</button></div>`;
+      // projected outcome for our client at this pick (+ any logged bonus fact)
+      const bonus = negBonus(c, pk.slot, pk.overall), ou = bonus - pk.slot;
+      const lb4 = bonusFor(sel.c.key);
+      if (lb4) h += `<div class="tc-kv"><span class="k">Logged bonus (${lb4.kind})</span><span class="v">${fmtM(lb4.amount)}${lb4.pick?` <span class="tc-onpace">at #${lb4.pick}</span>`:""}</span></div>`;
+      h += `<div class="tc-kv"><span class="k">Projected ${lastName} bonus</span><span class="v">${fmtM(bonus)} <span class="tg ${ou>0?'over':ou<0?'under':'fit'}">${ou>0?"over":ou<0?"under":"at"} slot</span></span></div>`;
+      h += `<div class="tc-kv"><span class="k">Agent · market value</span><span class="v" style="font-size:12px">${c.agent||"—"} · ${fmt$(demandFor(c))}</span></div>`;
+    }
+    let comps = slotComps(pk, filt);
+    if (sel && filt && comps.length < 3) { comps = slotComps(pk, { level: filt.level }); header += " (widened)"; }
+    const wd = comps.filter(r=>r.diff!=null), n = wd.length, overN = wd.filter(r=>r.diff>0).length;
+    const avg = n ? wd.reduce((s,r)=>s+r.diff,0)/n : 0;
+    if (n) {
+      h += `<div class="tc-kv"><span class="k">${header}</span><span class="v">${n} signed · ${Math.round(100*overN/n)}% over slot</span></div>`;
+      h += `<div class="tc-kv"><span class="k">Avg vs slot</span><span class="v">${avg>=0?"+":""}${fmtM(avg)}</span></div>`;
+      h += `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Bonus</th><th>vs slot</th></tr></thead><tbody>`;
+      h += comps.slice(0,6).map(r=>`<tr>
+        <td>'${String(r.year).slice(2)}</td>
+        <td style="font-size:11px">${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos}·#${r.overall}</span></td>
+        <td>${r.bonus!=null?fmtM(r.bonus):"—"}</td>
+        <td>${r.diff!=null?`<span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`).join("");
+      h += `</tbody></table>`;
+    } else {
+      h += `<div class="placeholder">No comparable signings in this range.</div>`;
+    }
+    return h + `</div>`;
   }
 
   function renderArmedForm(team, pk) {
-    const k = armed.kind, labels = { interest_received:"Interest received", interest_sought:"Interest sought", strike_window:"Strike window", offer:"Offer" };
+    const k = armed.kind, labels = { interest_received:"Interest received", interest_sought:"Interest sought", strike_window:"Strike window", offer:"Offer", bonus:"Signing bonus" };
     let inner = "";
+    if (k==="bonus") {
+      inner = `<label>Status <select id="afBonusKind"><option value="rumored">rumored</option><option value="confirmed">confirmed</option></select></label>
+        <span style="display:inline-flex;gap:4px;align-items:center">$<input id="afAmount" type="number" placeholder="amount" style="width:120px"></span>
+        <label>pick #<input id="afPick" type="number" min="1" value="${pk?pk.overall:""}" style="width:64px"></label>
+        <input id="afNote" placeholder="source / note (optional)">`;
+    }
     if (k==="interest_received" || k==="interest_sought") {
       inner = `<label>Strength <select id="afStrength">${[6,5,4,3,2,1,0,-1,-2,-3,-4,-5,-6].map(n=>`<option ${n===4?"selected":""}>${n>0?"+"+n:n}</option>`).join("")}</select></label>
         <label>Color <select id="afColor"><option value="">—</option><option>green</option><option>yellow</option><option>orange</option><option>red</option></select></label>
@@ -1518,7 +2160,7 @@
   function renderTeamDetail(state) {
     const t = selected.id, pool = state.poolsMap[t], o = DATA.orgs[t] || {};
     const teamName = (state.pools.find(p=>p.team===t)||{}).teamName || "";
-    let h = `<div class="cc"><div class="detail-head"><span class="big">${t}</span><span class="pl">${teamName}</span></div>`;
+    let h = `<div class="cc"><div class="detail-head">${teamLogo(t,34)}<span class="big">${t}</span><span class="pl">${teamName}</span></div>`;
     if (pool) h += `<div class="pool-row">${[
       ["Pool", fmt$(pool.pool)], ["Spent", fmt$(pool.poolCharge)+(pool.hasEst?" est":"")],
       ["Room (ammo)", fmt$(pool.room)], ["Overage (5% cushion)", fmt$(pool.overage)],
@@ -1633,6 +2275,11 @@
                  ["tabPools","viewPools","pools"],["tabBest","viewBest","best"]];
   function renderActive() {
     if (!currentState) return;
+    // refresh the open team card on live data ticks, but don't wipe an in-progress capture form
+    if (cardPick!=null) {
+      const ae = document.activeElement;
+      if (!(armed && ae && (ae.tagName==="INPUT" || ae.tagName==="SELECT"))) renderTeamCard(currentState);
+    }
     if (selected) {
       const ae = document.activeElement;   // don't wipe range/medical inputs mid-edit on live ticks
       if (!(ae && (ae.tagName==="INPUT" || ae.tagName==="SELECT"))) renderDetail();
@@ -1806,6 +2453,10 @@
   }
   function tick() {
     renderCountdown();
+    // keep the team-card countdown ticking without a full modal re-render
+    if (cardPick!=null && timer.pick===cardPick && timer.endsAt!=null) {
+      const el = $("tcClock"); if (el) el.textContent = fmtCountdown(timer.endsAt-Date.now());
+    }
     const pre = isPreDraft();
     if (pre !== lastPre) { lastPre = pre; renderActive(); }   // flip to live the moment the draft starts
     updatePreDraft();
@@ -1907,11 +2558,15 @@
     }
   }
 
+  document.addEventListener("keydown", (e) => { if (e.key==="Escape" && cardPick!=null) closeTeamCard(); });
+
   (async () => {
     initOrgTooltip();
+    applyTv();
     await loadStatic();
     try { await loadOrder(); } catch (e) {}   // slot table for demandFor() in all views
     await loadIntel().then(backfillLocalSettings);   // load shared intel, then migrate browser-only ranges/medicals
+    loadSlotHistory();                                // historical draft-slot signings for the team card's Q4
     pollLive();
     setInterval(pollLive, 3000);
     setInterval(loadIntel, 12000);            // refresh shared intel so the war room stays in sync
