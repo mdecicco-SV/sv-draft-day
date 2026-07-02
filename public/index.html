@@ -300,7 +300,13 @@
   .tc-backdrop { display:none; position:fixed; inset:0; z-index:90; background:rgba(0,0,0,.42); padding:24px; }
   .tc-backdrop.on { display:flex; align-items:stretch; justify-content:center; }
   .tc-card { background:var(--card); border-radius:16px; width:100%; height:calc(100vh - 48px); box-shadow:0 24px 70px rgba(0,0,0,.3); display:flex; flex-direction:column; overflow:hidden; }
-  .tc-top { display:flex; align-items:center; gap:12px; padding:13px 22px; border-bottom:1px solid var(--line); flex:0 0 auto; }
+  .tc-top { position:relative; display:flex; align-items:center; gap:12px; padding:13px 22px; border-bottom:1px solid var(--line); flex:0 0 auto; }
+  .tc-nav { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; align-items:center; gap:9px; }
+  .tc-nav-btn { border:1px solid var(--line); background:var(--card); border-radius:7px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:15px; font-weight:900; line-height:1; color:var(--ink); padding:0 0 2px; }
+  .tc-nav-btn:hover:not(:disabled) { border-color:var(--red); color:var(--red); }
+  .tc-nav-btn:disabled { opacity:.25; cursor:default; }
+  .tc-nav-lbl { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); white-space:nowrap; }
+  .tc-nav-lbl .sep { color:var(--muted); margin:0 3px; }
   .tc-top .tc-ttl { font-size:15px; font-weight:900; letter-spacing:.3px; text-transform:uppercase; color:var(--ink); }
   .tc-top .tc-abbr { font-weight:900; background:var(--ink); color:#fff; border-radius:7px; padding:3px 8px; font-size:12px; letter-spacing:.5px; }
   .tlogo { vertical-align:middle; object-fit:contain; }
@@ -320,6 +326,7 @@
   .tc-stat .v.big { color:var(--red); font-size:22px; }
   .tc-stat .sub { font-size:10px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
   .tc-selrow { flex:0 0 auto; }
+  .tc-band .tc-selrow + .tc-stats .tc-stat:first-child { border-left:1px solid var(--line); padding-left:14px; }
   .tc-inplay { font-size:8px; font-weight:800; color:var(--good); border:1px solid var(--good); border-radius:3px; padding:0 3px; margin-left:5px; letter-spacing:.3px; vertical-align:middle; }
   .tc-cdot { width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block; }
   .tc-pdrop .pdrop-btn { padding:8px 14px; min-width:280px; }
@@ -1846,6 +1853,17 @@
     document.body.style.overflow = "";
   };
   window.closeExpand = () => window.closeTeamCard();   // legacy alias
+  // Step the open card to the adjacent undrafted pick (drafted picks can't render here)
+  window.navCardPick = (dir) => {
+    const st = currentState; if (!st || cardPick==null) return;
+    const up = st.picks.filter(p=>!p.isDrafted).sort((a,b)=>a.overall-b.overall);
+    const i = up.findIndex(p=>p.overall===cardPick);
+    const tgt = i<0 ? null : up[i+dir];
+    if (!tgt) return;
+    cardPick = tgt.overall; evalPlayer = null; armed = null; tcMenuOpen = false; tcRangeMode = "profile";
+    renderTeamCard(st);
+    const bd = $("teamCard"); if (bd) bd.scrollTop = 0;
+  };
   window.selectEval = (key, e) => { if (e) e.stopPropagation(); evalPlayer = key || null; armed = null; tcMenuOpen = false; tcRangeMode = "profile"; renderTeamCard(currentState); };
   window.toggleTcMenu = (e) => { if (e) e.stopPropagation(); tcMenuOpen = !tcMenuOpen; renderTeamCard(currentState); };
   document.addEventListener("click", (e) => {
@@ -1953,12 +1971,22 @@
     if (evalPlayer && !roster.some(x=>x.c.key===evalPlayer)) evalPlayer = null;
     const sel = evalPlayer ? (roster.find(x=>x.c.key===evalPlayer) || null) : null;
 
+    // Round·pick navigator — steps through undrafted picks (the only ones this card can show)
+    const navPicks = state.picks.filter(p=>!p.isDrafted);
+    const navIdx = navPicks.findIndex(p=>p.overall===pk.overall);
+    const hasPrev = navIdx > 0, hasNext = navIdx >= 0 && navIdx < navPicks.length-1;
+
     let h = `<div class="tc-card">`;
     h += `<div class="tc-top">
       ${teamLogo(team,30)}
       <span class="tc-abbr">${team||"—"}</span>
       <span class="tc-ttl">Pick #${pk.overall} · ${pk.teamName||team||""}</span>
       ${onClockHere?`<span class="tc-live">● On the clock</span>`:`<span class="tc-round">Round ${pk.round}</span>`}
+      <div class="tc-nav">
+        <button class="tc-nav-btn" onclick="navCardPick(-1)" ${hasPrev?"":"disabled"} title="Previous pick">‹</button>
+        <span class="tc-nav-lbl">Round ${pk.round}<span class="sep">·</span>Pick ${pk.roundPick}</span>
+        <button class="tc-nav-btn" onclick="navCardPick(1)" ${hasNext?"":"disabled"} title="Next pick">›</button>
+      </div>
       <button class="tc-x" onclick="closeTeamCard()">✕</button></div>`;
 
     const next = state.picks.find(p=>!p.isDrafted && p.overall>pk.overall);
@@ -1994,7 +2022,7 @@
     } else {
       selHtml = `<div class="tc-selrow"><div class="placeholder">No undrafted clients on file.</div></div>`;
     }
-    h += `<div class="tc-band"><div class="tc-stats">${stats.map(([k,v,sub])=>`<div class="tc-stat"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`).join("")}</div>${selHtml}</div>`;
+    h += `<div class="tc-band">${selHtml}<div class="tc-stats">${stats.map(([k,v,sub])=>`<div class="tc-stat"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`).join("")}</div></div>`;
 
     h += `<div class="tc-panels">
       ${sel ? renderTcIntel(state, team, pk, sel) : renderTcMatrix(state, team, o, roster)}
