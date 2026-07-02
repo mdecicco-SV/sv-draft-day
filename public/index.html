@@ -817,14 +817,29 @@
     const arr = DATA.slotByName && DATA.slotByName.get(normName(name)); if (!arr) return null;
     return arr.find(r=>r.year===year) || arr[0] || null;
   }
-  // Historical signings near a pick's slot (overall band), optionally filtered to a player's profile.
+  // Comp window scales with draft position: the top slots are distinct (a #1 comp is
+  // only another #1 or #2), the middle of the draft blends, and late money is flat.
+  function slotWindow(ov) {
+    if (ov <= 3)   return { lo: Math.max(1, ov-1), hi: ov+1 };
+    if (ov <= 10)  return { lo: ov-1, hi: ov+2 };
+    if (ov <= 30)  return { lo: ov-2, hi: ov+4 };
+    if (ov <= 100) return { lo: ov-4, hi: ov+8 };
+    return { lo: ov-8, hi: ov+15 };
+  }
+  // Historical signings near a pick's slot — by pick number (scaled window) OR by money
+  // (bonus within ±20% of this slot's value, wherever they were picked); optionally
+  // filtered to a player's profile. Money-qualified rows carry _money for display.
   function slotComps(pk, filt) {
     const H = DATA.slotHistory; if (!H.length) return [];
-    const lo = Math.max(1, pk.overall-4), hi = pk.overall+8;
-    let rows = H.filter(r => r.overall>=lo && r.overall<=hi && r.bonus!=null);
+    const { lo, hi } = slotWindow(pk.overall);
+    const bandLo = pk.slot>0 ? pk.slot*0.8 : null, bandHi = pk.slot>0 ? pk.slot*1.2 : null;
+    let rows = H.filter(r => r.bonus!=null && (
+      (r.overall>=lo && r.overall<=hi) ||
+      (bandLo!=null && r.bonus>=bandLo && r.bonus<=bandHi)
+    )).map(r => (r.overall>=lo && r.overall<=hi) ? r : { ...r, _money: true });
     if (filt && filt.level) rows = rows.filter(r => r.level===filt.level);
     if (filt && filt.group) rows = rows.filter(r => r.group===filt.group);
-    return rows.sort((a,b)=> (b.year-a.year) || (Math.abs(a.overall-pk.overall)-Math.abs(b.overall-pk.overall)));
+    return rows.sort((a,b)=> (b.year-a.year) || (Math.abs(a.bonus-pk.slot)-Math.abs(b.bonus-pk.slot)));
   }
   const SUFFIX = /\b(jr|sr|ii|iii|iv|v)\b/g;
   const normName = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
@@ -2400,9 +2415,9 @@
     const lastName = sel ? tcInitialName(sel.c.name).split(" ").slice(-1)[0] : "";
     let h = `<div class="tc-panel"><h4><span class="n">4</span> Pick Range History${sel?' · '+lastName:''}</h4>`;
     const H = DATA.slotHistory;
-    const lo = Math.max(1, pk.overall-4), hi = pk.overall+8;
+    const { lo, hi } = slotWindow(pk.overall);
     const trackerUrl = SLOT_HISTORY_URL.replace("/data.csv","/");
-    h += `<div class="tc-fitline sm"><span>Signings at picks <b>#${lo}–#${hi}</b></span><span class="tc-nextland"><a href="${trackerUrl}" target="_blank" rel="noopener" style="color:var(--red);font-weight:800">full tracker ↗</a></span></div>`;
+    h += `<div class="tc-fitline sm"><span>Signings at <b>#${lo}${hi>lo?`–#${hi}`:""}</b>${pk.slot>0?` or <b>~${fmtM(pk.slot)}</b> money`:""}</span><span class="tc-nextland"><a href="${trackerUrl}" target="_blank" rel="noopener" style="color:var(--red);font-weight:800">full tracker ↗</a></span></div>`;
     if (!H.length) return h + `<div class="placeholder">Loading historical signings…</div></div>`;
 
     let filt = null, header = "In this spot (2018–25)";
@@ -2429,7 +2444,7 @@
       h += `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Bonus</th><th>vs slot</th></tr></thead><tbody>`;
       h += comps.slice(0,6).map(r=>`<tr>
         <td>'${String(r.year).slice(2)}</td>
-        <td style="font-size:11px">${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos}·#${r.overall}</span></td>
+        <td style="font-size:11px">${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos}·#${r.overall}</span>${r._money?' <span style="color:#1a7f37;font-weight:800" title="qualifies by money — signed near this slot value">$</span>':''}</td>
         <td>${r.bonus!=null?fmtM(r.bonus):"—"}</td>
         <td>${r.diff!=null?`<span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`).join("");
       h += `</tbody></table>`;
