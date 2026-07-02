@@ -374,23 +374,19 @@
   /* neutral fit-grade badge — teamintel colors are the only player-tied chroma on the board */
   .grade.gradeN { background:#fff; color:var(--ink); border:1px solid var(--line); }
   .fr-src { font-size:9px; font-weight:800; text-transform:uppercase; color:var(--muted); }
-  /* ── mock-side operator modules ── */
+  /* ── mock-side evaluation module: recent draft comparisons ── */
   .mock-mod { background:#fff; border:1px solid #f1b8c1; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
   .mock-mod-h { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); margin-bottom:8px; }
-  .radar-row { display:flex; align-items:center; gap:9px; padding:5px 7px; border-radius:8px; cursor:pointer; }
-  .radar-row:hover { background:#fdeef0; }
-  .radar-row .rr-no { font-weight:900; color:var(--red); min-width:38px; font-variant-numeric:tabular-nums; }
-  .radar-row .rr-away { font-size:10px; font-weight:800; color:var(--muted); min-width:32px; }
-  .radar-row .rr-tm { font-weight:900; min-width:56px; display:inline-flex; align-items:center; gap:4px; }
-  .radar-row .rr-slot { font-size:12px; font-weight:700; color:#374151; min-width:58px; font-variant-numeric:tabular-nums; }
-  .radar-row .rr-chips { display:flex; gap:5px; flex-wrap:wrap; }
-  .rr-chip { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; border:1px solid var(--line); border-radius:999px; padding:1px 8px; background:#fff; }
-  .rr-chip .idot { width:9px; height:9px; }
-  .rr-none { color:var(--muted); font-size:11px; }
-  .dig-bar { display:flex; gap:6px; margin-bottom:8px; }
-  .dig-bar input { flex:1; font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; }
-  .dig-h { font-size:13px; font-weight:900; margin:10px 0 4px; display:flex; align-items:center; gap:6px; }
-  #digResults .tc-kv .v { font-size:13px; }
+  .cmp-sel { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; }
+  .cmp-table { width:100%; border-collapse:collapse; }
+  .cmp-table th { text-align:left; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding:6px 8px; border-bottom:2px solid var(--ink); }
+  .cmp-table td { padding:9px 8px; border-bottom:1px solid var(--line); font-size:13px; font-weight:600; vertical-align:middle; }
+  .cmp-table .cmp-nm { font-weight:800; }
+  .cmp-table .cmp-dr b { font-size:14px; }
+  .cmp-table .cmp-dr span { font-size:11px; color:var(--muted); font-weight:600; }
+  .cmp-table .cmp-bn { font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .cmp-us { background:#fff0f1; } .cmp-us .cmp-nm { color:var(--red); }
+  .cmp-foot { margin-top:9px; font-size:11px; color:var(--muted); font-weight:600; }
   /* ── TV mode: wall-screen scale for the live board (per-device toggle) ── */
   body.tv .bcard { min-width:132px; }
   body.tv .bcard .bc-no { font-size:13px; }
@@ -567,20 +563,13 @@
     </div>
     <div class="board-split">
       <div class="board-left">
-        <!-- Mock-side operator modules: anticipatory radar + cold-fact precedent digger.
-             Static container (not re-rendered wholesale) so the digger input survives live ticks. -->
+        <!-- Mock-side evaluation module: Recent Draft Comparisons — baseball comps that anchor
+             "if this team comes with interest, what should we look at for X?" at any juncture. -->
         <div id="mockOps" style="display:none">
           <div class="mock-mod">
-            <div class="mock-mod-h">Forward radar <span class="exp-hint">next picks × our clients — colors are live teamintel</span></div>
-            <div id="mockRadar"></div>
-          </div>
-          <div class="mock-mod">
-            <div class="mock-mod-h">Precedent digger <span class="exp-hint">player, team, or pick # — comps, habits, logged intel</span></div>
-            <div class="dig-bar">
-              <input id="digQ" placeholder="e.g. Condon · SF · 41" onkeydown="if(event.key==='Enter')digGo()">
-              <button class="ctl" onclick="digGo()">Dig</button>
-            </div>
-            <div id="digResults"></div>
+            <div class="mock-mod-h">Recent draft comparisons <span class="exp-hint">baseball comps per client — drafted slot &amp; bonus facts from the slot tracker</span></div>
+            <div id="compsSel" class="cmp-sel"></div>
+            <div id="compsBody"></div>
           </div>
         </div>
         <div id="boardList" class="board"></div>
@@ -755,12 +744,18 @@
         const bonus=num(f[20]), slot=num(f[21]);
         rows.push({ year:+f[1], round:f[2], overall:+f[3], first:f[6], last:f[7], pos:f[8], group:posGroupOf(f[8]),
           level:(f[13]==="HS"?"HS":"College"), school:f[14], team:f[17], bonus, slot,
+          bats:f[9]||"", throws:f[10]||"", born:f[15]||"", ht:f[18]||"", wt:f[19]||"", full:f[16]||"",
           diff:(f[22]!==""&&f[22]!=null?num(f[22]):(bonus!=null&&slot!=null?bonus-slot:null)) });
       }
       DATA.slotHistory = rows;
-      // name index for looking up a specific player's signing (e.g. a team's recent 1st-rounders)
+      // name index for looking up a specific player's signing — index first+last AND the CSV's
+      // fullName (nicknames differ: "Perry Morlando" is listed as "PJ Morlando" in fullName)
       DATA.slotByName = new Map();
-      for (const r of rows) { const k = normName(r.first + " " + r.last); if (!DATA.slotByName.has(k)) DATA.slotByName.set(k, []); DATA.slotByName.get(k).push(r); }
+      const idx = (k, r) => { if (!k) return; if (!DATA.slotByName.has(k)) DATA.slotByName.set(k, []); DATA.slotByName.get(k).push(r); };
+      for (const r of rows) {
+        const a = normName(r.first + " " + r.last), b = normName(r.full);
+        idx(a, r); if (b && b !== a) idx(b, r);
+      }
       if (cardPick!=null) renderTeamCard(currentState);
     } catch (e) {}
   }
@@ -1359,84 +1354,68 @@
     $("boardCount").textContent = `${state.madeCount} of ${state.picks.length} picks made`;
     renderBoardPlayers(state);
     const ops = $("mockOps");
-    if (ops) { ops.style.display = MODE==="mock" ? "" : "none"; if (MODE==="mock") renderMockRadar(state); }
+    if (ops) { ops.style.display = MODE==="mock" ? "" : "none"; if (MODE==="mock") renderComps(state); }
     renderBoardGrid(state);
     renderBoardFeed(state);
   }
 
-  // ---------- Mock-side operator modules (radar + digger) ----------
-  // Next N undrafted picks × our clients — same teamintel-only rule as the board dots:
-  // green/light-green with the team AND in play at that specific pick.
-  function renderMockRadar(state) {
-    const el = $("mockRadar"); if (!el) return;
-    const next = state.picks.filter(p=>!p.isDrafted).slice(0, 8);
-    if (!next.length) { el.innerHTML = `<div class="placeholder">Draft complete.</div>`; return; }
-    const first = next[0].overall;
-    el.innerHTML = next.map(p=>{
-      const chips = tiClientsAt(p, state).slice(0, 6);
-      const away = p.overall - first;
-      return `<div class="radar-row" onclick="expandPick(${p.overall})">
-        <span class="rr-no">#${p.overall}</span>
-        <span class="rr-away">${away===0?"now":"+"+away}</span>
-        <span class="rr-tm">${teamLogo(p.team,15)}${p.team}</span>
-        <span class="rr-slot">${p.slot>0?fmtM(p.slot):"—"}</span>
-        <span class="rr-chips">${chips.map(c=>`<span class="rr-chip" data-intel-key="${c.key}" data-intel-team="${p.team}">
-          <span class="idot" style="background:${intelColorHex(c.key,p.team)}"></span>${initials(c.name)}</span>`).join("") || '<span class="rr-none">—</span>'}</span></div>`;
-    }).join("");
-  }
-
-  // Cold-fact lookup: a player (comps/profile/logged intel), a team (habits/pool), or a pick #
-  // (slot + who signed there 2018-25). No projections — precedent and logged facts only.
-  window.digGo = () => {
-    const el = $("digResults"), q = ($("digQ")?.value||"").trim(); if (!el) return;
-    if (!q) { el.innerHTML=""; return; }
-    const state = currentState; let h = "";
-    const kvRow = (k,v) => `<div class="tc-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-    const compsTable = (comps) => comps.length ? `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Bonus</th><th>vs slot</th></tr></thead><tbody>${
-      comps.slice(0,6).map(r=>`<tr><td>'${String(r.year).slice(2)}</td>
-        <td style="font-size:11px">${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos}·#${r.overall}</span></td>
-        <td>${r.bonus!=null?fmtM(r.bonus):"—"}</td>
-        <td>${r.diff!=null?`<span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`).join("")}</tbody></table>` : `<div class="placeholder">No signings in range.</div>`;
-
-    const asNum = parseInt(q, 10);
-    const teamQ = teamAlias(q.toUpperCase());
-    if (Number.isFinite(asNum) && String(asNum)===q) {
-      // pick # → slot value + who actually signed in this range
-      const pk = state ? pickByOverall(state, asNum) : null;
-      h += `<div class="dig-h">Pick #${asNum}${pk?` · ${pk.team} · ${roundLabel(pk.round)}`:""}</div>`;
-      if (pk && pk.slot>0) h += kvRow("Slot value", fmtM(pk.slot));
-      h += `<div class="tc-chart-h" style="margin-top:8px">Signings near #${asNum} (2018–25)</div>` + compsTable(slotComps({overall:asNum}));
-    } else if (DATA.orgs[teamQ] || (state && state.poolsMap[teamQ])) {
-      // team → habits + pool + recent R1s with real bonuses
-      const o = DATA.orgs[teamQ]||{}, pool = state ? state.poolsMap[teamQ] : null;
-      h += `<div class="dig-h">${teamLogo(teamQ,18)} ${teamQ} — habits &amp; pool</div>`;
-      if (o.orgRank!=null) h += kvRow("Org dev rank", `#${o.orgRank} / 30`);
-      if (o.earlyPitcherPct!=null) h += kvRow("Early pitchers · HS/College", `${o.earlyPitcherPct}% · ${o.hsPct??"—"}%/${o.collegePct??"—"}%`);
-      h += kvRow("Pool-spreader tendency", Math.round(spreadOf(teamQ)*100)+"%");
-      if (pool) h += kvRow("Pool room · over/under", `${fmt$(pool.room)} · ${fmtOU(pool.overUnder)}`);
-      for (const r of (o.recentR1||[])) {
-        const sg = slotSign(r.player, r.year);
-        h += kvRow(`${r.year} · ${r.player} (${r.pos})`, sg&&sg.bonus!=null?`${fmtM(sg.bonus)}${sg.diff!=null?` <span class="tg ${sg.diff>0?'over':sg.diff<0?'under':'fit'}" style="font-size:9px">${sg.diff>0?"+":""}${fmtM(sg.diff)}</span>`:""}`:(r.school||"—"));
-      }
-    } else {
-      // player → profile, logged intel facts, comps at his rank neighborhood
-      const qn = normName(q);
-      const matches = DATA.composite.filter(c=>normName(c.name).includes(qn)).slice(0,3);
-      if (!matches.length) h = `<div class="placeholder">No player, team, or pick matches “${q}”.</div>`;
-      for (const c of matches) {
-        const key = normName(c.name), cap = intelFor(key), lb = bonusFor(key), lev = leverageFor(c);
-        h += `<div class="dig-h">${c.name} <span style="color:var(--muted)">#${c.rank} ${c.pos} · ${c.school||""}</span></div>`;
-        h += kvRow("Profile · agent", `${levelClass(c).replace("College-","Col ")} ${c.posGroup||c.pos} · ${c.agent||"—"}`);
-        h += kvRow("Market value · sign floor", `${fmt$(demandFor(c))} · ${fmt$(signFloor(c))}`);
-        if (lev) h += kvRow(`Profile signs (hist.)`, `${lev.mult.toFixed(2)}× slot${lev.n!=null?` <span class="tc-onpace">${lev.n} comps</span>`:""}`);
-        if (cap?.window) h += kvRow("Logged window", `#${cap.window.lo||"?"}–#${cap.window.hi||"?"}`);
-        for (const ofr of (cap?.offers||[]).slice(0,3)) h += kvRow(`Offer · ${ofr.team||"?"} (${ofr.type||"—"})`, ofr.amount!=null?fmtM(ofr.amount):(ofr.lo||ofr.hi)?`${fmtM(ofr.lo)}–${fmtM(ofr.hi)}`:"—");
-        if (lb) h += kvRow(`Bonus (${lb.kind})`, `${fmtM(lb.amount)}${lb.pick?` <span class="tc-onpace">at #${lb.pick}</span>`:""}`);
-        h += `<div class="tc-chart-h" style="margin-top:8px">Signings near his rank (#${c.rank})</div>` + compsTable(slotComps({overall:c.rank}));
-      }
-    }
-    el.innerHTML = h;
+  // ---------- Mock-side evaluation module: Recent Draft Comparisons ----------
+  // "If this team comes with interest, what should we look at for X?" — baseball comps that
+  // anchor evaluation. Curated lists come from the SV deck; drafted slot/bonus facts hydrate
+  // live from the slot tracker. Clients without a curated list get cold auto-comps.
+  const DRAFT_COMPS = {   // client key -> comp names (slot-tracker spelling)
+    "trevor condon": ["Dillon Head","Slade Caldwell","Jonny Farmelo","Braylon Payne","Slater de Brun"],
+    "taj marchand":  ["Myles Naylor","Carson Williams","Sammy Stafura","Coy James"],
+    "bo lowrance":   ["Colson Montgomery","PJ Morlando","Brett Baty","Xavier Neyens"],
   };
+  let compsSel = null;   // client key shown in the comps module
+  window.setComps = (k, e) => { if (e) e.stopPropagation(); compsSel = k; renderComps(currentState); };
+  const compAge = (born, year) => {   // age on draft day (~Jul 14) from the CSV's m/d/yyyy borndate
+    const t = Date.parse(born); if (!Number.isFinite(t)) return null;
+    return (((Date.UTC(year,6,14) - t) / 31557600000)).toFixed(1);
+  };
+  const fmtHtWt = (r) => (r.ht && r.wt) ? `${r.ht.replace("-","'")}" / ${r.wt}` : "—";
+  // Auto comps: same level × position group, drafted nearest the client's composite rank,
+  // deduped, most recent first on ties. Cold facts only — no similarity modeling.
+  function autoComps(comp) {
+    const lvl = comp.level==="HS" ? "HS" : "College", grp = comp.posGroup || posGroupOf(comp.pos);
+    const seen = new Set(), out = [];
+    const rows = DATA.slotHistory.filter(r => r.bonus!=null && r.level===lvl && r.group===grp)
+      .sort((a,b) => Math.abs(a.overall-comp.rank)-Math.abs(b.overall-comp.rank) || b.year-a.year);
+    for (const r of rows) { const k = r.first+" "+r.last; if (seen.has(k)) continue; seen.add(k); out.push(r); if (out.length>=5) break; }
+    return out;
+  }
+  function renderComps(state) {
+    const selEl = $("compsSel"), bodyEl = $("compsBody"); if (!selEl || !bodyEl || !state) return;
+    const clients = DATA.clientList.filter(c=>c.comp)
+      .sort((a,b)=> ((DRAFT_COMPS[b.key]?1:0)-(DRAFT_COMPS[a.key]?1:0)) || a.comp.rank-b.comp.rank);
+    if (!clients.length) { bodyEl.innerHTML = `<div class="placeholder">No clients loaded.</div>`; return; }
+    if (!compsSel || !clients.some(c=>c.key===compsSel)) compsSel = clients[0].key;
+    selEl.innerHTML = clients.map(c=>`<button class="lens ${c.key===compsSel?'on':''}" onclick="setComps('${c.key.replace(/'/g,"\\'")}',event)">${tcInitialName(c.name)}${DRAFT_COMPS[c.key]?" ★":""}</button>`).join("");
+    const c = clients.find(x=>x.key===compsSel), comp = c.comp;
+    if (!DATA.slotHistory.length) { bodyEl.innerHTML = `<div class="placeholder">Loading historical signings…</div>`; return; }
+    const curated = DRAFT_COMPS[c.key];
+    const rows = curated ? curated.map(n=>slotSign(n)).filter(Boolean) : autoComps(comp);
+    const rowsH = rows.map(r=>`<tr>
+        <td class="cmp-nm">${r.full || (r.first+" "+r.last)}</td>
+        <td>${r.pos}</td><td>${r.bats&&r.throws?`${r.bats}/${r.throws}`:"—"}</td>
+        <td>${fmtHtWt(r)}</td>
+        <td>${compAge(r.born, r.year)??"—"}</td>
+        <td class="cmp-dr"><b>${r.year}</b><br><span>${roundLabel(r.round)} · #${r.overall} · ${r.team}</span></td>
+        <td class="cmp-bn">${r.bonus!=null?fmt$(r.bonus):"—"}${r.diff!=null?`<br><span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)} vs slot</span>`:""}</td>
+      </tr>`).join("");
+    const wd = rows.filter(r=>r.bonus!=null);
+    const lo = wd.length?Math.min(...wd.map(r=>r.bonus)):null, hi = wd.length?Math.max(...wd.map(r=>r.bonus)):null;
+    const avg = wd.length ? wd.reduce((s,r)=>s+r.bonus,0)/wd.length : null;
+    bodyEl.innerHTML = `
+      <table class="cmp-table"><thead><tr><th>Player</th><th>Pos</th><th>B/T</th><th>HT / WT</th><th>Age</th><th>Drafted</th><th>Bonus</th></tr></thead>
+      <tbody>
+        <tr class="cmp-us"><td class="cmp-nm">${c.name}</td><td>${comp.pos}</td><td>—</td><td>—</td><td>${fmtAge(comp.age)||"—"}</td>
+          <td class="cmp-dr"><b>2026</b><br><span>TBD${comp.rank?` · ranked #${comp.rank}`:""}</span></td><td class="cmp-bn">—</td></tr>
+        ${rowsH || `<tr><td colspan="7"><div class="placeholder">No comps found for this profile.</div></td></tr>`}
+      </tbody></table>
+      <div class="cmp-foot">${curated?"Curated comps (SV deck)":"Auto comps — same level × position, drafted nearest his rank"}${avg!=null?` · comp bonuses ${fmtM(lo)}–${fmtM(hi)} · avg <b>${fmt$(Math.round(avg))}</b>`:""}</div>`;
+  }
   // Readable text color for a filled intel-color card.
   function textOn(hex) {
     const h=(hex||"").replace("#",""); if (h.length<6) return "#111";
