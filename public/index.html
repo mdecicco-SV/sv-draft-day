@@ -360,6 +360,11 @@
   .tc-kv .v { font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
   .hg-pct { color:var(--muted); font-weight:700; }
   .pi-ovr { color:var(--muted); font-weight:600; margin-left:2px; }
+  .tc-feed-row { display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-top:1px solid var(--line); }
+  .tc-feed-row:first-child { border-top:none; }
+  .tc-feed-meta { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); }
+  .tc-feed-note { font-size:12px; color:var(--ink); font-weight:600; white-space:pre-wrap; margin-top:1px; }
+  .tc-feed-more { font-size:10px; font-weight:700; color:var(--muted); padding:6px 0 0; text-transform:uppercase; letter-spacing:.3px; }
   .tc-made { flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:30px; text-align:center; }
   .tc-made-name { font-size:26px; font-weight:600; color:var(--ink); }
   .tc-made-name b { font-weight:900; }
@@ -2185,6 +2190,25 @@
       </div><div>
         <div class="tc-chart-h">Interest strength over time <span style="font-weight:600;text-transform:none;letter-spacing:0">· line color = signal at that time</span></div>
         ${tcSparkline(points, col)}`;
+    // Teamintel feed — the raw logged records for this player × team, newest first
+    if (recs.length) {
+      const FEED_CAP = 12;
+      const feed = [...recs].reverse().slice(0, FEED_CAP);
+      h += `<div class="tc-chart-h" style="margin-top:12px">Teamintel feed · ${team} × ${tcInitialName(sel.c.name)}</div><div class="tc-feed">`;
+      h += feed.map((r, i) => {
+        const hex = points[recs.length-1-i].hex;
+        const src = r.is_manual ? "manual" : (r.channel ? "#"+r.channel : "");
+        const meta = [r.date||"—", (r.tier_label||"").replace(/_/g," ").toLowerCase(), src].filter(Boolean).join(" · ");
+        const raw = (r.note || r.full_text || "").trim();
+        const note = raw.length > 220 ? raw.slice(0,220)+"…" : raw;
+        const sig = [r.color?`signal: ${r.color}`:"", r.score!=null?`score ${r.score}`:""].filter(Boolean).join(" · ");
+        return `<div class="tc-feed-row"><span class="tc-cdot" style="background:${hex};margin-top:3px"></span>
+          <div class="tc-feed-body"><div class="tc-feed-meta">${meta}</div>
+          ${note?`<div class="tc-feed-note">${_esc(note)}</div>`:(sig?`<div class="tc-feed-note" style="color:var(--muted)">${sig}</div>`:"")}</div></div>`;
+      }).join("");
+      if (recs.length > FEED_CAP) h += `<div class="tc-feed-more">+ ${recs.length-FEED_CAP} earlier records</div>`;
+      h += `</div>`;
+    }
     const tiers = {};
     for (const r of recs) { const t=(r.tier_label||"").toUpperCase(); if (t) tiers[t]=(tiers[t]||0)+1; }
     const tKeys = Object.keys(tiers), tTot = tKeys.reduce((s,k)=>s+tiers[k],0);
@@ -2289,54 +2313,74 @@
     } else {
       h += `<div class="tc-kv"><span class="k">Homegrown</span><span class="v">${o.homegrown!=null?`${o.homegrown} in system`:"—"}</span></div>`;
     }
-    // Range-specific org habits: the team's actual 2018-25 picks near THIS slot
-    // (slot-tracker rows carry the signing team as a full name; franchises renamed
-    // mid-window are aliased forward).
+    // Round-specific org habits: the team's actual 2018-25 picks in THIS round.
+    // The slot tracker labels comp/PPI selections with the adjacent numeric round,
+    // so special 2026 rounds (PPI, CB-A, SUP-2, 2C, 4C…) fold forward to the last
+    // numeric round before them. Renamed franchises are aliased forward.
     const NAME_FWD = { "Cleveland Indians":"Cleveland Guardians", "Oakland Athletics":"Athletics" };
-    const rgLo = Math.max(1, pk.overall-15), rgHi = pk.overall+15;
-    const myName = pk.teamName || "";
-    const rg = DATA.slotHistory.length
-      ? DATA.slotHistory.filter(r => (NAME_FWD[r.team]||r.team)===myName && r.overall>=rgLo && r.overall<=rgHi)
-      : null;   // null = tracker still loading
-    const rangeLbl = `#${rgLo}–#${rgHi}`;
-    let mixV = "…", leanPitcher = o.earlyPitcherPct!=null && o.earlyPitcherPct>=50, leanWhere = "early";
-    if (rg) {
-      if (rg.length) {
-        const pN = rg.filter(r=>r.group==="P").length;
-        const pPct = Math.round(100*pN/rg.length);
-        mixV = `${pPct}% P / ${100-pPct}% H <span class="hg-pct">· ${rg.length} picks</span>`;
-        if (rg.length >= 5) { leanPitcher = pPct >= 50; leanWhere = "in this range"; }
-      } else mixV = "—";
+    let rd = String(pk.round);
+    if (!/^\d+$/.test(rd)) {
+      let last = "1";
+      for (const p of state.picks) { if (/^\d+$/.test(String(p.round))) last = String(p.round); if (p.overall === pk.overall) break; }
+      rd = last;
     }
-    h += `<div class="tc-kv"><span class="k">P / H mix · ${rangeLbl}</span><span class="v">${mixV}</span></div>`;
-    h += `<div class="tc-kv"><span class="k">HS / College mix</span><span class="v">${o.hsPct!=null?o.hsPct:"—"}% / ${o.collegePct!=null?o.collegePct:"—"}%</span></div>`;
+    const myName = pk.teamName || "";
+    const rdRows = DATA.slotHistory.length
+      ? DATA.slotHistory.filter(r => (NAME_FWD[r.team]||r.team)===myName && String(r.round)===rd)
+          .sort((a,b)=> (b.year-a.year) || (a.overall-b.overall))
+      : null;   // null = tracker still loading
+    const rdLbl = `round ${rd}`;
+    let mixV = "…", hsV = "…", hsPctRd = null, leanPitcher = o.earlyPitcherPct!=null && o.earlyPitcherPct>=50, leanWhere = "early";
+    if (rdRows) {
+      if (rdRows.length) {
+        const pN = rdRows.filter(r=>r.group==="P").length;
+        const hsN = rdRows.filter(r=>r.level==="HS").length;
+        const pPct = Math.round(100*pN/rdRows.length), hsPct = Math.round(100*hsN/rdRows.length);
+        mixV = `${pPct}% P / ${100-pPct}% H <span class="hg-pct">· ${rdRows.length} picks</span>`;
+        hsV = `${hsPct}% / ${100-hsPct}%`;
+        if (rdRows.length >= 5) { hsPctRd = hsPct; leanPitcher = pPct >= 50; leanWhere = `in ${rdLbl}`; }
+      } else { mixV = "—"; hsV = "—"; }
+    }
+    h += `<div class="tc-kv"><span class="k">P / H mix · ${rdLbl}</span><span class="v">${mixV}</span></div>`;
+    h += `<div class="tc-kv"><span class="k">HS / College · ${rdLbl}</span><span class="v">${hsV}</span></div>`;
     h += `<div class="tc-kv"><span class="k">MLB-debut rate (dev)</span><span class="v">${dev.mlbDebut!=null?Math.round(dev.mlbDebut*100)+"%":"—"}</span></div>`;
     let postV = "…";
-    if (rg) {
-      const signed = rg.filter(r=>r.diff!=null);
+    if (rdRows) {
+      const signed = rdRows.filter(r=>r.diff!=null);
       if (signed.length) {
         const overN = signed.filter(r=>r.diff>0).length;
         const avg = signed.reduce((s,r)=>s+r.diff,0)/signed.length;
-        const posture = avg>=100000 ? "pays over slot in this range" : avg<=-100000 ? "pays under slot in this range" : "pays at slot in this range";
+        const posture = avg>=100000 ? `pays over slot in ${rdLbl}` : avg<=-100000 ? `pays under slot in ${rdLbl}` : `pays at slot in ${rdLbl}`;
         postV = `${Math.round(100*overN/signed.length)}% over · avg ${avg>=0?"+":""}${fmtM(avg)}<br><span style="color:var(--muted);font-weight:600">${signed.length} signings · ${posture}</span>`;
       } else postV = "—";
     }
-    h += `<div class="tc-kv"><span class="k">Bonus posture · ${rangeLbl}</span><span class="v" style="font-size:12px;text-align:right">${postV}</span></div>`;
-    const r1 = o.recentR1 || [];
-    if (r1.length) {
-      h += `<div class="tc-chart-h" style="margin-top:11px">Recent 1st-round picks <span style="font-weight:600;text-transform:none;letter-spacing:0">· signing bonus</span></div>`;
-      h += r1.map(r=>{
-        const rel = sel ? (isPitcher(sel.c.comp.pos)===isPitcher(r.pos||"")) : false;
-        const sg = slotSign(r.player, r.year);   // historical bonus from the slot tracker
-        const bonusCell = (sg && sg.bonus!=null)
-          ? `${fmtM(sg.bonus)}${sg.diff!=null?` <span class="tg ${sg.diff>0?'over':sg.diff<0?'under':'fit'}" style="font-size:9px">${sg.diff>0?"+":""}${fmtM(sg.diff)}</span>`:""}`
-          : `<span style="color:var(--muted);font-weight:600;font-size:11px">${r.school||"—"}</span>`;
-        return `<div class="tc-kv"><span class="k" style="color:var(--ink)">${r.year} · ${r.player} <span style="color:var(--muted)">(${r.pos})</span>${rel?' <span class="tc-inplay" style="border-color:#3949ab;color:#3949ab">≈ profile</span>':''}</span><span class="v">${bonusCell}</span></div>`;
+    h += `<div class="tc-kv"><span class="k">Bonus posture · ${rdLbl}</span><span class="v" style="font-size:12px;text-align:right">${postV}</span></div>`;
+    // Precedents — every pick this org made in this round across the DB years.
+    // With a player selected, true money comps (same HS/College level + position
+    // group) surface to the top; same-side P/H matches get the softer ≈ marker.
+    if (rdRows && rdRows.length) {
+      const tierOf = r => {
+        if (!sel) return 0;
+        const c = sel.c.comp;
+        const lvl = c.level==="HS" ? "HS" : "College";
+        if (r.level===lvl && r.group===(c.posGroup||posGroupOf(c.pos))) return 2;
+        return isPitcher(c.pos)===(r.group==="P") ? 1 : 0;
+      };
+      const prec = [...rdRows].sort((a,b)=> (tierOf(b)-tierOf(a)) || (b.year-a.year) || (a.overall-b.overall));
+      h += `<div class="tc-chart-h" style="margin-top:11px">Round ${rd} precedents <span style="font-weight:600;text-transform:none;letter-spacing:0">· 2018–25 · signing bonus${sel?' · $ = money comp':''}</span></div>`;
+      h += prec.map(r=>{
+        const tier = tierOf(r);
+        const bonusCell = r.bonus!=null
+          ? `${fmtM(r.bonus)}${r.diff!=null?` <span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:""}`
+          : `<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`;
+        const mark = tier===2 ? ' <span class="tc-inplay">$ COMP</span>'
+                   : tier===1 ? ' <span class="tc-inplay" style="border-color:#3949ab;color:#3949ab">≈ profile</span>' : '';
+        return `<div class="tc-kv"${tier===2?' style="background:#f2faf4;margin:0 -6px;padding-left:6px;padding-right:6px;border-radius:6px"':''}><span class="k" style="color:var(--ink)">'${String(r.year).slice(2)} · ${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos} · #${r.overall}</span>${mark}</span><span class="v">${bonusCell}</span></div>`;
       }).join("");
     }
     if (sel) {
       const c = sel.c.comp, isHS = c.level==="HS", p = isPitcher(c.pos);
-      const levPct = isHS ? o.hsPct : o.collegePct;
+      const levPct = hsPctRd!=null ? (isHS ? hsPctRd : 100-hsPctRd) : (isHS ? o.hsPct : o.collegePct);
       const withLean = (p && leanPitcher) || (!p && !leanPitcher);
       const bonus = negBonus(c, pk.slot, pk.overall), ou = bonus - pk.slot;
       const last = tcInitialName(sel.c.name).split(" ").slice(-1)[0];
