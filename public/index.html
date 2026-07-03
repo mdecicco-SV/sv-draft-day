@@ -835,8 +835,6 @@
     LAMBDA: 4.5,          // cost of money: talent points sacrificed per $1M
     BANK_K: 2.5,          // spare money vs picks left -> lower cost-of-money (spend the cushion)
     RESERVE: 90000,       // $ reserved per remaining pool pick so late picks stay signable
-    TOP_DISCOUNT: 0.90,   // elite picks (<=10) sign under the mega-slot
-    RAMP_DIV: 24,         // leverage premium ramps in from pick 1 to ~pick 25
     EROSION_RATE: 0.010,  // a slider's price erodes per spot fallen past his rank
     EROSION_FLOOR: 0.40,
     HOLD: { HS:0.90, JUCO:0.85, "College-JR":0.55, "College-SR":0.15 }, // over-slot premium captured
@@ -1059,18 +1057,23 @@
     if (comp.level === "College") return (a && a >= 21.5) ? "College-SR" : "College-JR";
     return (a && a <= 18.5) ? "HS" : "College-JR";   // Unk -> age proxy
   }
-  function leverageMult(comp) {
+  // Rank-banded leverage (leverage.json): the 2021-25 bonus/slot-at-rank medians per
+  // level x rank band x position, evaluated at band midpoints and linearly interpolated
+  // by rank so estimates don't cliff at a band edge. The bands ARE the old hand-tuned
+  // ramp + top-10 discount, but measured: top-ranked HS hitters ~0.93x slot, deep prep
+  // talent 2-3x (commitment buyouts).
+  const LEV_BANDS = [ {key:"1-9",mid:5}, {key:"10-20",mid:15}, {key:"21-45",mid:33}, {key:"46-120",mid:83}, {key:"121+",mid:180} ];
+  function effMult(comp) {
     const L = DATA.leverage && DATA.leverage.mult; if (!L) return 1;
-    const cell = L[levelClass(comp)];
-    if (cell && cell[comp.posGroup] != null) return cell[comp.posGroup];
-    if (cell && cell["_"] != null) return cell["_"];
-    return L["_"] || 1;
-  }
-  function effMult(comp) {                             // leverage, ramped in (top picks ~ slot) + elite discount
-    const ramp = Math.min(1, Math.max(0, (comp.rank-1)/ENG.RAMP_DIV));
-    let m = 1 + (leverageMult(comp)-1)*ramp;
-    if (comp.rank <= 10) m *= ENG.TOP_DISCOUNT;
-    return m;
+    const lv = L[levelClass(comp)]; if (!lv) return L["_"] || 1;
+    const at = (b) => { const c = lv[b.key]; return c ? (c[comp.posGroup] ?? c["_"]) : (lv["_"] ?? L["_"] ?? 1); };
+    const r = comp.rank || 1;
+    if (r <= LEV_BANDS[0].mid) return at(LEV_BANDS[0]);
+    for (let i=0; i<LEV_BANDS.length-1; i++) {
+      const a = LEV_BANDS[i], b = LEV_BANDS[i+1];
+      if (r <= b.mid) return at(a) + (at(b)-at(a)) * (r-a.mid) / (b.mid-a.mid);
+    }
+    return at(LEV_BANDS[LEV_BANDS.length-1]);
   }
   function demandFor(comp) {                           // expected market bonus for the player
     if (!comp) return null;
@@ -2511,17 +2514,6 @@
     h += `</tbody></table>`;
     h += `<div class="tc-kv" style="margin-top:6px"><span class="k">Total remaining (${up.length} picks)</span><span class="v">${fmtM(remSlot)}</span></div>`;
     return h + `</div>`;
-  }
-
-  // Historical signing leverage for a player's profile (level × position), from 2021-25 data.
-  function leverageFor(comp) {
-    const L = DATA.leverage && DATA.leverage.mult, N = DATA.leverage && DATA.leverage.n;
-    if (!L || !comp) return null;
-    const lc = levelClass(comp), pg = comp.posGroup;
-    const cell = L[lc] || {};
-    const mult = (pg && cell[pg]!=null) ? cell[pg] : (cell["_"]!=null ? cell["_"] : L["_"]);
-    const n = (N && N[lc] && pg && N[lc][pg]!=null) ? N[lc][pg] : null;
-    return { mult, n, lc, pg };
   }
 
   // Q1 in team mode — org dev rank header + broad matrix of our clients' fit with this team.

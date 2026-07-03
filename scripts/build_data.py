@@ -348,9 +348,24 @@ def _level_class(school_class):
     return None
 
 
+# Leverage is strongly rank-dependent: top-ranked HS hitters sign at ~93% of their rank's
+# slot while deep prep talent gets bought out of college commitments at 2-3x. One median
+# per level x pos (plus a hand-tuned ramp) overshot the top of the board — so calibrate
+# per rank band and let the front end interpolate between band midpoints.
+LEV_BANDS = [(1, 9), (10, 20), (21, 45), (46, 120), (121, None)]
+LEV_BAND_KEYS = [f"{lo}-{hi}" if hi else f"{lo}+" for lo, hi in LEV_BANDS]
+
+
+def _lev_band(rank):
+    for (lo, hi), key in zip(LEV_BANDS, LEV_BAND_KEYS):
+        if rank >= lo and (hi is None or rank <= hi):
+            return key
+
+
 def build_leverage(years=(2021, 2022, 2023, 2024, 2025)):
     """Leverage multiplier = actual bonus / slot-at-pre-draft-rank, by level-class
-    x position, calibrated from past drafts (statsapi embeds MLB's pre-draft rank)."""
+    x rank band x position, calibrated from past drafts (statsapi embeds MLB's
+    pre-draft rank). Thin cells shrink toward their parent (pos -> band -> level)."""
     import statistics
     ratios = defaultdict(list)
     for y in years:
@@ -372,29 +387,38 @@ def build_leverage(years=(2021, 2022, 2023, 2024, 2025)):
                 lv = _level_class((p.get("school") or {}).get("schoolClass"))
                 pos = pos_group((p.get("person") or {}).get("primaryPosition", {}).get("abbreviation"))
                 if lv and pos != "Other" and market > 0:
-                    ratios[(lv, pos)].append(float(bn) / market)
+                    ratios[(lv, _lev_band(int(rank)), pos)].append(float(bn) / market)
 
     all_r = [x for arr in ratios.values() for x in arr]
     g = round(statistics.median(all_r), 3) if all_r else 1.0
     LEVELS = ["HS", "JUCO", "College-JR", "College-SR"]
     POS = ["P", "C", "IF", "OF"]
-    out = {"mult": {"_": g}, "n": {}, "meta": {"years": list(years), "global": g}}
+    out = {"mult": {"_": g}, "n": {},
+           "meta": {"years": list(years), "global": g, "bands": LEV_BAND_KEYS}}
     for lv in LEVELS:
-        lv_all = [x for pos in POS for x in ratios.get((lv, pos), [])]
-        lv_med = round(statistics.median(lv_all), 3) if lv_all else g
-        out["mult"][lv] = {"_": lv_med}
+        lv_all = [x for key in LEV_BAND_KEYS for pos in POS for x in ratios.get((lv, key, pos), [])]
+        lv_med = statistics.median(lv_all) if lv_all else g
+        out["mult"][lv] = {"_": round(lv_med, 3)}
         out["n"][lv] = {}
-        for pos in POS:
-            arr = ratios.get((lv, pos), [])
-            n = len(arr)
-            if n:
-                med = statistics.median(arr)
-                if n < 10:  # shrink small cells toward the level mean
-                    med = (med * n + lv_med * 10) / (n + 10)
-                out["mult"][lv][pos] = round(med, 3)
-            else:
-                out["mult"][lv][pos] = lv_med
-            out["n"][lv][pos] = n
+        for key in LEV_BAND_KEYS:
+            b_all = [x for pos in POS for x in ratios.get((lv, key, pos), [])]
+            b_med = statistics.median(b_all) if b_all else lv_med
+            if len(b_all) < 8:  # thin band -> shrink toward the level median
+                b_med = (b_med * len(b_all) + lv_med * 8) / (len(b_all) + 8)
+            cell, nn = {"_": round(b_med, 3)}, {"_": len(b_all)}
+            for pos in POS:
+                arr = ratios.get((lv, key, pos), [])
+                n = len(arr)
+                if n:
+                    med = statistics.median(arr)
+                    if n < 10:  # shrink small cells toward the band median
+                        med = (med * n + b_med * 10) / (n + 10)
+                    cell[pos] = round(med, 3)
+                else:
+                    cell[pos] = round(b_med, 3)
+                nn[pos] = n
+            out["mult"][lv][key] = cell
+            out["n"][lv][key] = nn
     return out
 
 
