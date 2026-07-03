@@ -574,6 +574,12 @@
   #mtabs button .mi { font-size:17px; line-height:1; }
   #mtabs button.on { color:var(--red); }
   body.mob #ticker { bottom:calc(56px + env(safe-area-inset-bottom)); }
+  /* pick flash: two tidy rows — PICK · team · player, then pos/school · agency · $ */
+  body.mob #ticker .tk-inner { flex-wrap:wrap; gap:5px 10px; margin:0 8px; padding:10px 14px; font-size:14px; border-radius:12px; }
+  body.mob #ticker .tk-team { font-size:16px; }
+  body.mob #ticker .tk-player { flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  body.mob #ticker .tk-meta, body.mob #ticker .tk-agency, body.mob #ticker .tk-bonus { white-space:nowrap; }
+  body.mob #ticker .tk-sv { margin-left:0; }
 
   /* board: every pick a screen-width tile — the board IS the list on a phone.
      Children keep their desktop classes; we re-place them on a 3-col grid
@@ -608,12 +614,17 @@
   /* team card: full-bleed sheet, modules stacked + collapsible (tap the numbered header).
      Collapse rules are scoped to #teamCard — the player dossier reuses .tc-panel/.tc-foot. */
   body.mob .tc-backdrop { padding:0; }
-  body.mob .tc-card { height:100dvh; max-height:100dvh; border-radius:0; overflow-y:auto; overscroll-behavior:contain; }
+  /* the card FITS the screen — no sheet scrolling. Modules are an accordion: an open
+     module takes the remaining height (scrolling internally when long); collapsed ones
+     are just headers. Tap headers to swap what you're examining. */
+  body.mob .tc-card { height:100dvh; max-height:100dvh; border-radius:0; overflow:hidden; overscroll-behavior:contain; }
   body.mob .tc-top { position:sticky; top:0; background:var(--card); z-index:4; flex-wrap:wrap; gap:8px; padding:9px 12px; }
   body.mob .tc-top .tc-ttl { font-size:13px; }
   body.mob .tc-nav { position:static; transform:none; order:5; flex-basis:100%; justify-content:center; gap:14px; }
   body.mob .tc-nav-btn { width:44px; height:38px; font-size:19px; }
-  body.mob .tc-nav-menu { max-height:50dvh; overflow-y:auto; }
+  /* round/pick jump menus: centered fixed sheet (the desktop popover hangs half off-screen) */
+  body.mob .tc-nav-menu { position:fixed; left:12px; right:12px; top:108px; transform:none;
+    min-width:0; white-space:normal; max-height:60dvh; overflow-y:auto; box-shadow:0 14px 44px rgba(0,0,0,.3); }
   body.mob .tc-x { font-size:26px; padding:2px 10px; }
   body.mob .tc-band { flex-wrap:wrap; gap:8px; padding:8px 12px; }
   body.mob .tc-selrow { flex-basis:100%; }
@@ -623,8 +634,9 @@
   body.mob .tc-stats { flex:1 1 100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; gap:0 16px; padding-bottom:3px; }
   body.mob .tc-stat { flex:0 0 auto; }
   body.mob .tc-band .tc-selrow + .tc-stats .tc-stat:first-child { border-left:none; padding-left:0; }
-  body.mob .tc-panels { display:flex; flex-direction:column; gap:10px; padding:10px 12px; flex:none; }
-  body.mob .tc-panel { overflow-y:visible; }
+  body.mob .tc-panels { display:flex; flex-direction:column; gap:10px; padding:10px 12px; flex:1 1 auto; min-height:0; overflow:hidden; }
+  body.mob #teamCard .tc-panel[data-q]:not(.collapsed) { flex:1 1 0; min-height:0; overflow-y:auto; }
+  body.mob #teamCard .tc-panel.collapsed { flex:0 0 auto; }
   body.mob #teamCard .tc-panel[data-q] > h4 { cursor:pointer; }
   body.mob #teamCard .tc-panel[data-q] > h4::after { content:"▾"; margin-left:auto; color:var(--muted); font-size:14px; }
   body.mob #teamCard .tc-panel.collapsed > h4 { margin-bottom:0; }
@@ -1078,7 +1090,9 @@
   const MOBILE = matchMedia("(max-width:640px)");
   const applyMobile = () => document.body.classList.toggle("mob", MOBILE.matches);
   applyMobile();
-  if (MOBILE.addEventListener) MOBILE.addEventListener("change", applyMobile); else MOBILE.addListener(applyMobile);
+  // re-render on crossover: board tiles emit different markup per form factor
+  const onMobileFlip = () => { applyMobile(); try { renderActive(); } catch (e) {} };
+  if (MOBILE.addEventListener) MOBILE.addEventListener("change", onMobileFlip); else MOBILE.addListener(onMobileFlip);
   if (MOBILE.matches) VIEW = "board";
   const teamLink = (t) => t ? `<span class="tlink" onclick="openTeam('${t}')">${t}</span>` : "";
   const playerLink = (name) => `<span class="tlink" onclick="openPlayer('${normName(name).replace(/'/g,"\\'")}')">${name}</span>`;
@@ -1842,12 +1856,17 @@
         body = (p.player||"—") + (ours?' <span class="svtag">SV</span>':"");
         const comp = DATA.compByName.get(normName(p.player||""));
         const eb = effectiveBonus(p);
-        const lines = [p.pos, schoolShort(comp?.school || p.school), comp?.agent]
-          .filter(Boolean).map(v=>`<div class="bc-meta">${v}</div>`);
+        // mobile tiles are rows, not columns — meta joins onto one line, money onto another
+        const metaParts = [p.pos, schoolShort(comp?.school || p.school), comp?.agent].filter(Boolean);
+        const lines = MOBILE.matches
+          ? (metaParts.length ? [`<div class="bc-meta">${metaParts.join(" · ")}</div>`] : [])
+          : metaParts.map(v=>`<div class="bc-meta">${v}</div>`);
         if (eb.bonus!=null && (p.bonus!=null || eb.src)) {   // facts only on tiles — no model estimates
-          lines.push(`<div class="bc-bonus">${fmtM(eb.bonus)}${eb.src?` <span class="bc-src">${eb.src==="confirmed"?"✓":eb.src.slice(0,3)}</span>`:""}</div>`);
+          const amt = `${fmtM(eb.bonus)}${eb.src?` <span class="bc-src">${eb.src==="confirmed"?"✓":eb.src.slice(0,3)}</span>`:""}`;
           const ou = p.slot>0 ? eb.bonus-p.slot : null;
-          if (ou!=null) lines.push(`<div class="bc-bonus"><span class="tg ${ou>50000?'over':ou<-50000?'under':'fit'}">${ou>50000?"+":""}${Math.abs(ou)>50000?fmtM(ou)+" vs slot":"at slot"}</span></div>`);
+          const tag = ou!=null ? `<span class="tg ${ou>50000?'over':ou<-50000?'under':'fit'}">${ou>50000?"+":""}${Math.abs(ou)>50000?fmtM(ou)+" vs slot":"at slot"}</span>` : "";
+          if (MOBILE.matches) lines.push(`<div class="bc-bonus">${amt}${tag?` ${tag}`:""}</div>`);
+          else { lines.push(`<div class="bc-bonus">${amt}</div>`); if (tag) lines.push(`<div class="bc-bonus">${tag}</div>`); }
         }
         dotsHtml = lines.join("");
       } else if (single) {
