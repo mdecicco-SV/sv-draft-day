@@ -31,7 +31,7 @@
 
   .bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 16px; background:#fff7f8; border-bottom:1px solid var(--line); position:sticky; top:90px; z-index:5; }
   .bar.hidden { display:none; }
-  .prebanner { display:flex; align-items:center; justify-content:center; gap:8px; padding:9px 16px; background:#fff; border-bottom:1px solid var(--line); font-size:13px; font-weight:700; color:var(--ink); position:sticky; top:90px; z-index:4; }
+  .prebanner { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:2px 8px; padding:9px 16px; background:#fff; border-bottom:1px solid var(--line); font-size:13px; font-weight:700; color:var(--ink); position:sticky; top:90px; z-index:4; }
   .prebanner b { color:var(--red); font-variant-numeric:tabular-nums; }
   .pulse { width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 0 0 rgba(255,42,34,.5); animation:pulse 1.6s infinite; }
   @keyframes pulse { 70% { box-shadow:0 0 0 7px rgba(255,42,34,0); } 100% { box-shadow:0 0 0 0 rgba(255,42,34,0); } }
@@ -128,19 +128,7 @@
   .ct .tm { font-weight:800; min-width:38px; } .ct .nx { color:var(--muted); margin-left:auto; text-align:right; font-variant-numeric:tabular-nums; }
   .ct .ov { min-width:34px; color:var(--red); font-weight:800; font-variant-numeric:tabular-nums; }
 
-  /* clock view */
-  .clock-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
-  .clock-card.mock { border-color:#f1b8c1; box-shadow:0 0 0 2px #fdeef0; }
-  .pick-no { font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
-  .team-line { display:flex; align-items:center; gap:14px; margin:6px 0 2px; }
-  .team-abbr { font-size:44px; font-weight:900; line-height:1; }
-  .team-name { font-size:15px; color:var(--muted); }
-  .countdown { margin-left:auto; text-align:right; }
-  .cd-time { font-size:46px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; }
-  .cd-time.low { color:var(--red); }
-  .cd-time.days { font-size:clamp(24px,6vw,34px); }
-  .cd-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
-  .alert { margin-top:12px; background:#fff5f6; border:1px solid #f1b8c1; border-radius:10px; padding:10px 12px; font-size:14px; font-weight:700; color:var(--red); }
+  /* stat tiles + panels (team/player detail pages) */
   .pool-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
   .stat { background:#fafafa; border:1px solid var(--line); border-radius:10px; padding:9px 13px; min-width:92px; }
   .stat .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
@@ -152,14 +140,6 @@
   .chip { font-size:12px; font-weight:600; background:#f1f3f5; border-radius:999px; padding:4px 10px; }
   .chip .lab { color:var(--muted); }
   .r1 { margin-top:10px; font-size:13px; color:var(--muted); } .r1 div { padding:2px 0; }
-  .intel .row { display:flex; align-items:center; gap:9px; padding:3px 0; }
-  .intel .nm { font-weight:700; } .intel .sc { color:var(--muted); font-size:13px; margin-left:auto; }
-  .recent { display:flex; flex-direction:column; gap:6px; }
-  .pick { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
-  .pick .ov { font-weight:800; min-width:38px; color:var(--red); }
-  .pick .who { font-weight:700; } .pick .rkbadge { font-size:11px; font-weight:700; color:var(--good); }
-  .pick .clab { font-size:11px; font-weight:700; color:#fff; background:var(--good); border-radius:4px; padding:0 5px; }
-  .pick .meta { color:var(--muted); font-size:13px; margin-left:auto; text-align:right; }
 
   /* best available */
   .ba-filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
@@ -208,8 +188,6 @@
   .brow.oc { border-color:var(--red); box-shadow:0 0 0 2px #fdeef0; }
 
   @media (max-width:680px) {
-    .team-abbr { font-size:34px; } .cd-time { font-size:34px; }
-    .countdown { margin-left:0; text-align:left; width:100%; }
     .cols, .clients { grid-template-columns:1fr; }
     table.ba .hide-sm { display:none; }
     .bar { top:90px; }
@@ -673,8 +651,26 @@
   body.mob table.ba th, body.mob table.ba td { padding:8px 6px; font-size:13px; }
   body.mob .summary { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
   body.mob .summary .v { font-size:20px; }
-  /* other roster-style tables (Best Available, Pools) scroll sideways rather than squeeze */
-  body.mob .view table.ba:not(.cl-table) { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  /* Bonus Pools + Best Available: trim to the columns that fit a phone instead of a
+     sideways-scrolling table — everything dropped here lives in the team card / player
+     dossier. Desktop keeps the full tables (all rules key off body.mob). */
+  /* pools: Team / Spent / Over-Under / Room / % — Pool(2) + Overage(8) go; Picks/Committed are hide-sm */
+  body.mob #viewPools th:nth-child(2), body.mob #viewPools td:nth-child(2),
+  body.mob #viewPools th:nth-child(8), body.mob #viewPools td:nth-child(8) { display:none; }
+  /* best available: # / Player / Pos / Lvl / B/T / BA / MLB (+ Draft in a paused mock) —
+     OS/ESPN/PBR/ATH(12-15) go; School/Commit/Agency/Age/Trend are already hide-sm.
+     B/T stays: deliberately made always-visible incl. mobile (commit 7bfd615). */
+  body.mob #viewBest th:nth-child(12), body.mob #viewBest td:nth-child(12),
+  body.mob #viewBest th:nth-child(13), body.mob #viewBest td:nth-child(13),
+  body.mob #viewBest th:nth-child(14), body.mob #viewBest td:nth-child(14),
+  body.mob #viewBest th:nth-child(15), body.mob #viewBest td:nth-child(15) { display:none; }
+  body.mob .ba-sub { font-size:11px; color:var(--muted); font-weight:600; }
+  body.mob #viewBest table.ba th, body.mob #viewBest table.ba td { padding:8px 4px; }
+  body.mob #viewBest table.ba th:first-child, body.mob #viewBest table.ba td:first-child { padding-left:8px; }
+  /* best-available filter bar: one swipeable row (matches the board toolbar) */
+  body.mob #viewBest .ba-filters { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+  body.mob #viewBest .ba-filters label, body.mob #viewBest .ba-filters .count { white-space:nowrap; }
+  body.mob #fQuery { min-width:120px !important; flex:0 0 auto; }
   /* player dossier + detail pages */
   body.mob #viewDetail .backbtn { position:sticky; top:45px; z-index:5; width:100%; text-align:left;
     padding:11px 12px; font-size:15px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
@@ -696,7 +692,6 @@
 <nav class="tabs">
   <button id="tabClients" class="on" onclick="setView('clients')">Our Clients</button>
   <button id="tabBoard" onclick="setView('board')">Board</button>
-  <button id="tabClock" onclick="setView('clock')">On The Clock</button>
   <button id="tabPools" onclick="setView('pools')">Bonus Pools</button>
   <button id="tabBest" onclick="setView('best')">Best Available</button>
 </nav>
@@ -728,27 +723,6 @@
       <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Age</th><th>Interest</th><th class="hide-sm">Range</th><th>Status</th><th>Money</th></tr></thead>
       <tbody id="clientRows"></tbody>
     </table>
-  </section>
-
-  <!-- ON THE CLOCK -->
-  <section id="viewClock" class="view">
-    <div class="clock-card" id="clockCard">
-      <div class="pick-no" id="pickNo">Loading…</div>
-      <div class="team-line">
-        <span class="team-abbr" id="teamAbbr">—</span>
-        <span class="team-name" id="teamName"></span>
-        <div class="countdown"><div class="cd-time" id="cdTime">--:--</div><div class="cd-label" id="cdLabel">on the clock</div></div>
-      </div>
-      <div id="ocAlert"></div>
-      <div class="pool-row" id="poolRow"></div>
-    </div>
-    <div class="cols">
-      <div class="panel"><h3 id="tendHdr">Org tendencies</h3><div class="chips" id="tendChips"></div><div class="r1" id="recentR1"></div></div>
-      <div class="panel"><h3 id="intelHdr">Interest in our guys</h3><div class="intel" id="intelList"></div></div>
-    </div>
-    <div id="teamRecentWrap" style="display:none"><h2 id="teamRecentHdr">Their picks so far</h2><div class="recent" id="teamRecent"></div></div>
-    <h2>Recent picks</h2>
-    <div class="recent" id="recent"></div>
   </section>
 
   <!-- BONUS POOLS (all 30 teams) -->
@@ -806,7 +780,6 @@
   <button data-view="board" onclick="setView('board')"><span class="mi">▦</span>Board</button>
   <button data-view="clients" onclick="setView('clients')"><span class="mi">★</span>Clients</button>
   <button data-view="best" onclick="setView('best')"><span class="mi">≡</span>Best</button>
-  <button data-view="clock" onclick="setView('clock')"><span class="mi">⏱</span>Clock</button>
   <button data-view="pools" onclick="setView('pools')"><span class="mi">$</span>Pools</button>
 </nav>
 
@@ -1197,20 +1170,6 @@
     const allot = allotment(p.round) * 1000;
     timer = { pick: p.overall, remainingMs: allot, endsAt: clockRunning() ? Date.now()+allot : null };
   }
-  function renderCountdown() {
-    if (isPreDraft()) {                                   // pre-draft: clock shows time until first pick
-      $("cdTime").textContent = fmtCountdown(DRAFT_START - Date.now());
-      $("cdTime").classList.remove("low"); $("cdTime").classList.add("days");
-      return;
-    }
-    $("cdTime").classList.remove("days");
-    if (!timer.pick) { $("cdTime").textContent = "--:--"; return; }
-    const leftMs = timer.endsAt != null ? (timer.endsAt - Date.now()) : timer.remainingMs;  // frozen when paused
-    const left = Math.max(0, Math.round(leftMs/1000));
-    $("cdTime").textContent = `${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`;
-    $("cdTime").classList.toggle("low", left <= 15);
-  }
-
   // Actual bonus if known (mock engine, or live once signed); else a LOGGED bonus
   // (war-room confirmed beats reported/estimated); otherwise our model estimate, flagged est.
   function effectiveBonus(p) {
@@ -1476,89 +1435,6 @@
     return pk ? pk.slot : null;
   }
 
-  // ---------- VIEW: ON THE CLOCK ----------
-  function renderClock(state) {
-    $("clockCard").classList.toggle("mock", MODE==="mock");
-    const pre = isPreDraft();
-    const oc = state.onClock;
-    if (oc) {
-      $("pickNo").textContent = `${MODE==="mock"?"MOCK · ":""}${pre?"Up first":"On the clock"} · Pick #${oc.overall} · Round ${oc.round} (${oc.roundPick})`;
-      $("teamAbbr").innerHTML = oc.team ? `<span class="tlink" onclick="openTeam('${oc.team}')">${oc.team}</span>` : (oc.teamName || "—");
-      $("teamName").textContent = oc.teamName || "";
-      $("cdLabel").textContent = pre ? "until first pick · Jul 11, 1:30 PM ET" : `allotted ${Math.floor(allotment(oc.round)/60)}:${String(allotment(oc.round)%60).padStart(2,"0")}`;
-      const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
-      $("ocAlert").innerHTML = "";   // interest is already shown in the "Interest in our guys" panel below
-      const pool = state.poolsMap[oc.team];
-      $("poolRow").innerHTML = pool ? [
-        ["Pick slot", fmt$(oc.slot)],
-        ["Room left (incl. 5%)", fmt$(pool.room)],
-        ["Spent / pool", `${fmt$(pool.poolCharge)} / ${fmt$(pool.pool)}`],
-        ["Overage (5% cushion)", fmt$(pool.overage)],
-        ["Over/under to date", fmtOU(pool.overUnder)],
-        ["Picks", `${pool.picksMade}/${pool.picksTotal}`],
-      ].map(([k,v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("") : "";
-      renderTendencies(oc.team); renderIntel(oc.team, drafted);
-      renderTeamRecent(state, oc.team);
-    } else {
-      $("pickNo").textContent = MODE==="mock" ? "MOCK · Draft complete" : "Draft complete";
-      $("teamAbbr").textContent="✓"; $("teamName").textContent=""; $("ocAlert").innerHTML=""; $("poolRow").innerHTML="";
-      renderTendencies(null); renderIntel(null, new Set());
-      $("teamRecentWrap").style.display="none";
-    }
-    const made = state.picks.filter(p=>p.isDrafted).slice(-12).reverse();
-    $("recent").innerHTML = made.length ? made.map(p => {
-      const comp = DATA.compByName.get(normName(p.player||""));
-      const ours = DATA.clients.has(normName(p.player||""));
-      return `<div class="pick"><span class="ov">#${p.overall}</span><span class="who">${p.player||"—"}</span>
-        ${ours?'<span class="svtag">SV</span>':""}${p.bucket&&p.bucket!=="UNK"?`<span class="clab">${p.bucket}</span>`:""}
-        ${comp?`<span class="rkbadge">composite #${comp.rank}</span>`:""}
-        <span class="meta">${p.team||""}${p.school?" · "+p.school:""} · ${moneyCell(p)}</span></div>`;
-    }).join("") : `<div class="placeholder">No picks yet${MODE==="mock"?" — press Start.":"."}</div>`;
-  }
-  // On-the-clock team's own picks already made in THIS draft (shows from their 2nd pick on).
-  function renderTeamRecent(state, team) {
-    const wrap = $("teamRecentWrap");
-    const own = team ? state.picks.filter(p => p.isDrafted && p.player && p.team === team) : [];
-    if (!own.length) { wrap.style.display = "none"; $("teamRecent").innerHTML = ""; return; }
-    wrap.style.display = "";
-    $("teamRecentHdr").textContent = `${team} picks so far · ${own.length} this draft`;
-    $("teamRecent").innerHTML = own.slice().reverse().map(p => {
-      const comp = DATA.compByName.get(normName(p.player||""));
-      const ours = DATA.clients.has(normName(p.player||""));
-      return `<div class="pick"><span class="ov">#${p.overall}</span><span class="who">${p.player||"—"}</span>
-        ${ours?'<span class="svtag">SV</span>':""}${p.bucket&&p.bucket!=="UNK"?`<span class="clab">${p.bucket}</span>`:""}
-        ${comp?`<span class="rkbadge">composite #${comp.rank}</span>`:""}
-        <span class="meta">R${p.round}${p.school?" · "+p.school:""} · ${moneyCell(p)}</span></div>`;
-    }).join("");
-  }
-  function renderTendencies(team) {
-    const o = DATA.orgs[team];
-    $("tendHdr").textContent = `If ${team||"—"} picks · org tendencies (landing-spot quality)`;
-    if (!o) { $("tendChips").innerHTML = `<span class="placeholder">No org profile.</span>`; $("recentR1").innerHTML=""; return; }
-    const chips = [];
-    if (o.orgRank!=null) chips.push(["Org dev rank", `#${o.orgRank}`]);
-    if (o.earlyPitcherPct!=null) chips.push(["Early picks pitchers", `${o.earlyPitcherPct}%`]);
-    if (o.hsPct!=null) chips.push(["HS", `${o.hsPct}%`]);
-    if (o.collegePct!=null) chips.push(["College", `${o.collegePct}%`]);
-    $("tendChips").innerHTML = chips.map(([l,v])=>`<span class="chip"><span class="lab">${l}</span> <b>${v}</b></span>`).join("");
-    $("recentR1").innerHTML = (o.recentR1||[]).length
-      ? "<div style='font-weight:700;color:#14161a;margin-bottom:2px'>Recent 1st-rounders</div>"+
-        o.recentR1.map(r=>`<div>${r.year} · ${r.player} (${r.pos}${r.school?", "+r.school:""})</div>`).join("") : "";
-  }
-  function renderIntel(team, drafted) {
-    $("intelHdr").textContent = `${team||"—"} interest in our guys`;
-    const recs = DATA.intel.filter(r => teamAlias(r.team)===team);
-    const byPlayer = new Map();
-    for (const r of recs) { const c=byPlayer.get(r.player); if (!c||(r.date||"")>(c.date||"")) byPlayer.set(r.player, r); }
-    const list = [...byPlayer.values()].sort((a,b)=>(b.score||0)-(a.score||0));
-    $("intelList").innerHTML = list.length ? list.map(r => {
-      const gone = drafted.has(normName(r.player));
-      return `<div class="row">${intelDot(normName(r.player), team)}
-        <span class="nm" style="${gone?"text-decoration:line-through;color:#9aa0a6":""}">${r.player}</span>
-        ${contactBadges(normName(r.player), team)}${gone?'<span style="font-size:11px;color:#9aa0a6">drafted</span>':""}</div>`;
-    }).join("") : `<div class="placeholder">No logged interest from ${team} on our clients.</div>`;
-  }
-
   // ---------- VIEW: BEST AVAILABLE ----------
   function renderBest() {
     if (!currentState) return;
@@ -1579,7 +1455,7 @@
     $("baBody").innerHTML = rows.map(p => {
       const ours = DATA.clients.has(normName(p.name)), qn = p.name.replace(/'/g,"\\'");
       return `<tr class="${ours?"sv":""} clickrow" onclick="openPlayer('${normName(p.name).replace(/'/g,"\\'")}')">
-        <td class="rk">#${p.rank}</td><td>${p.name} ${ours?'<span class="svtag">SV</span>':""}</td>
+        <td class="rk">#${p.rank}</td><td>${p.name} ${ours?'<span class="svtag">SV</span>':""}${MOBILE.matches&&p.school?`<div class="ba-sub">${p.school}</div>`:""}</td>
         <td>${p.pos}</td><td><span class="lvl ${p.level}">${p.level}</span></td>
         <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${p.commit||"—"}</td><td class="hide-sm">${p.agent||"—"}</td><td class="hide-sm">${fmtAge(p.age)}</td><td>${fmtBT(p)}</td>
         <td class="sr-col">${p.ba!=null?"#"+p.ba:"—"}</td>
@@ -2030,18 +1906,21 @@
     $("poolNote").textContent = currentState.poolsEst
       ? "Spent is estimated from the model until signing bonuses are reported"
       : `${currentState.madeCount} picks in`;
+    // phone columns are narrow — compact money ("$9.25M") and a signed over/under badge
+    const money = MOBILE.matches ? fmtM : fmt$;
+    const ou = MOBILE.matches ? (n => !n ? "slot" : (n>0?"+":"−")+fmtM(Math.abs(n))) : fmtOU;
     $("poolBody").innerHTML = pools.map(t => {
       const ouCls = t.overUnder>50000 ? "over" : t.overUnder<-50000 ? "under" : "atslot";
       const pctCls = t.pctNum>=4.8 ? "over" : t.pctNum<0 ? "under" : "atslot";
       return `<tr class="clickable" onclick="openTeam('${t.team}')">
         <td><b>${t.team}</b></td>
-        <td>${fmt$(t.pool)}</td>
+        <td>${money(t.pool)}</td>
         <td class="hide-sm">${t.picksMade}/${t.picksTotal}</td>
-        <td class="hide-sm">${fmt$(t.committedSlot)}</td>
-        <td>${fmt$(t.poolCharge)}${t.hasEst?' <span class="outag est atslot">est</span>':""}</td>
-        <td><span class="outag ${ouCls}">${fmtOU(t.overUnder)}</span></td>
-        <td>${fmt$(t.room)}</td>
-        <td>${fmt$(t.overage)}</td>
+        <td class="hide-sm">${money(t.committedSlot)}</td>
+        <td>${money(t.poolCharge)}${t.hasEst?' <span class="outag est atslot">est</span>':""}</td>
+        <td><span class="outag ${ouCls}">${ou(t.overUnder)}</span></td>
+        <td>${money(t.room)}</td>
+        <td>${money(t.overage)}</td>
         <td><span class="outag ${pctCls}">${t.pctNum>=0?"+":""}${t.pctNum.toFixed(1)}%</span></td>
       </tr>`;
     }).join("");
@@ -3010,7 +2889,7 @@
     const hold = tickerQueue.length > 4 ? 800 : 4500;   // drain bursts (mock turbo) fast
     setTimeout(() => { el.classList.remove("show"); setTimeout(nextTicker, 420); }, hold);
   }
-  const VIEWS = [["tabClients","viewClients","clients"],["tabBoard","viewBoard","board"],["tabClock","viewClock","clock"],
+  const VIEWS = [["tabClients","viewClients","clients"],["tabBoard","viewBoard","board"],
                  ["tabPools","viewPools","pools"],["tabBest","viewBest","best"]];
   function renderActive() {
     if (!currentState) return;
@@ -3025,7 +2904,6 @@
       return;
     }
     if (VIEW==="clients") renderClients(currentState);
-    else if (VIEW==="clock") renderClock(currentState);
     else if (VIEW==="pools") renderPools();
     else if (VIEW==="board") {
       const ae = document.activeElement;   // don't wipe an open capture form while typing
@@ -3050,7 +2928,7 @@
         // Pre-draft or no live data: blank skeleton
         mock.picks = o.picks.map(p => ({ ...p, isDrafted:false, isPass:false, player:null, playerId:null, school:null, schoolClass:null, bucket:"UNK", bonus:null, rank:null }));
       }
-    } catch (e) { $("pickNo").textContent = "Couldn't load board — serve via a web server (vercel dev / python3 -m http.server)"; }
+    } catch (e) { $("mockNote").textContent = "Couldn't load board — serve via a web server (vercel dev / python3 -m http.server)"; }
     mock.seeding = false;
   }
   function draftedKeySet() {
@@ -3191,7 +3069,6 @@
     if (pre) { const sp = document.getElementById("draftCountdown"); if (sp) sp.textContent = fmtCountdown(DRAFT_START-Date.now()); }
   }
   function tick() {
-    renderCountdown();
     // keep the team-card countdown ticking without a full modal re-render
     if (cardPick!=null && timer.pick===cardPick && timer.endsAt!=null) {
       const el = $("tcClock"); if (el) el.textContent = fmtCountdown(timer.endsAt-Date.now());
@@ -3219,7 +3096,7 @@
     } catch (e) {
       try { const o = await loadOrder(); if (MODE!=="live") return;
             setState(derive(o.picks.map(p=>({...p})), o.year)); $("conn").className="dot"; }
-      catch (e2) { $("conn").className="dot err"; $("pickNo").textContent="Couldn't load board — serve via vercel dev / python3 -m http.server"; }
+      catch (e2) { $("conn").className="dot err"; $("yearBadge").textContent="Couldn't load board — serve via vercel dev / python3 -m http.server"; }
     }
   }
 
