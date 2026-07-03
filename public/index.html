@@ -19,6 +19,13 @@
   header .logo { height:26px; width:auto; display:block; }
   header .title { font-weight:900; letter-spacing:.2px; font-size:17px; }
   header .badge { margin-left:auto; font-size:12px; font-weight:700; color:var(--red); border:1px solid var(--red); border-radius:999px; padding:3px 10px; }
+  /* on-the-clock header chip — the always-visible pick clock (was the big countdown on the old On The Clock view) */
+  .hdr-clock { margin-left:auto; display:flex; align-items:center; gap:7px; background:#fafafa; border:1px solid var(--line); border-radius:999px; padding:3px 11px; font-size:13px; }
+  .hdr-clock + .badge { margin-left:0; }
+  .hdr-clock .hc-tm { font-weight:800; }
+  .hdr-clock .hc-lab { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .hdr-clock .hc-cd { font-weight:900; font-variant-numeric:tabular-nums; }
+  .hdr-clock .hc-cd.low { color:var(--red); }
   .dot { width:9px; height:9px; border-radius:50%; background:#bbb; display:inline-block; }
   .dot.live { background:var(--good); } .dot.err { background:var(--red); }
   .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
@@ -552,6 +559,8 @@
   body.mob header { gap:8px; padding:8px 10px; }
   body.mob header .title { display:none; }
   body.mob header .badge { font-size:10px; padding:2px 8px; white-space:nowrap; }
+  body.mob .hdr-clock { font-size:12px; padding:2px 9px; gap:5px; white-space:nowrap; }
+  body.mob .hdr-clock .hc-lab { display:none; }
   body.mob .tabs { display:none; }
   body.mob .bar, body.mob .prebanner { position:static; }
   body.mob main, body.mob main.wide { padding:12px 10px calc(74px + env(safe-area-inset-bottom)); }
@@ -686,6 +695,7 @@
     <button id="mLive" class="on" onclick="setMode('live')">● Live</button>
     <button id="mMock" onclick="setMode('mock')">⚙ Mock</button>
   </span>
+  <span class="hdr-clock" id="hdrClock" style="display:none"></span>
   <span class="badge" id="yearBadge">2026 MLB DRAFT</span>
 </header>
 
@@ -1169,6 +1179,18 @@
   function setClockForPick(p) {
     const allot = allotment(p.round) * 1000;
     timer = { pick: p.overall, remainingMs: allot, endsAt: clockRunning() ? Date.now()+allot : null };
+  }
+  // Header pick clock (live + mock). Frozen at the remaining time while a mock is paused;
+  // hidden pre-draft (the banner carries that countdown) and when the draft is complete.
+  function renderCountdown() {
+    const el = $("hdrClock"); if (!el) return;
+    const oc = currentState && currentState.onClock;
+    if (!oc || !timer.pick || isPreDraft()) { el.style.display = "none"; return; }
+    const leftMs = timer.endsAt != null ? (timer.endsAt - Date.now()) : timer.remainingMs;  // frozen when paused
+    const left = Math.max(0, Math.round(leftMs/1000));
+    el.style.display = "";
+    el.innerHTML = `<span class="hc-tm">${oc.team||"—"}</span><span class="hc-lab">on the clock</span>
+      <span class="hc-cd${left<=15?" low":""}">${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}</span>`;
   }
   // Actual bonus if known (mock engine, or live once signed); else a LOGGED bonus
   // (war-room confirmed beats reported/estimated); otherwise our model estimate, flagged est.
@@ -3069,6 +3091,7 @@
     if (pre) { const sp = document.getElementById("draftCountdown"); if (sp) sp.textContent = fmtCountdown(DRAFT_START-Date.now()); }
   }
   function tick() {
+    renderCountdown();
     // keep the team-card countdown ticking without a full modal re-render
     if (cardPick!=null && timer.pick===cardPick && timer.endsAt!=null) {
       const el = $("tcClock"); if (el) el.textContent = fmtCountdown(timer.endsAt-Date.now());
