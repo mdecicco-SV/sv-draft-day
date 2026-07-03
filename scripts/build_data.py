@@ -44,8 +44,16 @@ def name_to_abbr(name):
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "public", "data")
-COMPOSITE = os.path.expanduser("~/Desktop/claude/draft-rankings-composite/outputs/composite_latest.csv")
+COMPOSITE_REPO = os.path.expanduser("~/Desktop/claude/draft-rankings-composite")
+COMPOSITE = os.path.join(COMPOSITE_REPO, "outputs", "composite_latest.json")
+RANK_HISTORY = os.path.join(COMPOSITE_REPO, "outputs", "rank_history.json")
 ORGREVIEW_DIR = os.path.expanduser("~/Desktop/claude/sv-org-review")
+
+# rank_history.json keys players by the composite repo's canon(norm(name)) — import the
+# same functions so lookups can never drift from how that repo normalizes names.
+import sys
+sys.path.insert(0, COMPOSITE_REPO)
+import build_composite as _bc
 
 # org-review sheet abbrev -> live-feed abbrev (only the A's differ)
 SHEET_TO_FEED = {"OAK": "ATH"}
@@ -111,39 +119,74 @@ def _src_rank(v):
         return None
 
 
+def _load_hist():
+    return json.load(open(RANK_HISTORY, encoding="utf-8")) if os.path.exists(RANK_HISTORY) else None
+
+
 def build_composite():
+    """Composite board from composite_latest.json, plus ATH ranks and composite-rank
+    trends from rank_history.json (ATH is hidden on the public share board by design —
+    the internal draft-day board wants it)."""
+    src = json.load(open(COMPOSITE, encoding="utf-8"))
+    hist = _load_hist()
+    ath_ranks = ((hist or {}).get("source_history", {}).get("ATH") or {}).get("ranks", {})
+    hist_players = (hist or {}).get("players", {})
+    latest = lambda vals: next((v for v in reversed(vals or []) if v is not None), None)
     rows = []
-    with open(COMPOSITE, newline="", encoding="utf-8-sig") as f:
-        for r in csv.DictReader(f):
-            try:
-                rank = int(float(r.get("Rank_Weighted") or 0))
-            except ValueError:
-                continue
-            if not rank:
-                continue
-            pos = (r.get("Pos") or "").strip()
-            school = (r.get("School") or "").strip()
-            age = (r.get("Age") or "").strip()
-            agent = (r.get("Agent") or "").strip()
-            rows.append({
-                "rank": rank,
-                "name": (r.get("Name") or "").strip(),
-                "pos": pos,
-                "posGroup": pos_group(pos),
-                "level": classify_level(school, age),
-                "school": school,
-                "age": age,
-                # advising agency (null when unknown/unlisted)
-                "agent": agent if agent and agent.lower() != "unknown" else None,
-                "sources": int(float(r.get("Num_Sources") or 0)),
-                # per-source board ranks (null = not ranked by that source)
-                "ba": _src_rank(r.get("BA_Rank")),
-                "mlb": _src_rank(r.get("MLB_Rank")),
-                "overslot": _src_rank(r.get("OverSlot_Rank")),
-                "espn": _src_rank(r.get("ESPN_Rank")),
-            })
+    for r in src["players"]:
+        try:
+            rank = int(float(r.get("Rank_Weighted") or 0))
+        except (ValueError, TypeError):
+            continue
+        if not rank:
+            continue
+        pos = (r.get("Pos") or "").strip()
+        school = (r.get("School") or "").strip()
+        age = r.get("Age")
+        age = "" if age in (None, "") else (str(int(float(age))) if float(age) == int(float(age)) else str(age))
+        agent = (r.get("Agent") or "").strip()
+        key = _bc.canon(_bc.norm(r.get("Name") or ""))
+        hp = hist_players.get(key)
+        row = {
+            "rank": rank,
+            "name": (r.get("Name") or "").strip(),
+            "pos": pos,
+            "posGroup": pos_group(pos),
+            "level": classify_level(school, age),
+            "school": school,
+            "age": age,
+            # advising agency (null when unknown/unlisted)
+            "agent": agent if agent and agent.lower() != "unknown" else None,
+            "sources": int(float(r.get("Num_Sources") or 0)),
+            # per-source board ranks (null = not ranked by that source)
+            "ba": _src_rank(r.get("BA_Rank")),
+            "mlb": _src_rank(r.get("MLB_Rank")),
+            "overslot": _src_rank(r.get("OverSlot_Rank")),
+            "espn": _src_rank(r.get("ESPN_Rank")),
+            "pbr": _src_rank(r.get("PBR_Rank")),
+            "ath": _src_rank(latest(ath_ranks.get(key))),
+        }
+        # composite rank across ranking editions (aligned to meta.json's histDates)
+        if hp and any(v is not None for v in hp["rw"]):
+            row["trend"] = hp["rw"]
+        rows.append(row)
     rows.sort(key=lambda x: x["rank"])
     return rows
+
+
+def rank_meta():
+    """Per-source depth + as-of date (ATH's come from rank history — it's not in the
+    composite build) and the snapshot dates the players' trend arrays align to."""
+    src = json.load(open(COMPOSITE, encoding="utf-8"))
+    sources = {s: {"depth": d, "asOf": (src.get("as_of") or {}).get(s)}
+               for s, d in (src.get("sources") or {}).items()}
+    hist = _load_hist()
+    ath = (hist or {}).get("source_history", {}).get("ATH")
+    if ath and ath.get("dates"):
+        last = len(ath["dates"]) - 1
+        depth = sum(1 for v in ath["ranks"].values() if len(v) > last and v[last] is not None)
+        sources["ATH"] = {"depth": depth, "asOf": ath["dates"][-1]}
+    return {"sources": sources, "histDates": (hist or {}).get("dates", [])}
 
 
 def bucket(school_class):
@@ -404,6 +447,7 @@ def main():
             "builtAt": datetime.datetime.now().isoformat(timespec="seconds"),
             "composite_n": len(composite),
             "orgreview_file": os.path.basename(orgpath),
+            **rank_meta(),
         }, f, indent=2)
 
     print(f"composite.json  {len(composite)} players")

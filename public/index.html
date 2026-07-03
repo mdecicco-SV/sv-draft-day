@@ -53,6 +53,13 @@
   .pdw.cmb { color:#3949ab; border-color:#3949ab; margin-left:4px; }
   td.sr-col, th.sr-col { text-align:center; font-variant-numeric:tabular-nums; }
   td.sr-col { font-weight:700; color:#374151; }
+  th .sr-asof { display:block; font-size:9px; font-weight:600; color:var(--muted); text-transform:none; letter-spacing:0; }
+  .trend { display:inline-flex; align-items:center; gap:5px; font-variant-numeric:tabular-nums; }
+  .trend .spark path { fill:none; stroke:currentColor; stroke-width:1.5; }
+  .trend .spark circle { fill:currentColor; }
+  .trend.up { color:var(--good); } .trend.down { color:var(--red); } .trend.flat { color:#9aa0a6; }
+  .trend .delta { font-size:11px; font-weight:800; }
+  .trend .new { font-size:9px; font-weight:800; letter-spacing:.08em; color:#9aa0a6; }
   .ct .nx .mlab { font-size:10px; text-transform:uppercase; letter-spacing:.3px; opacity:.6; font-weight:800; }
   .bcard.bc-dim { opacity:.38; }
   .bcard .bc-lens { display:flex; align-items:center; gap:4px; margin-top:5px; flex-wrap:wrap; }
@@ -88,9 +95,13 @@
   /* our-clients roster list */
   table.cl-table td { vertical-align:middle; }
   .cl-nm { font-weight:800; }
-  .cl-int { display:inline-flex; align-items:center; gap:3px; margin-right:8px; font-weight:800; font-size:11px; }
+  .cl-intw { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+  .cl-int { display:inline-flex; align-items:center; gap:4px; font-weight:800; font-size:11px;
+    border:1px solid var(--line); border-radius:999px; padding:2px 7px; background:var(--card); white-space:nowrap; }
+  .cl-int .idot { width:9px; height:9px; flex-shrink:0; }
   .cl-more { font-size:10px; color:var(--muted); font-weight:800; }
-  .cl-int .cl-pk { color:var(--red); font-weight:800; font-size:10px; margin-left:2px; font-variant-numeric:tabular-nums; }
+  .cl-int .cl-pk { color:var(--red); font-weight:800; font-size:10px; font-variant-numeric:tabular-nums; min-width:24px; text-align:right; }
+  .cl-int .cl-pk.na { color:#c2c7cd; }
   .cl-none { color:#c2c7cd; }
   .cl-rng { color:var(--muted); font-weight:700; font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
   /* player page — in-page version of the team-card look (stat band, numbered quadrants, foot) */
@@ -784,7 +795,7 @@
       <span class="count" id="baCount"></span>
     </div>
     <table class="ba">
-      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Agency</th><th class="hide-sm">Age</th><th class="sr-col">BA</th><th class="sr-col">MLB</th><th class="sr-col">OS</th><th class="sr-col">ESPN</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Agency</th><th class="hide-sm">Age</th><th class="sr-col" data-src="BA">BA<span class="sr-asof"></span></th><th class="sr-col" data-src="MLB">MLB<span class="sr-asof"></span></th><th class="sr-col" data-src="OverSlot">OS<span class="sr-asof"></span></th><th class="sr-col" data-src="ESPN">ESPN<span class="sr-asof"></span></th><th class="sr-col" data-src="PBR">PBR<span class="sr-asof"></span></th><th class="sr-col" data-src="ATH">ATH<span class="sr-asof"></span></th><th class="hide-sm">Trend</th><th></th></tr></thead>
       <tbody id="baBody"></tbody>
     </table>
   </section>
@@ -1101,13 +1112,22 @@
 
   async function loadStatic() {
     try {
-      const [c, o, lev, hg] = await Promise.all([
+      const [c, o, lev, hg, meta] = await Promise.all([
         fetch("/data/composite.json").then(r=>r.json()),
         fetch("/data/orgs.json").then(r=>r.json()),
         fetch("/data/leverage.json").then(r=>r.json()).catch(()=>null),
         fetch("/data/homegrown.json").then(r=>r.json()).catch(()=>null),
+        fetch("/data/meta.json").then(r=>r.json()).catch(()=>null),
       ]);
-      DATA.composite = c; DATA.orgs = o; DATA.leverage = lev;
+      DATA.composite = c; DATA.orgs = o; DATA.leverage = lev; DATA.meta = meta;
+      // stamp each rank source's "as of M/D" under its Best Available column header
+      if (meta?.sources) {
+        const md = (s) => { const [,m,d] = s.split("-"); return `${+m}/${+d}`; };
+        document.querySelectorAll("th[data-src]").forEach(th => {
+          const s = meta.sources[th.dataset.src], el = th.querySelector(".sr-asof");
+          if (s?.asOf && el) el.textContent = `as of ${md(s.asOf)}`;
+        });
+      }
       // homegrown-by-level (baked from MLB StatsAPI, keyed by team id) → org records,
       // with each team's league rank on the two homegrown percentages
       if (hg) {
@@ -1409,14 +1429,18 @@
       const comp = c.comp, pk = drafted.get(c.key);
       // Interest: strongest color first; ties broken by who's up soonest INSIDE his landing
       // window (locked range / strike window) — teams with no pick in the window sort last.
-      // Hover a dot for the latest intel; the #pick is that team's next shot at him.
+      // Every pill has the same shape (dot · team · pick slot); no pick in window → "—",
+      // so rows scan as a repeated unit. Hover a dot for the latest intel.
       const rgW = comp ? rangeOf(comp) : null;
       const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
         .map(t => ({ t, cr: intelColorRank(c.key,t), nx: teamPickInRange(state, t, rgW) }))
         .sort((a,b)=> (a.cr-b.cr) || (!!b.nx-!!a.nx) || ((a.nx?a.nx.overall:1e9)-(b.nx?b.nx.overall:1e9)));
       const interest = teams.length
-        ? teams.slice(0,3).map(x=>`<span class="cl-int">${intelDot(c.key,x.t)}${x.t}${x.nx&&!pk?`<span class="cl-pk">#${x.nx.overall}</span>`:""}</span>`).join("")
-          + (teams.length>3?`<span class="cl-more">+${teams.length-3}</span>`:"")
+        ? `<div class="cl-intw">` + teams.slice(0,3).map(x=>{
+            const hasPk = x.nx && !pk;
+            return `<span class="cl-int">${intelDot(c.key,x.t)}${x.t}<span class="cl-pk${hasPk?"":" na"}">${hasPk?`#${x.nx.overall}`:"—"}</span></span>`;
+          }).join("")
+          + (teams.length>3?`<span class="cl-int cl-more">+${teams.length-3}</span>`:"") + `</div>`
         : `<span class="cl-none">—</span>`;
       // Range: locked intel range when we have one, else the engine's window around his rank.
       const rg = comp ? rangeOf(comp) : null;
@@ -1559,8 +1583,32 @@
         <td class="sr-col">${p.mlb!=null?"#"+p.mlb:"—"}</td>
         <td class="sr-col">${p.overslot!=null?"#"+p.overslot:"—"}</td>
         <td class="sr-col">${p.espn!=null?"#"+p.espn:"—"}</td>
+        <td class="sr-col">${p.pbr!=null?"#"+p.pbr:"—"}</td>
+        <td class="sr-col">${p.ath!=null?"#"+p.ath:"—"}</td>
+        <td class="hide-sm">${trendCell(p)}</td>
         <td class="ba-draft">${clickable?`<button class="ctl ba-draft-btn" onclick="event.stopPropagation();draftManual('${qn}')">Draft</button>`:""}</td></tr>`;
-    }).join("") || `<tr><td colspan="12" style="color:#9aa0a6;padding:14px">No players match these filters.</td></tr>`;
+    }).join("") || `<tr><td colspan="15" style="color:#9aa0a6;padding:14px">No players match these filters.</td></tr>`;
+  }
+  // Composite-rank trend across ranking editions (baked from rank_history.json; the point
+  // dates live in meta.json histDates). Lower rank = better, so the spark draws rank #1 at
+  // the top and the Δ is vs the previous edition: ▲3 = climbed three composite spots.
+  function trendCell(p) {
+    const t = p.trend, pts = (t||[]).map((v,i)=>({v,i})).filter(x=>x.v!=null);
+    if (!pts.length) return `<span class="cl-none">—</span>`;
+    if (pts.length === 1) return `<span class="trend flat"><span class="new">NEW</span></span>`;
+    const last = pts[pts.length-1].v, prev = pts[pts.length-2].v, d = prev - last;
+    const cls = d>0?"up":d<0?"down":"flat", arrow = d>0?"▲":d<0?"▼":"·";
+    const dates = DATA.meta?.histDates||[];
+    const tip = pts.map(x=>`${dates[x.i]?dates[x.i].slice(5).replace("-","/"):""} #${x.v}`).join(" → ");
+    return `<span class="trend ${cls}" title="composite rank by edition: ${tip}">${spark(pts.map(x=>x.v))}<span class="delta">${arrow}${d?Math.abs(d):""}</span></span>`;
+  }
+  function spark(vals) {
+    const w=56, h=16, n=vals.length;
+    const lo=Math.min(...vals), hi=Math.max(...vals), sp=(hi-lo)||1;
+    const xy=(v,i)=>[ (i/(n-1))*(w-4)+2, ((v-lo)/sp)*(h-6)+3 ];
+    const d = vals.map((v,i)=>`${i?"L":"M"}${xy(v,i).map(z=>z.toFixed(1)).join(",")}`).join("");
+    const [cx,cy]=xy(vals[n-1],n-1);
+    return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${d}"/><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="2"/></svg>`;
   }
 
   // ---------- VIEW: BOARD (running log + card grid) ----------
@@ -1626,7 +1674,7 @@
   // Batting side for hitter clients (normName -> "L" | "R" | "S"). The composite feed has no
   // B/T, so fill these in as known — unknown hitters get unfiltered comps. Pitchers need no
   // entry: their throwing hand comes off the position (RHP/LHP).
-  const CLIENT_BATS = {};
+  const CLIENT_BATS = { "roch cholowsky":"R" };
   // Same-hand rule for comps: pitchers match throwing hand, hitters match batting side.
   function handOf(comp) {
     if (!comp) return null;
@@ -1634,15 +1682,26 @@
     const b = CLIENT_BATS[normName(comp.name)];
     return b ? { field:"bats", side:String(b)[0].toUpperCase() } : null;
   }
-  // Auto comps: same level × position group × same hand (RHP -> RHPs, LHH -> LHHs), drafted
-  // nearest the client's composite rank, deduped, most recent first on ties. Cold facts only.
+  // A hitter with one defined position comps against that exact position (an SS comps to
+  // SSs, not the whole infield); generic listings (IF/OF) and pitchers keep group matching.
+  const compExactPos = (comp) => { const p = String(comp?.pos||"").toUpperCase();
+    return (!isPitcher(comp?.pos) && /^(C|1B|2B|3B|SS|LF|CF|RF)$/.test(p)) ? p : null; };
+  // Auto comps: same level × exact position (hitters) or position group, drafted nearest the
+  // client's composite rank, deduped, most recent first on ties. Hand: pitchers hard-match
+  // throwing hand (RHP -> RHPs); hitters PREFER the same batting side — an off-side comp only
+  // makes the table if it's >25 picks closer to his rank than the next same-side option.
   function autoComps(comp) {
     const lvl = comp.level==="HS" ? "HS" : "College", grp = comp.posGroup || posGroupOf(comp.pos);
-    const hand = handOf(comp);
+    const hand = handOf(comp), xp = compExactPos(comp);
+    // primary listed position must match: "SS-3B" is an SS comp, "P-SS"/"2b-ss" are not
+    const posHit = (r) => (String(r.pos||"").toUpperCase().split(/[^A-Z0-9]+/)[0]||"") === xp;
+    const sameHand = (r) => !hand || (r[hand.field]||"").toUpperCase().startsWith(hand.side);
     const seen = new Set(), out = [];
-    const rows = DATA.slotHistory.filter(r => r.bonus!=null && r.level===lvl && r.group===grp
-        && (!hand || (r[hand.field]||"").toUpperCase().startsWith(hand.side)))
-      .sort((a,b) => Math.abs(a.overall-comp.rank)-Math.abs(b.overall-comp.rank) || b.year-a.year);
+    const rows = DATA.slotHistory.filter(r => r.bonus!=null && r.level===lvl
+        && (xp ? posHit(r) : r.group===grp)
+        && (isPitcher(comp.pos) ? sameHand(r) : true))
+      .sort((a,b) => (Math.abs(a.overall-comp.rank) + (sameHand(a)?0:25))
+                   - (Math.abs(b.overall-comp.rank) + (sameHand(b)?0:25)) || b.year-a.year);
     for (const r of rows) { const k = r.first+" "+r.last; if (seen.has(k)) continue; seen.add(k); out.push(r); if (out.length>=5) break; }
     return out;
   }
@@ -1671,7 +1730,10 @@
           <td class="cmp-dr"><b>2026</b><br><span>TBD${comp.rank?` · ranked #${comp.rank}`:""}</span></td><td class="cmp-bn">—</td></tr>
         ${rowsH || `<tr><td colspan="7"><div class="placeholder">No comps found for this profile.</div></td></tr>`}
       </tbody></table>
-      <div class="cmp-foot">${curated?"Presented comps (already shared)":(()=>{const hd=handOf(comp);return `Auto comps — same level × position${hd?` × ${hd.side==="L"?"lefty":hd.side==="R"?"righty":"switch"} (${hd.field})`:""}, drafted nearest his rank`;})()}${avg!=null?` · comp bonuses ${fmtM(lo)}–${fmtM(hi)} · avg <b>${fmt$(Math.round(avg))}</b>`:""}</div>`;
+      <div class="cmp-foot">${curated?"Presented comps (already shared)":(()=>{const hd=handOf(comp), xp=compExactPos(comp);
+        const hdTxt = !hd ? "" : hd.field==="throws" ? ` × ${hd.side==="L"?"lefty":"righty"} (throws)`
+          : hd.side==="S" ? " · switch-hitters preferred" : ` · ${hd.side}HH preferred`;
+        return `Auto comps — same level × ${xp||"position"}${hdTxt}, drafted nearest his rank`;})()}${avg!=null?` · comp bonuses ${fmtM(lo)}–${fmtM(hi)} · avg <b>${fmt$(Math.round(avg))}</b>`:""}</div>`;
   }
 
   // Historical precedent search over the FULL 2018-25 slot-tracker database: same-profile
@@ -2710,6 +2772,7 @@
       const dpk = state.picks.find(p => p.isDrafted && normName(p.player)===c.key);
       if (dpk) { renderDraftedVitals(state, c, dpk); return; }
     }
+    const isClient = DATA.clients.has(c.key);
     const comp = c.comp, kqk = c.key.replace(/'/g,"\\'");
     const dem = demandFor(comp);
     const pk = state.picks.find(p => p.isDrafted && normName(p.player)===c.key);
@@ -2758,26 +2821,31 @@
     // 1 — presented/auto comps (top-left)
     const p1 = `<div class="tc-panel"><h4><span class="n">1</span> Recent Draft Comparisons</h4>${compsTableHtml(c)}</div>`;
 
-    // 2 — every org with logged intel, in draft order of their next pick (right column)
-    const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
-      .map(t => ({ t, rec:latestIntel(c.key,t), f:fit(comp,t,c.key,state), nx:teamNextPick(state,t) }))
-      .sort((a,b) => (!!a.nx !== !!b.nx) ? (a.nx?-1:1) : (a.nx ? a.nx.overall-b.nx.overall : b.f.score-a.f.score));
-    let p2 = `<div class="tc-panel"><h4><span class="n">2</span> How Each Org Views Him</h4>
-      <div class="tc-fitline sm"><span>sorted by their next pick · dot = interest, grade = fit</span></div>`;
-    p2 += teams.length ? teams.map(x => {
-      const pool = state.poolsMap[x.t];
-      const ou = (comp && x.nx) ? negBonus(comp, x.nx.slot, x.nx.overall) - x.nx.slot : null;
-      return `<div class="ct">
-        <span class="ov" style="min-width:44px;color:var(--red);font-weight:800">${x.nx?`#${x.nx.overall}`:"—"}</span>
-        ${intelDot(c.key, x.t)}
-        <span class="tm">${teamLink(x.t)}</span>
-        <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>${contactBadges(c.key, x.t)}
-        <span class="nx">${x.nx?`${fmtM(x.nx.slot)}${ou!=null?` · ${ouTag(ou,true)}`:""}${pool?` · ammo ${fmtM(pool.room)}`:""}`:"no picks left"}</span></div>`;
-    }).join("") : `<div class="placeholder">No logged team interest.</div>`;
-    p2 += `</div>`;
+    // 2 — every org with logged intel, in draft order of their next pick (right column).
+    // Client-only: for a non-SV player there's no intel book to show, so the panel is skipped
+    // and the remaining panels renumber.
+    let p2 = "";
+    if (isClient) {
+      const teams = [...new Set(DATA.intel.filter(r=>normName(r.player)===c.key).map(r=>teamAlias(r.team)))]
+        .map(t => ({ t, rec:latestIntel(c.key,t), f:fit(comp,t,c.key,state), nx:teamNextPick(state,t) }))
+        .sort((a,b) => (!!a.nx !== !!b.nx) ? (a.nx?-1:1) : (a.nx ? a.nx.overall-b.nx.overall : b.f.score-a.f.score));
+      p2 = `<div class="tc-panel"><h4><span class="n">2</span> How Each Org Views Him</h4>
+        <div class="tc-fitline sm"><span>sorted by their next pick · dot = interest, grade = fit</span></div>`;
+      p2 += teams.length ? teams.map(x => {
+        const pool = state.poolsMap[x.t];
+        const ou = (comp && x.nx) ? negBonus(comp, x.nx.slot, x.nx.overall) - x.nx.slot : null;
+        return `<div class="ct">
+          <span class="ov" style="min-width:44px;color:var(--red);font-weight:800">${x.nx?`#${x.nx.overall}`:"—"}</span>
+          ${intelDot(c.key, x.t)}
+          <span class="tm">${teamLink(x.t)}</span>
+          <span class="grade" data-org="${x.t}" style="background:${x.f.color}">${x.f.grade}</span>${contactBadges(c.key, x.t)}
+          <span class="nx">${x.nx?`${fmtM(x.nx.slot)}${ou!=null?` · ${ouTag(ou,true)}`:""}${pool?` · ammo ${fmtM(pool.room)}`:""}`:"no picks left"}</span></div>`;
+      }).join("") : `<div class="placeholder">No logged team interest.</div>`;
+      p2 += `</div>`;
+    }
 
     // 3 — Money (and, once drafted, the approximate-bonus capture) — under the comps
-    let p3 = `<div class="tc-panel"><h4><span class="n">3</span> Money</h4>`;
+    let p3 = `<div class="tc-panel"><h4><span class="n">${isClient?3:2}</span> Money</h4>`;
     if (comp) p3 += `<div class="tc-kv"><span class="k">Est. market value</span><span class="v">${fmt$(dem)}</span></div>`;
     if (ms!=="unknown") p3 += `<div class="tc-kv"><span class="k">Medical floor</span><span class="v">${ms==="yes"?(pk&&pk.slot>0?`${fmtM(MEDICAL_FLOOR*pk.slot)} · 75% of slot`:"≥75% of slot"):"none · under-slot possible"}</span></div>`;
     if (pk) {
@@ -2807,11 +2875,13 @@
     p3 += `</div>`;
 
     // 4 — historical precedent in the live context — under the money panel
-    const p4 = `<div class="tc-panel"><h4><span class="n">4</span> Historical Precedent</h4>${
+    const p4 = `<div class="tc-panel"><h4><span class="n">${isClient?4:3}</span> Historical Precedent</h4>${
       comp ? (DATA.slotHistory.length ? renderEmerging(state, c, comp) : (loadSlotHistory(), `<div class="placeholder">Loading historical signings…</div>`))
            : `<div class="placeholder">Unranked — no precedent profile.</div>`}</div>`;
 
-    h += `<div class="pp-cols"><div class="pp-col">${p1}${p3}${p4}</div><div class="pp-col">${p2}</div></div>`;
+    h += isClient
+      ? `<div class="pp-cols"><div class="pp-col">${p1}${p3}${p4}</div><div class="pp-col">${p2}</div></div>`
+      : `<div class="pp-cols"><div class="pp-col">${p1}${p3}</div><div class="pp-col">${p4}</div></div>`;
 
     $("detailBody").innerHTML = h;
   }
