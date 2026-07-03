@@ -74,7 +74,7 @@
   /* ESPN-style pick ticker — bottom, slides up on each new pick (live + mock), any page */
   #ticker { position:fixed; left:0; right:0; bottom:0; z-index:80; transform:translateY(115%); transition:transform .38s cubic-bezier(.2,.7,.3,1); pointer-events:none; }
   #ticker.show { transform:translateY(0); }
-  #ticker .tk-inner { margin:0 auto; max-width:920px; display:flex; align-items:center; gap:13px; background:#141414; color:#fff; border-top:3px solid var(--red); border-radius:12px 12px 0 0; padding:12px 20px; box-shadow:0 -8px 26px rgba(0,0,0,.28); font-size:16px; }
+  #ticker .tk-inner { margin:0 auto; max-width:920px; display:flex; align-items:center; gap:13px; background:#141414; color:#fff; border-top:3px solid var(--red); border-radius:12px 12px 0 0; padding:12px 20px; box-shadow:0 -8px 26px rgba(0,0,0,.28); font-size:16px; pointer-events:auto; touch-action:none; cursor:grab; }
   #ticker .tk-inner.sv { border-top-color:#1a7f37; }
   #ticker .tk-badge { background:var(--red); color:#fff; font-weight:900; font-size:12px; letter-spacing:.5px; padding:4px 9px; border-radius:6px; font-variant-numeric:tabular-nums; }
   #ticker .tk-inner.sv .tk-badge { background:#1a7f37; }
@@ -2957,13 +2957,62 @@
       ${knownBonus?`<span class="tk-bonus">${fmtM(eb.bonus)}${eb.src&&eb.src!=="confirmed"?" "+eb.src.slice(0,3):""}</span>`:""}
       ${ours?'<span class="tk-sv">SV CLIENT</span>':""}</div>`;
     el.classList.add("show");
+    tickerCur = p;
     const burst = tickerQueue.length > 4;               // drain bursts (mock turbo) fast, no zap
-    const hold = burst ? 800 : 2500;                    // banner surfaces ~2.5s, then zaps to its tile
-    setTimeout(() => {
-      if (burst) { el.classList.remove("show"); setTimeout(nextTicker, 420); }
-      else zapTicker(el, p.overall, () => setTimeout(nextTicker, 100));
-    }, hold);
+    clearTimeout(tickerHoldTimer);
+    if (burst) tickerHoldTimer = setTimeout(() => {
+      tickerCur = null; el.classList.remove("show"); setTimeout(nextTicker, 420);
+    }, 800);
+    else tickerHoldTimer = setTimeout(advanceTicker, 1100);   // banner surfaces ~1s, then zaps to its tile
   }
+  let tickerCur = null, tickerHoldTimer = 0;
+  function advanceTicker() {                            // zap the current banner into its tile, move on
+    const el = $("ticker"), p = tickerCur;
+    if (!el || !p) return;
+    tickerCur = null;
+    zapTicker(el, p.overall, () => setTimeout(nextTicker, 100));
+  }
+  // Swipe the banner away early — flinging it sideways/down dismisses without the zap;
+  // a small drag springs back and the zap fires shortly after. Touching pauses the hold.
+  (function() {
+    const el = $("ticker"); if (!el) return;
+    let sx = 0, sy = 0, drag = false;
+    el.addEventListener("pointerdown", e => {
+      if (!tickerCur || !el.classList.contains("show")) return;
+      drag = true; sx = e.clientX; sy = e.clientY;
+      clearTimeout(tickerHoldTimer);
+    });
+    const move = e => {
+      if (!drag) return;
+      const inner = el.querySelector(".tk-inner"); if (!inner) return;
+      const dx = e.clientX - sx, dy = Math.max(-10, e.clientY - sy);
+      inner.style.transform = `translate(${dx}px,${dy}px)`;
+      inner.style.opacity = Math.max(.3, 1 - (Math.abs(dx) + Math.max(0, dy)) / 260);
+    };
+    const up = e => {
+      if (!drag) return; drag = false;
+      const inner = el.querySelector(".tk-inner"); if (!inner) return;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 55 || dy > 40) {
+        tickerCur = null;
+        const a = inner.animate(
+          [{ transform: inner.style.transform, opacity: inner.style.opacity || 1 },
+           { transform: `translate(${dx*4}px,${Math.max(dy,0)*4 + 80}px)`, opacity: 0 }],
+          { duration: 180, easing: "ease-in" });
+        a.onfinish = a.oncancel = () => {
+          el.classList.remove("show"); el.style.visibility = "hidden";
+          inner.style.transform = ""; inner.style.opacity = "";
+          setTimeout(nextTicker, 60);
+        };
+      } else {
+        inner.style.transform = ""; inner.style.opacity = "";
+        if (tickerCur) tickerHoldTimer = setTimeout(advanceTicker, 600);
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  })();
   const VIEWS = [["tabClients","viewClients","clients"],["tabBoard","viewBoard","board"],
                  ["tabPools","viewPools","pools"],["tabBest","viewBest","best"]];
   function renderActive() {
