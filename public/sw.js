@@ -1,7 +1,7 @@
 // Minimal service worker for the SV Draft Day companion.
 // This is a LIVE tool — HTML, /data/*, /api/* and external feeds are NEVER cached here.
 // Only immutable-ish static assets (fonts, brand art, icons, MLB team logos) get cache-first.
-const CACHE = "svdd-static-v1";
+const CACHE = "svdd-static-v2";
 const PRECACHE = [
   "/brand/sv-logo.svg",
   "/brand/sv-logo-white.svg",
