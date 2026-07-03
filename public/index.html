@@ -795,7 +795,7 @@
       <span class="count" id="baCount"></span>
     </div>
     <table class="ba">
-      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Commit</th><th class="hide-sm">Agency</th><th class="hide-sm">Age</th><th class="hide-sm">B/T</th><th class="sr-col" data-src="BA">BA<span class="sr-asof"></span></th><th class="sr-col" data-src="MLB">MLB<span class="sr-asof"></span></th><th class="sr-col" data-src="OverSlot">OS<span class="sr-asof"></span></th><th class="sr-col" data-src="ESPN">ESPN<span class="sr-asof"></span></th><th class="sr-col" data-src="PBR">PBR<span class="sr-asof"></span></th><th class="sr-col" data-src="ATH">ATH<span class="sr-asof"></span></th><th class="hide-sm">Trend</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Commit</th><th class="hide-sm">Agency</th><th class="hide-sm">Age</th><th>B/T</th><th class="sr-col" data-src="BA">BA<span class="sr-asof"></span></th><th class="sr-col" data-src="MLB">MLB<span class="sr-asof"></span></th><th class="sr-col" data-src="OverSlot">OS<span class="sr-asof"></span></th><th class="sr-col" data-src="ESPN">ESPN<span class="sr-asof"></span></th><th class="sr-col" data-src="PBR">PBR<span class="sr-asof"></span></th><th class="sr-col" data-src="ATH">ATH<span class="sr-asof"></span></th><th class="hide-sm">Trend</th><th></th></tr></thead>
       <tbody id="baBody"></tbody>
     </table>
   </section>
@@ -1581,7 +1581,7 @@
       return `<tr class="${ours?"sv":""} clickrow" onclick="openPlayer('${normName(p.name).replace(/'/g,"\\'")}')">
         <td class="rk">#${p.rank}</td><td>${p.name} ${ours?'<span class="svtag">SV</span>':""}</td>
         <td>${p.pos}</td><td><span class="lvl ${p.level}">${p.level}</span></td>
-        <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${p.commit||"—"}</td><td class="hide-sm">${p.agent||"—"}</td><td class="hide-sm">${fmtAge(p.age)}</td><td class="hide-sm">${p.bats?`${p.bats.replace("B","S")}/${p.throws||"?"}`:"—"}</td>
+        <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${p.commit||"—"}</td><td class="hide-sm">${p.agent||"—"}</td><td class="hide-sm">${fmtAge(p.age)}</td><td>${fmtBT(p)}</td>
         <td class="sr-col">${p.ba!=null?"#"+p.ba:"—"}</td>
         <td class="sr-col">${p.mlb!=null?"#"+p.mlb:"—"}</td>
         <td class="sr-col">${p.overslot!=null?"#"+p.overslot:"—"}</td>
@@ -1674,6 +1674,8 @@
     return (((Date.UTC(year,6,14) - t) / 31557600000)).toFixed(1);
   };
   const fmtHtWt = (r) => (r.ht && r.wt) ? `${r.ht.replace("-","'")}" / ${r.wt}` : "—";
+  // B/T display: feed marks switch-hitters "B" — show the slot-tracker's "S" convention
+  const fmtBT = (r) => (r && (r.bats || r.throws)) ? `${(r.bats||"?").replace("B","S")}/${r.throws||"?"}` : "—";
   // Manual batting-side overrides (normName -> "L" | "R" | "S"). The composite feed now
   // bakes Bats/Throws for nearly everyone — this is only an escape hatch for feed errors.
   const CLIENT_BATS = {};
@@ -1735,7 +1737,7 @@
     return `
       <table class="cmp-table"><thead><tr><th>Player</th><th>Pos</th><th>B/T</th><th>HT / WT</th><th>Age</th><th>Drafted</th><th>Bonus</th></tr></thead>
       <tbody>
-        <tr class="cmp-us"><td class="cmp-nm">${c.name}</td><td>${comp.pos}</td><td>${comp.bats||comp.throws?`${(comp.bats||"?").replace("B","S")}/${comp.throws||"?"}`:"—"}</td><td>${fmtHtWt(comp)}</td><td>${fmtAge(comp.age)||"—"}</td>
+        <tr class="cmp-us"><td class="cmp-nm">${c.name}</td><td>${comp.pos}</td><td>${fmtBT(comp)}</td><td>${fmtHtWt(comp)}</td><td>${fmtAge(comp.age)||"—"}</td>
           <td class="cmp-dr"><b>2026</b><br><span>TBD${comp.rank?` · ranked #${comp.rank}`:""}</span></td><td class="cmp-bn">—</td></tr>
         ${rowsH || `<tr><td colspan="7"><div class="placeholder">No comps found for this profile.</div></td></tr>`}
       </tbody></table>
@@ -2730,6 +2732,8 @@
       ["Level", level],
       ["School", schoolShort(comp?.school || pk.school) || "—"],
       [positions.includes("/") ? "Positions" : "Position", positions || "—"],
+      ["B/T", fmtBT(comp)],
+      ["HT / WT", comp ? fmtHtWt(comp) : "—"],
       ["Agency", comp?.agent || "—"],
       ["Pick slot", pk.slot>0?fmt$(pk.slot):"—"],
       ["Bonus", eb.bonus!=null && (pk.bonus!=null||eb.src) ? fmt$(eb.bonus)+(eb.src?` (${eb.src})`:"") : "—"],
@@ -2785,13 +2789,14 @@
       pk ? ["Pick slot", pk.slot>0?fmtM(pk.slot):"—", "slot value"] : null,
       pk ? ["Signing bonus", knownB?fmt$(eb.bonus):"—", knownB?(eb.src||"official"):"not yet known"]
          : ["Est. market value", dem!=null?fmt$(dem):"—", comp?`${levelClass(comp).replace("College-","Col ")} ${comp.posGroup||comp.pos}`:""],
+      comp ? ["B/T", fmtBT(comp), comp.ht&&comp.wt?fmtHtWt(comp):""] : null,
       ["Medical", ms==="yes"?"✓ Yes":ms==="no"?"✗ No":"? Unknown", ms==="yes"?"≥75% slot floor":"combine consent"],
       ["Range", `<span class="tlink" title="edit the landing window (player settings below)" onclick="ppEditRange()">${hasRg?`🔒 #${rg.lo||"?"}–${rg.hi||"?"}`:(comp?`~#${Math.max(1,comp.rank-7)}–${Math.min(state.picks.length||(comp.rank+45), comp.rank+45)}`:"—")}</span>`, hasRg?"your intel · hard lock ✎":"engine window · click to set ✎"],
       ["School", schoolShort(comp?.school)||"—", [comp?.commit?`${comp.commit} commit`:null, comp?.agent].filter(Boolean).join(" · ")],
     ].filter(Boolean);
     let h = `<div class="cc">
       <div class="detail-head">${pk?teamLogo(pk.team,30):""}<span class="rk" style="font-size:20px">${comp?"#"+comp.rank:"NR"}</span>
-        <span class="big">${c.name}</span><span class="pl">${comp?`${comp.pos} · ${levelClass(comp).replace("College-","Col ")}${comp.age?" · age "+fmtAge(comp.age):""}${comp.bats?` · ${comp.bats.replace("B","S")}/${comp.throws||"?"}`:""}${comp.ht&&comp.wt?` · ${fmtHtWt(comp)}`:""}`:"unranked"}</span></div>
+        <span class="big">${c.name}</span><span class="pl">${comp?`${comp.pos} · ${levelClass(comp).replace("College-","Col ")}${comp.age?" · age "+fmtAge(comp.age):""}`:"unranked"}</span></div>
       <div class="tc-stats pp-stats">${stats.map(([k,v,sub])=>`<div class="tc-stat"><div class="k">${k}</div><div class="v">${v}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`).join("")}</div>
     </div>`;
 
