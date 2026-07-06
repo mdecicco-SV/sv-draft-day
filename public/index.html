@@ -488,7 +488,11 @@
   .tg.lvl-col { background:#e0e7ff; color:#3730a3; font-size:8px; padding:0 4px; vertical-align:1px; }
   /* Research tab: filters left, results right; dual-thumb range sliders */
   .res-grid { display:grid; grid-template-columns:440px minmax(0,1fr); gap:18px; align-items:start; }
-  .res-filters { border:1px solid #c9c9c7; border-radius:12px; padding:12px 13px; position:sticky; top:76px; }
+  .res-filters { position:sticky; top:76px; }
+  .res-box { border:1px solid #c9c9c7; border-radius:12px; padding:12px 13px; background:var(--card); }
+  .res-box + .res-box { margin-top:10px; }
+  .res-chead { display:flex; justify-content:space-between; align-items:center; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.4px; color:var(--ink); cursor:pointer; user-select:none; }
+  .res-chead span { color:var(--muted); font-size:12px; }
   .res-filters .tc-wizgrp { margin-bottom:7px; }
   .res-filters .tc-chip { padding:2px 7px; }
   .res-pdrop { position:relative; }
@@ -2797,7 +2801,8 @@
   // dropdown with group-selects, dual-thumb Age and Bonus range sliders, and a fully
   // sortable results table. Sliders repaint ONLY the results (no full re-render
   // mid-drag); the view never re-renders on live ticks.
-  let researchDrawn = false, resPosOpen = false;
+  let researchDrawn = false, resPosOpen = false, resClientsOpen = false;
+  window.toggleResClients = () => { resClientsOpen = !resClientsOpen; renderResearch(); };
   const BN_MAX = 10000000;
   const RES_DEF = () => ({ pos:new Set(), cls:new Set(), lvl:new Set(), money:new Set(), round:new Set(),
                            ageLo:16, ageHi:25, bnLo:0, bnHi:BN_MAX, client:null, sortKey:"year", sortDir:-1 });
@@ -2819,8 +2824,10 @@
     if (research.sortKey === k) research.sortDir *= -1;
     else { research.sortKey = k; research.sortDir = (k==="player"||k==="pos"||k==="team") ? 1 : -1; }
     renderResearchResults(); };
-  // Preload a client's comp profile: level, class proxy, positions, age ±1
+  // Preload a client's comp profile: level, class proxy, positions, age ±1.
+  // Clicking the already-selected client clears back to defaults.
   window.resClient = (key) => {
+    if (research.client === key) { research = RES_DEF(); renderResearch(); return; }
     const c = (DATA.clientList.find(x=>x.key===key) || {}).comp; if (!c) return;
     research = RES_DEF(); research.client = key;
     research.lvl.add(c.level==="HS" ? "HS" : "College");
@@ -2902,12 +2909,15 @@
         `<button class="tc-chip${research.pos.has(t)?' on':''}" onclick="resPosTok('${t}',event)">${t}</button>`).join("")}</div>`;}).join("")}</div>`;
     const posBtn = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab">Position</span>
       <button class="tc-chip${research.pos.size?' on':''}" onclick="toggleResPos(event)">${research.pos.size?[...research.pos].join(" "):"Any"} ▾</button>${posMenu}</div>`;
-    // our clients — one tap preloads level/class/positions/age±1 as comp lenses
+    // SV clients — one tap preloads level/class/positions/age±1 as comp lenses;
+    // lives in its own collapsible box beneath the filters.
     const clients = DATA.clientList.filter(c=>c.comp);
-    const cRow = clients.length ? `<div class="tc-wizgrp"><span class="tc-wizlab">Our guys</span>${clients.map(c=>
-      `<button class="tc-chip match${research.client===c.key?' on':''}" onclick="resClient('${c.key.replace(/'/g,"\\'")}')">${tcInitialName(c.name)}</button>`).join("")}</div>` : "";
-    el.innerHTML = `<div class="tc-wiz">
-      ${cRow}
+    const cBox = clients.length ? `<div class="res-box res-cbox">
+      <div class="res-chead" onclick="toggleResClients()">SV Clients${research.client?` · ${tcInitialName((clients.find(c=>c.key===research.client)||{}).name||"")}`:""}<span>${resClientsOpen?"▾":"▸"}</span></div>
+      ${resClientsOpen?`<div class="tc-wizgrp" style="flex-wrap:wrap;margin-top:8px">${clients.map(c=>
+        `<button class="tc-chip match${research.client===c.key?' on':''}" onclick="resClient('${c.key.replace(/'/g,"\\'")}')">${tcInitialName(c.name)}</button>`).join("")}</div>`:""}
+    </div>` : "";
+    el.innerHTML = `<div class="res-box"><div class="tc-wiz">
       ${chipRow("round", "Round", RES_ROUNDS)}
       ${posBtn}
       ${chipRow("cls", "Class", WIZ_GROUPS.cls.opts)}
@@ -2920,7 +2930,7 @@
         <div class="dual"><input type="range" id="resBnLo" min="0" max="${BN_MAX}" step="50000" value="${research.bnLo}" oninput="resSlide()">
         <input type="range" id="resBnHi" min="0" max="${BN_MAX}" step="50000" value="${research.bnHi}" oninput="resSlide()"></div></div>
       ${anyOn?`<div class="tc-wizgrp"><button class="tc-chip clear" onclick="resReset()">✕ clear all</button></div>`:""}
-    </div>`;
+    </div></div>${cBox}`;
     $("resAgeLab").textContent = `${research.ageLo.toFixed(1)} – ${research.ageHi.toFixed(1)}`;
     $("resBnLab").textContent = `${fmtM(research.bnLo)} – ${research.bnHi>=BN_MAX?"$10M+":fmtM(research.bnHi)}`;
     renderResearchResults();
