@@ -406,8 +406,8 @@
   .tc-pdrop .pdrop-menu { min-width:340px; max-height:300px; }
   .tc-pdrop .pdrop-item .pi-nm { display:flex; align-items:center; }
   .tc-panels { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; padding:14px 22px; flex:1 1 auto; min-height:0; }
-  .tc-panel { border:1px solid #c9c9c7; border-radius:12px; padding:15px 16px; overflow-y:auto; min-height:0; }
-  .tc-panel h4 { margin:0 0 12px; font-size:12px; font-weight:900; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); display:flex; align-items:center; gap:8px; }
+  .tc-panel { border:1px solid #c9c9c7; border-radius:12px; padding:12px 13px; overflow-y:auto; min-height:0; }
+  .tc-panel h4 { margin:0 0 9px; font-size:12px; font-weight:900; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); display:flex; align-items:center; gap:8px; }
   .tc-panel h4 .n { color:var(--muted); font-weight:900; }
   .tc-intel-grid { display:grid; grid-template-columns:auto 1fr; gap:14px; }
   .tc-score .big { font-size:40px; font-weight:900; line-height:1; }
@@ -421,10 +421,10 @@
   .tc-tierbar span { height:100%; }
   .tc-tierleg { display:flex; flex-wrap:wrap; gap:10px; margin-top:7px; font-size:10px; font-weight:700; color:var(--muted); }
   .tc-tierleg i { width:8px; height:8px; border-radius:2px; display:inline-block; margin-right:4px; vertical-align:middle; }
-  .tc-kv { display:flex; justify-content:space-between; align-items:baseline; padding:6px 0; border-top:1px solid var(--line); }
+  .tc-kv { display:flex; justify-content:space-between; align-items:baseline; padding:4px 0; border-top:1px solid var(--line); }
   .tc-kv:first-of-type { border-top:none; }
-  .tc-kv .k { font-size:12px; color:var(--muted); font-weight:700; }
-  .tc-kv .v { font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .tc-kv .k { font-size:11.5px; color:var(--muted); font-weight:700; }
+  .tc-kv .v { font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; }
   .hg-pct { color:var(--muted); font-weight:700; }
   .pi-ovr { color:var(--muted); font-weight:600; margin-left:2px; }
   .tc-feed-row { display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-top:1px solid var(--line); }
@@ -440,8 +440,10 @@
   .tc-made-adv { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--red); animation:tcPulse 1s ease-in-out infinite; }
   @keyframes tcPulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
   .tc-upc { width:100%; border-collapse:collapse; margin-top:4px; }
-  .tc-upc th { text-align:left; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); padding:4px 6px; white-space:nowrap; }
-  .tc-upc td { font-size:13px; font-weight:700; padding:5px 6px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .tc-upc th { text-align:left; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); padding:3px 4px; white-space:nowrap; }
+  .tc-upc td { font-size:11.5px; font-weight:700; padding:3px 4px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .tc-upc td.pl { max-width:1px; width:38%; overflow:hidden; text-overflow:ellipsis; font-weight:700; }
+  .tc-upc td .tg { font-size:9px; padding:1px 4px; }
   .tc-upc td.cur { color:var(--red); }
   .tc-cur-tag { font-size:9px; font-weight:800; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:1px 5px; margin-left:6px; }
   .tc-fit-strip { margin:0 22px 16px; border:1px solid var(--line); border-radius:12px; padding:13px 16px; display:flex; gap:22px; align-items:center; flex-wrap:wrap; background:#fbfbfc; }
@@ -486,12 +488,12 @@
   /* league-rank tiers: top 10 green, middle black, bottom 10 red */
   .hg-pct.rk-hi { color:#1a7f37; } .hg-pct.rk-mid { color:var(--ink); } .hg-pct.rk-lo { color:#c8102e; }
   .tc-sub { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin:-6px 0 10px; }
-  .tc-dfrow { position:relative; display:flex; align-items:center; gap:7px; padding:5px 6px; border-bottom:1px solid var(--line); font-size:12px; cursor:pointer; border-radius:6px; }
+  .tc-dfrow { position:relative; display:flex; align-items:center; gap:6px; padding:3px 6px; border-bottom:1px solid var(--line); font-size:11px; cursor:pointer; border-radius:6px; }
   .tc-dfrow:hover { background:#f7f8fa; }
   .tc-dfrow.done { opacity:.62; }
   .tc-dfrow.cur { background:#fdeef0; border:1px solid var(--red); opacity:1; }
-  .tc-dfno { font-weight:800; font-variant-numeric:tabular-nums; width:44px; flex-shrink:0; display:flex; flex-direction:column; line-height:1.15; }
-  .tc-dfno small { font-size:8px; font-weight:700; color:var(--muted); text-transform:uppercase; }
+  .tc-dfno { font-weight:800; font-variant-numeric:tabular-nums; width:72px; flex-shrink:0; display:flex; align-items:baseline; gap:4px; line-height:1.2; }
+  .tc-dfno small { font-size:8px; font-weight:700; color:var(--muted); text-transform:uppercase; white-space:nowrap; }
   .tc-dfwho { flex:1; min-width:0; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tc-dfsub { font-size:10px; font-weight:600; color:var(--muted); margin-left:5px; }
   .tc-dffits { flex:1; min-width:0; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
@@ -2625,7 +2627,7 @@
     h += picks.map(p => {
       const cur = p.overall === pk.overall;
       const cls = `tc-dfrow${cur?" cur":p.isDrafted?" done":""}`;
-      const no = `<span class="tc-dfno">#${p.overall}<small>${roundLabel(p.round)}</small></span>`;
+      const no = `<span class="tc-dfno">#${p.overall}<small>${/^\d+$/.test(String(p.round))?"RD "+p.round:p.round}</small></span>`;
       let main, val, onclick;
       if (p.isDrafted) {
         const eb = effectiveBonus(p);
@@ -2712,7 +2714,7 @@
                    : tier===1 ? ' <span class="tc-inplay" style="border-color:#3949ab;color:#3949ab">≈</span>' : '';
         return `<tr${tier===2?' style="background:#f2faf4"':''}>
           <td>'${String(r.year).slice(2)}</td>
-          <td style="font-size:12px;font-weight:700">${r.first?r.first[0]+". ":""}${r.last}${mark}</td>
+          <td class="pl">${r.first?r.first[0]+". ":""}${r.last}${mark}</td>
           <td style="color:var(--muted)">${posDisp(r)}</td>
           <td>#${r.overall}</td>
           <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
@@ -2752,7 +2754,7 @@
     h += `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Pos</th><th>Team</th><th>Bonus</th><th>vs Slot</th></tr></thead><tbody>`;
     h += rows.map(r=>`<tr>
       <td>'${String(r.year).slice(2)}</td>
-      <td style="font-size:12px;font-weight:700">${r.first?r.first[0]+". ":""}${r.last}</td>
+      <td class="pl">${r.first?r.first[0]+". ":""}${r.last}</td>
       <td style="color:var(--muted)">${posDisp(r)}</td>
       <td style="color:var(--muted)">${teamAbbrevOf(r.team)}</td>
       <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
@@ -2819,7 +2821,7 @@
       const mine = (NAME_FWD[r.team]||r.team) === (pk.teamName||"");
       return `<tr${mine?' style="background:#fff5f6"':''}>
         <td>'${String(r.year).slice(2)}</td>
-        <td style="font-size:12px;font-weight:700">${r.first?r.first[0]+". ":""}${r.last}</td>
+        <td class="pl">${r.first?r.first[0]+". ":""}${r.last}</td>
         <td style="color:var(--muted)">${posDisp(r)}</td>
         <td>#${r.overall}</td>
         <td style="color:var(--muted)${mine?';color:var(--red);font-weight:800':''}">${teamAbbrevOf(r.team)}</td>
