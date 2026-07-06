@@ -741,8 +741,8 @@
 </header>
 
 <nav class="tabs">
-  <button id="tabClients" class="on" onclick="setView('clients')">Our Clients</button>
-  <button id="tabBoard" onclick="setView('board')">Board</button>
+  <button id="tabBoard" class="on" onclick="setView('board')">Board</button>
+  <button id="tabClients" onclick="setView('clients')">Our Clients</button>
   <button id="tabPools" onclick="setView('pools')">Bonus Pools</button>
   <button id="tabBest" onclick="setView('best')">Best Available</button>
 </nav>
@@ -768,7 +768,7 @@
   <!-- OUR CLIENTS (hero) -->
   <!-- OUR CLIENTS — a scannable roster list; every row click-opens the full player page,
        which carries all per-player depth (intel, money, comps, precedent). -->
-  <section id="viewClients" class="view on">
+  <section id="viewClients" class="view">
     <div class="summary" id="clientSummary"></div>
     <table class="ba cl-table">
       <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th class="hide-sm">School</th><th class="hide-sm">Age</th><th>Interest</th><th class="hide-sm">Range</th><th>Status</th><th>Money</th></tr></thead>
@@ -786,7 +786,7 @@
   </section>
 
   <!-- BOARD (running log of all picks) -->
-  <section id="viewBoard" class="view">
+  <section id="viewBoard" class="view on">
     <div class="ba-filters">
       <label><input type="checkbox" id="bSv" onchange="renderBoard(currentState)"> SV picks only</label>
       <span id="boardPlayers" class="board-players"></span>
@@ -1124,7 +1124,7 @@
     if (medicalOf(comp) === "yes") b = Math.max(b, MEDICAL_FLOOR*pickSlot);   // combine-medical 75% floor
     return Math.max(50000, Math.round(b));
   }
-  let MODE = "live", VIEW = "clients", selected = null;
+  let MODE = "live", VIEW = "board", selected = null;
   // Mobile companion mode: body.mob mirrors the ≤640px query and drives the stacked
   // PWA layout. On a phone the board IS the app, so it becomes the launch tab.
   const MOBILE = matchMedia("(max-width:640px)");
@@ -1147,7 +1147,6 @@
   // re-render on crossover: board tiles emit different markup per form factor
   const onMobileFlip = () => { applyMobile(); try { renderActive(); } catch (e) {} };
   if (MOBILE.addEventListener) MOBILE.addEventListener("change", onMobileFlip); else MOBILE.addListener(onMobileFlip);
-  if (MOBILE.matches) VIEW = "board";
   const teamLink = (t) => t ? `<span class="tlink" onclick="openTeam('${t}')">${t}</span>` : "";
   const playerLink = (name) => `<span class="tlink" onclick="openPlayer('${normName(name).replace(/'/g,"\\'")}')">${name}</span>`;
   let currentState = null, lastLive = null, ORDER = null;
@@ -3427,7 +3426,7 @@
   (async () => {
     initOrgTooltip();
     applyTv();
-    applyViewVis();   // sync tab/section classes (mobile boots into Board, not the HTML default)
+    applyViewVis();   // sync tab/section classes (Board is the default view everywhere)
     await loadStatic();
     try { await loadOrder(); } catch (e) {}   // slot table for demandFor() in all views
     await loadIntel().then(backfillLocalSettings);   // load shared intel, then migrate browser-only ranges/medicals
