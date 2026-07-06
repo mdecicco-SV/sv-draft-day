@@ -98,7 +98,6 @@
   #ticker .tk-player { font-weight:800; }
   #ticker .tk-meta { color:#aaa; font-size:13px; }
   #ticker .tk-agency { color:#e8c46a; font-size:12px; font-weight:800; letter-spacing:.3px; }
-  #ticker .tk-bonus { color:#7fd39a; font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; }
   #ticker .tk-sv { margin-left:auto; background:#1a7f37; color:#fff; font-weight:900; font-size:11px; letter-spacing:.5px; padding:3px 8px; border-radius:5px; }
   /* zap: after the hold the banner flies (a fixed clone) into the pick's board tile, which pulses on landing */
   #tickerZap { position:fixed; z-index:81; pointer-events:none; will-change:transform,opacity; }
@@ -618,7 +617,7 @@
   body.mob #ticker .tk-inner { flex-wrap:wrap; gap:5px 10px; margin:0 8px; padding:10px 14px; font-size:14px; border-radius:12px; }
   body.mob #ticker .tk-team { font-size:16px; }
   body.mob #ticker .tk-player { flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  body.mob #ticker .tk-meta, body.mob #ticker .tk-agency, body.mob #ticker .tk-bonus { white-space:nowrap; }
+  body.mob #ticker .tk-meta, body.mob #ticker .tk-agency { white-space:nowrap; }
   body.mob #ticker .tk-sv { margin-left:0; }
 
   /* board: every pick a screen-width tile — the board IS the list on a phone.
@@ -3045,10 +3044,8 @@
     const key = normName(p.player||""), ours = DATA.clients.has(key), comp = DATA.compByName.get(key);
     const meta = comp ? `${comp.pos} · ${levelClass(comp).replace("College-","Col ")}` : (p.pos||"");
     const agency = comp && comp.agent ? comp.agent : "";
-    // Facts only on the announcement — no model estimates. A bonus shows here only once
-    // it's official or logged by the war room (the estimate lives in the entry form as a suggestion).
-    const eb = effectiveBonus(p);
-    const knownBonus = eb.bonus!=null && (p.bonus!=null || eb.src);
+    // No money on the flash ticker — the announcement is pick/player only; bonus lives
+    // on the board tile's chip and in the pool math.
     el.innerHTML = `<div class="tk-inner ${ours?"sv":""}">
       <span class="tk-badge">PICK #${p.overall}</span>
       <span class="tk-team">${p.team||""}</span>
@@ -3056,7 +3053,6 @@
       <span class="tk-player">${p.player||"—"}</span>
       ${meta?`<span class="tk-meta">${meta}</span>`:""}
       ${agency?`<span class="tk-agency">${agency}</span>`:""}
-      ${knownBonus?`<span class="tk-bonus">${fmtM(eb.bonus)}${eb.src&&eb.src!=="confirmed"?" "+eb.src.slice(0,3):""}</span>`:""}
       ${ours?'<span class="tk-sv">SV CLIENT</span>':""}</div>`;
     el.classList.add("show");
     tickerCur = p;
