@@ -488,7 +488,8 @@
   .tc-dfsub { font-size:10px; font-weight:600; color:var(--muted); margin-left:5px; }
   .tc-dffits { flex:1; min-width:0; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .tc-dffits.none { color:var(--muted); font-weight:600; }
-  .tc-dffit { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; color:#374151; white-space:nowrap; }
+  .tc-dffit { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; color:#374151; white-space:nowrap; cursor:help; }
+  .tc-dfsep { color:var(--line); font-weight:400; }
   .tc-dfmore { font-size:10px; font-weight:700; color:var(--muted); }
   .tc-dfval { font-weight:800; font-variant-numeric:tabular-nums; font-size:11px; flex-shrink:0; }
   .fr-src { font-size:9px; font-weight:800; text-transform:uppercase; color:var(--muted); }
@@ -867,6 +868,7 @@
   // Ages always show one decimal (20.0, not 20) — everywhere an age renders.
   const fmtAge = (a) => { if (a==null||a==="") return ""; const n=parseFloat(a); return Number.isFinite(n) ? n.toFixed(1) : String(a); };
   const fmtM = (n) => n == null ? "—" : "$" + (n/1e6).toFixed(2) + "M";
+  const sgn$ = (n) => n == null ? "—" : (n<0?"−":"+") + "$" + Math.abs(n/1e6).toFixed(2) + "M";
   const DRAFT_START = Date.UTC(2026, 6, 11, 17, 30, 0);   // Jul 11 2026, 1:30 PM ET (EDT = UTC-4)
   function fmtCountdown(ms) {
     if (ms < 0) ms = 0; let s = Math.floor(ms/1000);
@@ -2604,9 +2606,9 @@
         val = known ? `${fmtM(eb.bonus)}${eb.src?` <span class="bc-src">${eb.src==="confirmed"?"✓":eb.src.slice(0,3)}</span>`:""}` : "—";
         onclick = `openPlayer('${normName(p.player||"").replace(/'/g,"\\'")}')`;
       } else {
-        const fits = tiClientsAt(p, state), shown = fits.slice(0, 4);
+        const fits = tiClientsAt(p, state), shown = fits.slice(0, 6);
         main = shown.length
-          ? `<div class="tc-dffits">${shown.map(c=>`<span class="tc-dffit"><span class="tc-cdot" style="background:${intelColorHex(c.key, team)}"></span>${tcInitialName(c.name)}</span>`).join("")}${fits.length>4?`<span class="tc-dfmore">+${fits.length-4}</span>`:""}</div>`
+          ? `<div class="tc-dffits">${shown.map(c=>`<span class="tc-dffit" title="${c.name}"><span class="tc-cdot" style="background:${intelColorHex(c.key, team)}"></span>${initials(c.name)}</span>`).join('<span class="tc-dfsep">|</span>')}${fits.length>6?`<span class="tc-dfmore">+${fits.length-6}</span>`:""}</div>`
           : `<div class="tc-dffits none">—</div>`;
         val = p.slot>0 ? fmtM(p.slot) : "—";
         onclick = `tcNavGoPick(${p.overall},event)`;
@@ -2626,9 +2628,10 @@
     if (!o || o.orgRank==null) return h + `<div class="placeholder">No org profile for ${team}.</div></div>`;
     const dev = o.dev || {};
     const ord = n => n + (n%100>=11 && n%100<=13 ? "th" : ["th","st","nd","rd"][n%10] || "th");
-    // value · ±pts vs league average · league rank
-    const vsLg = (val, avg, rank) => val==null ? "—"
-      : `${Math.round(val)}% <span class="hg-pct">${avg!=null?`· ${val-avg>=0?"+":"−"}${Math.abs(val-avg).toFixed(1)} vs lg`:""}${rank?` · ${ord(rank)}`:""}</span>`;
+    // clean ±pts vs league average · league rank (raw values stay off the panel)
+    const vsLg = (val, avg, rank) => (val==null || avg==null) ? "—"
+      : `${val-avg>=0?"+":"−"}${Math.abs(val-avg).toFixed(1)}%${rank?` <span class="hg-pct">· ${ord(rank)}</span>`:""}`;
+    h += `<div class="tc-fitline sm"><span>All values <b>vs league average</b></span><span class="tc-nextland">rank of 30</span></div>`;
     // homegrown = drafted by this org & still with them (MLB StatsAPI bake)
     const hg = o.hgLevels, lgHG = DATA.lgHomegrown || {};
     if (hg && hg.fortyManAll) {
@@ -2669,7 +2672,7 @@
         return isPitcher(c.pos)===(r.group==="P") ? 1 : 0;
       };
       const prec = [...rdRows].sort((a,b)=> (tierOf(b)-tierOf(a)) || (b.year-a.year) || (a.overall-b.overall));
-      h += `<div class="tc-chart-h" style="margin-top:11px">Round ${rd} precedents <span style="font-weight:600;text-transform:none;letter-spacing:0">· 2018–25 · signing bonus${sel?' · $ = money comp':''}</span></div>`;
+      h += `<div class="tc-chart-h" style="margin-top:11px">Round ${rd} · Recent Picks</div>`;
       h += prec.map(r=>{
         const tier = tierOf(r);
         const bonusCell = r.bonus!=null
@@ -2707,14 +2710,17 @@
     const wd = rows.filter(r=>r.diff!=null), n = wd.length;
     const avg = n ? wd.reduce((s,r)=>s+r.diff,0)/n : 0;
     const overN = wd.filter(r=>r.diff>0).length;
-    h += `<div class="tc-fitline sm"><span>At <b>#${pk.overall}</b> overall · 2018–25${n?` · <b>${n} signed</b> · ${Math.round(100*overN/n)}% over slot · avg ${avg>=0?"+":""}${fmtM(avg)}`:""}</span><span class="tc-nextland"><a href="${trackerUrl}" target="_blank" rel="noopener" style="color:var(--red);font-weight:800">full tracker ↗</a></span></div>`;
+    h += `<div class="tc-fitline sm"><span>At <b>#${pk.overall}</b> overall, from 2018–25${n?` · <b>${Math.round(100*overN/n)}% over slot</b> · avg ${sgn$(avg)}`:""}</span><span class="tc-nextland"><a href="${trackerUrl}" target="_blank" rel="noopener" style="color:var(--red);font-weight:800">full tracker ↗</a></span></div>`;
     if (!rows.length) return h + `<div class="placeholder">No history at #${pk.overall} — draft numbering shifts year to year.</div></div>`;
-    h += rows.map(r=>{
-      const bonusCell = r.bonus!=null
-        ? `${fmtM(r.bonus)}${r.diff!=null?` <span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:""}`
-        : `<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`;
-      return `<div class="tc-kv"><span class="k" style="color:var(--ink)">'${String(r.year).slice(2)} · ${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos} · ${teamAbbrevOf(r.team)}</span></span><span class="v">${bonusCell}</span></div>`;
-    }).join("");
+    h += `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Pos</th><th>Team</th><th>Bonus</th><th>vs Slot</th></tr></thead><tbody>`;
+    h += rows.map(r=>`<tr>
+      <td>'${String(r.year).slice(2)}</td>
+      <td style="font-size:12px;font-weight:700">${r.first?r.first[0]+". ":""}${r.last}</td>
+      <td style="color:var(--muted)">${r.pos}</td>
+      <td style="color:var(--muted)">${teamAbbrevOf(r.team)}</td>
+      <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
+      <td>${r.diff!=null?`<span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`).join("");
+    h += `</tbody></table>`;
     return h + `</div>`;
   }
 
@@ -2768,16 +2774,22 @@
     const avgB = signed.length ? signed.reduce((s,r)=>s+r.bonus,0)/signed.length : null;
     const avgD = signed.length ? signed.reduce((s,r)=>s+r.diff,0)/signed.length : null;
     const overN = signed.filter(r=>r.diff>0).length;
-    h += `<div class="tc-kv"><span class="k">Round ${rd} · league-wide${anyOn?" · filtered":""}</span><span class="v">${rows.length} matches${signed.length?` · avg ${fmtM(avgB)} · ${avgD>=0?"+":""}${fmtM(avgD)} vs slot · ${Math.round(100*overN/signed.length)}% over`:""}</span></div>`;
+    h += `<div class="tc-kv"><span class="k">Round ${rd} · league-wide${anyOn?" · filtered":""}</span><span class="v">${rows.length} matches${signed.length?` · avg ${fmtM(avgB)} · ${sgn$(avgD)} vs slot · ${Math.round(100*overN/signed.length)}% over`:""}</span></div>`;
     if (!rows.length) return h + `<div class="placeholder">No precedents match those lenses.</div></div>`;
     const CAP = 12;
+    h += `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Pos</th><th>Pick</th><th>Team</th><th>Bonus</th><th>vs Slot</th></tr></thead><tbody>`;
     h += rows.slice(0,CAP).map(r=>{
       const mine = (NAME_FWD[r.team]||r.team) === (pk.teamName||"");
-      const bonusCell = r.bonus!=null
-        ? `${fmtM(r.bonus)}${r.diff!=null?` <span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:""}`
-        : `<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`;
-      return `<div class="tc-kv"${mine?' style="background:#fff5f6;margin:0 -6px;padding-left:6px;padding-right:6px;border-radius:6px"':''}><span class="k" style="color:var(--ink)">'${String(r.year).slice(2)} · ${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos} · #${r.overall} · ${teamAbbrevOf(r.team)}</span>${mine?' <span class="tc-inplay">'+team+'</span>':''}</span><span class="v">${bonusCell}</span></div>`;
+      return `<tr${mine?' style="background:#fff5f6"':''}>
+        <td>'${String(r.year).slice(2)}</td>
+        <td style="font-size:12px;font-weight:700">${r.first?r.first[0]+". ":""}${r.last}</td>
+        <td style="color:var(--muted)">${r.pos}</td>
+        <td>#${r.overall}</td>
+        <td style="color:var(--muted)${mine?';color:var(--red);font-weight:800':''}">${teamAbbrevOf(r.team)}</td>
+        <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
+        <td>${r.diff!=null?`<span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`;
     }).join("");
+    h += `</tbody></table>`;
     if (rows.length > CAP) h += `<div class="tc-feed-more">+ ${rows.length-CAP} more matches</div>`;
     return h + `</div>`;
   }
