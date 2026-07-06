@@ -351,7 +351,7 @@
   .ib.feed { background:#f8f9fa; border:1px solid var(--line); } .ib.win { background:#fef3c7; color:#92400e; } .ib.offer { background:#fae8ff; color:#86198f; }
   .tg { font-size:11px; font-weight:700; border-radius:5px; padding:1px 6px; background:#f1f3f5; color:#6b7280; }
   .tg.fit { background:#dcfce7; color:#166534; } .tg.early { background:#fee2e2; color:#991b1b; } .tg.late { background:#e0e7ff; color:#3730a3; }
-  .tg.over { background:#e8f5e9; color:#1a7f37; } .tg.under { background:#fff3e0; color:#e65100; } .tg.ruledtag { background:#fee2e2; color:#991b1b; }
+  .tg.over { background:#e8f5e9; color:#1a7f37; } .tg.under { background:#fdecea; color:#c8102e; } .tg.ruledtag { background:#fee2e2; color:#991b1b; }
   .er-act { display:flex; gap:4px; flex-wrap:wrap; }
   .mini { border:1px solid var(--line); background:#fff; border-radius:6px; padding:3px 7px; font:inherit; font-size:11px; font-weight:700; cursor:pointer; color:#374151; }
   .mini:hover { border-color:#6366f1; color:#6366f1; } .mini.on { background:#fee2e2; border-color:#f1b8c1; color:#991b1b; }
@@ -440,8 +440,8 @@
   .tc-made-adv { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--red); animation:tcPulse 1s ease-in-out infinite; }
   @keyframes tcPulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
   .tc-upc { width:100%; border-collapse:collapse; margin-top:4px; }
-  .tc-upc th { text-align:left; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); padding:4px 6px; }
-  .tc-upc td { font-size:13px; font-weight:700; padding:5px 6px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  .tc-upc th { text-align:left; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); padding:4px 6px; white-space:nowrap; }
+  .tc-upc td { font-size:13px; font-weight:700; padding:5px 6px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .tc-upc td.cur { color:var(--red); }
   .tc-cur-tag { font-size:9px; font-weight:800; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:1px 5px; margin-left:6px; }
   .tc-fit-strip { margin:0 22px 16px; border:1px solid var(--line); border-radius:12px; padding:13px 16px; display:flex; gap:22px; align-items:center; flex-wrap:wrap; background:#fbfbfc; }
@@ -480,7 +480,12 @@
   .tc-wizsum { display:flex; justify-content:space-between; align-items:baseline; gap:4px 10px; flex-wrap:wrap; font-size:11px; margin:4px 0 6px; border-top:1px solid var(--line); padding-top:7px; }
   .tc-wizsum > span:first-child { font-weight:700; font-variant-numeric:tabular-nums; }
   .tc-wizscope { color:var(--muted); font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
-  .tc-draftflow { position:relative; max-height:420px; overflow-y:auto; margin:2px -6px 4px; padding:0 6px; }
+  /* The Draft fills its panel: header fixed, flow takes the rest, remaining line pinned */
+  .tc-panel[data-q="draft"] { display:flex; flex-direction:column; }
+  .tc-draftflow { position:relative; flex:1 1 auto; min-height:0; overflow-y:auto; margin:2px -6px 4px; padding:0 6px; }
+  /* league-rank tiers: top 10 green, middle black, bottom 10 red */
+  .hg-pct.rk-hi { color:#1a7f37; } .hg-pct.rk-mid { color:var(--ink); } .hg-pct.rk-lo { color:#c8102e; }
+  .tc-sub { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin:-6px 0 10px; }
   .tc-dfrow { position:relative; display:flex; align-items:center; gap:7px; padding:5px 6px; border-bottom:1px solid var(--line); font-size:12px; cursor:pointer; border-radius:6px; }
   .tc-dfrow:hover { background:#f7f8fa; }
   .tc-dfrow.done { opacity:.62; }
@@ -716,7 +721,7 @@
   /* wide tables inside panels scroll sideways instead of stretching the sheet */
   body.mob .tc-panel { min-width:0; }
   body.mob .tc-panel table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  body.mob .tc-draftflow { max-height:280px; }
+  body.mob .tc-draftflow { flex:none; overflow:visible; }  /* the expanded panel scrolls itself */
   body.mob .tc-wizlab { width:100%; }
 
   /* our clients roster: trim to # / Player / Interest / Status — School/Age/Range already
@@ -1034,6 +1039,14 @@
   }
   // Renamed franchises alias forward so 2018-25 tracker rows pool under today's name.
   const NAME_FWD = { "Cleveland Indians":"Cleveland Guardians", "Oakland Athletics":"Athletics" };
+  // Standardized position display for tracker rows: ALL CAPS, pitchers carry handedness
+  // (RHP/LHP from the throws column when the pos cell doesn't already say so).
+  function posDisp(r) {
+    const p = String(r.pos||"").toUpperCase();
+    if (r.group !== "P") return p;
+    const m = p.match(/[LR]HP/); if (m) return m[0];
+    return r.throws==="L" ? "LHP" : r.throws==="R" ? "RHP" : "P";
+  }
   // Tracker rows carry full team names; map to the feed's abbrevs (built lazily from the
   // live pick list), falling back to the nickname for any unmapped name.
   function teamAbbrevOf(fullName) {
@@ -2645,10 +2658,12 @@
     if (!o || o.orgRank==null) return h + `<div class="placeholder">No org profile for ${team}.</div></div>`;
     const dev = o.dev || {};
     const ord = n => n + (n%100>=11 && n%100<=13 ? "th" : ["th","st","nd","rd"][n%10] || "th");
-    // clean ±pts vs league average · league rank (raw values stay off the panel)
+    // clean ±pts vs league average · league rank (raw values stay off the panel);
+    // rank colors: top 10 green, middle black, bottom 10 red
+    const rkCls = n => n<=10 ? "rk-hi" : n<=20 ? "rk-mid" : "rk-lo";
     const vsLg = (val, avg, rank) => (val==null || avg==null) ? "—"
-      : `${val-avg>=0?"+":"−"}${Math.abs(val-avg).toFixed(1)}%${rank?` <span class="hg-pct">· ${ord(rank)}</span>`:""}`;
-    h += `<div class="tc-fitline sm"><span>All values <b>vs league average</b></span><span class="tc-nextland">rank of 30</span></div>`;
+      : `${val-avg>=0?"+":"−"}${Math.abs(val-avg).toFixed(1)}%${rank?` <span class="hg-pct ${rkCls(rank)}">· ${ord(rank)}</span>`:""}`;
+    h += `<div class="tc-sub">vs league average · rank of 30</div>`;
     // homegrown = drafted by this org & still with them (MLB StatsAPI bake)
     const hg = o.hgLevels, lgHG = DATA.lgHomegrown || {};
     if (hg && hg.fortyManAll) {
@@ -2690,15 +2705,20 @@
       };
       const prec = [...rdRows].sort((a,b)=> (tierOf(b)-tierOf(a)) || (b.year-a.year) || (a.overall-b.overall));
       h += `<div class="tc-chart-h" style="margin-top:11px">Round ${rd} · Recent Picks</div>`;
+      h += `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Pos</th><th>Pick</th><th>Bonus</th><th>vs Slot</th></tr></thead><tbody>`;
       h += prec.map(r=>{
         const tier = tierOf(r);
-        const bonusCell = r.bonus!=null
-          ? `${fmtM(r.bonus)}${r.diff!=null?` <span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:""}`
-          : `<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`;
         const mark = tier===2 ? ' <span class="tc-inplay">$ COMP</span>'
-                   : tier===1 ? ' <span class="tc-inplay" style="border-color:#3949ab;color:#3949ab">≈ profile</span>' : '';
-        return `<div class="tc-kv"${tier===2?' style="background:#f2faf4;margin:0 -6px;padding-left:6px;padding-right:6px;border-radius:6px"':''}><span class="k" style="color:var(--ink)">'${String(r.year).slice(2)} · ${r.first?r.first[0]+". ":""}${r.last} <span style="color:var(--muted)">${r.pos} · #${r.overall}</span>${mark}</span><span class="v">${bonusCell}</span></div>`;
+                   : tier===1 ? ' <span class="tc-inplay" style="border-color:#3949ab;color:#3949ab">≈</span>' : '';
+        return `<tr${tier===2?' style="background:#f2faf4"':''}>
+          <td>'${String(r.year).slice(2)}</td>
+          <td style="font-size:12px;font-weight:700">${r.first?r.first[0]+". ":""}${r.last}${mark}</td>
+          <td style="color:var(--muted)">${posDisp(r)}</td>
+          <td>#${r.overall}</td>
+          <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
+          <td>${r.diff!=null?`<span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`;
       }).join("");
+      h += `</tbody></table>`;
     }
     if (sel) {
       const c = sel.c.comp, isHS = c.level==="HS", p = isPitcher(c.pos);
@@ -2733,7 +2753,7 @@
     h += rows.map(r=>`<tr>
       <td>'${String(r.year).slice(2)}</td>
       <td style="font-size:12px;font-weight:700">${r.first?r.first[0]+". ":""}${r.last}</td>
-      <td style="color:var(--muted)">${r.pos}</td>
+      <td style="color:var(--muted)">${posDisp(r)}</td>
       <td style="color:var(--muted)">${teamAbbrevOf(r.team)}</td>
       <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
       <td>${r.diff!=null?`<span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}" style="font-size:9px">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`).join("");
@@ -2800,7 +2820,7 @@
       return `<tr${mine?' style="background:#fff5f6"':''}>
         <td>'${String(r.year).slice(2)}</td>
         <td style="font-size:12px;font-weight:700">${r.first?r.first[0]+". ":""}${r.last}</td>
-        <td style="color:var(--muted)">${r.pos}</td>
+        <td style="color:var(--muted)">${posDisp(r)}</td>
         <td>#${r.overall}</td>
         <td style="color:var(--muted)${mine?';color:var(--red);font-weight:800':''}">${teamAbbrevOf(r.team)}</td>
         <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
@@ -3525,7 +3545,8 @@
     if (!MOBILE.matches) return;
     const h4 = e.target.closest(".tc-panel[data-q] > h4"); if (!h4) return;
     const q = h4.parentElement.dataset.q;
-    mPanelOpen[q] = !mPanelOpen[q];
+    // Accordion: opening a panel collapses the others; tapping the open one just closes it.
+    mPanelOpen = mPanelOpen[q] ? { ...mPanelOpen, [q]: false } : { [q]: true };
     try { localStorage.setItem("dd:mPanels", JSON.stringify(mPanelOpen)); } catch (err) {}
     if (cardPick != null) renderTeamCard(currentState);
   });
