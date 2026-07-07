@@ -879,7 +879,8 @@
     <button id="mMock" onclick="setMode('mock')">⚙ Mock</button>
   </span>
   <span class="hdr-clock" id="hdrClock" style="display:none"></span>
-  <span class="badge" id="yearBadge">2026 MLB DRAFT</span>
+  <!-- hidden pill: kept only as the load-error surface (pollLive unhides it) -->
+  <span class="badge" id="yearBadge" style="display:none">2026 MLB DRAFT</span>
 </header>
 
 <nav class="tabs">
@@ -3914,7 +3915,7 @@
     } catch (e) {
       try { const o = await loadOrder(); if (MODE!=="live") return;
             setState(derive(o.picks.map(p=>({...p})), o.year)); $("conn").className="dot"; }
-      catch (e2) { $("conn").className="dot err"; $("yearBadge").textContent="Couldn't load board — serve via vercel dev / python3 -m http.server"; }
+      catch (e2) { $("conn").className="dot err"; const yb=$("yearBadge"); yb.style.display=""; yb.textContent="Couldn't load board — serve via vercel dev / python3 -m http.server"; }
     }
   }
 
