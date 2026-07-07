@@ -566,6 +566,60 @@
   .dual input[type=range]::-moz-range-thumb { pointer-events:auto; width:12px; height:12px; border-radius:50%; background:#fff; border:2.5px solid var(--red); cursor:pointer; }
   .tc-wizsum > span:first-child { font-weight:700; font-variant-numeric:tabular-nums; }
   .tc-wizscope { color:var(--muted); font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+  /* Research sub-tabs */
+  .res-subtabs { display:flex; gap:8px; margin-bottom:14px; border-bottom:2px solid var(--line); }
+  .res-subtab { font:inherit; font-size:12px; font-weight:900; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; padding:7px 4px; cursor:pointer; }
+  .res-subtab:hover { color:var(--ink); }
+  .res-subtab.on { color:var(--red); border-bottom-color:var(--red); }
+  /* Team-fit module — controls + heat grid (players × orgs) */
+  .rf-controls { margin-bottom:12px; }
+  .rf-controls .tc-wizgrp { margin-bottom:5px; }
+  .rf-grade { -webkit-appearance:none; appearance:none; height:4px; border-radius:2px; background:var(--line); flex:0 0 150px; margin:0 4px; }
+  .rf-grade::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#fff; border:2.5px solid var(--red); cursor:pointer; }
+  .rf-grade::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:#fff; border:2.5px solid var(--red); cursor:pointer; }
+  .rf-tbox, .rf-wbox { margin-top:9px; max-width:560px; }
+  .rf-tgrps { display:flex; flex-direction:column; gap:6px; margin-top:9px; }
+  .rf-tgrp { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+  .rf-tgrp .tc-chip.grp { border-style:dashed; font-weight:900; width:78px; text-align:center; }
+  .rf-wgrid { margin-top:9px; }
+  .rf-wrow { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .rf-wlab { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); width:66px; flex:0 0 auto; }
+  .rf-wsl { flex:1 1 auto; min-width:0; -webkit-appearance:none; appearance:none; height:4px; border-radius:2px; background:var(--line); }
+  .rf-wsl::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#fff; border:2.5px solid var(--red); cursor:pointer; }
+  .rf-wsl::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:#fff; border:2.5px solid var(--red); cursor:pointer; }
+  .rf-wval { font-size:12px; font-weight:900; font-variant-numeric:tabular-nums; width:42px; text-align:right; flex:0 0 auto; }
+  .rf-wfoot { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:6px; font-size:10px; color:var(--muted); font-weight:600; }
+  .rf-note { font-size:10px; font-weight:700; color:var(--muted); margin:8px 2px 2px; text-transform:uppercase; letter-spacing:.3px; }
+  .rf-gridwrap { overflow:auto; border:1px solid #c9c9c7; border-radius:12px; max-height:calc(100vh - 260px); }
+  table.rf-grid { border-collapse:separate; border-spacing:0; }
+  .rf-grid th, .rf-grid td { border-right:1px solid #eef0f2; border-bottom:1px solid #eef0f2; }
+  .rf-grid thead th { position:sticky; top:0; z-index:3; background:var(--card); }
+  .rf-corner { position:sticky; left:0; top:0; z-index:6; background:var(--card); text-align:left; padding:6px 8px; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); min-width:86px; box-shadow:1px 0 0 #e3e5e8; }
+  .rf-corner small { display:block; color:var(--red); font-size:9px; margin-top:2px; }
+  .rf-ph { width:34px; min-width:34px; max-width:34px; height:104px; vertical-align:bottom; padding:5px 0; cursor:pointer; text-align:center; }
+  .rf-phn { writing-mode:vertical-rl; transform:rotate(180deg); font-size:11px; font-weight:800; white-space:nowrap; display:inline-block; max-height:92px; overflow:hidden; text-overflow:ellipsis; }
+  .rf-phr { display:none; }
+  .rf-ph:hover .rf-phn { color:var(--red); }
+  .rf-th { position:sticky; left:0; z-index:2; background:var(--card); text-align:left; padding:3px 8px; white-space:nowrap; cursor:pointer; box-shadow:1px 0 0 #e3e5e8; }
+  .rf-th .rf-tab { font-size:11px; font-weight:900; margin-left:4px; }
+  .rf-th .rf-tor { font-size:9px; color:var(--muted); font-weight:700; margin-left:5px; }
+  .rf-th:hover .rf-tab { color:var(--red); }
+  .rf-cell { text-align:center; font-size:11px; font-weight:800; font-variant-numeric:tabular-nums; cursor:pointer; color:#141b26; padding:0; height:24px; min-width:34px; }
+  .rf-cell:hover { outline:2px solid var(--ink); outline-offset:-2px; }
+  .rf-cell.rf-dim { opacity:.14; }
+  /* Fit card (player × team deep dive) */
+  .fc-card .fc-sub { font-size:11px; font-weight:700; color:var(--muted); }
+  .fc-card .fc-arrow { color:var(--muted); font-weight:900; margin:0 3px; font-size:15px; }
+  .fc-panels { display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); gap:14px; padding:14px 22px; flex:1 1 auto; min-height:0; overflow-y:auto; align-items:start; align-content:start; }
+  .fc-blend { margin-bottom:12px; }
+  .fc-blend .fc-brow { display:flex; justify-content:space-between; align-items:baseline; font-size:11.5px; font-weight:800; margin-bottom:3px; }
+  .fc-blend .fc-brow small { color:var(--muted); font-weight:700; }
+  .fc-blend .db { height:7px; border-radius:4px; background:#ececec; overflow:hidden; }
+  .fc-blend .db i { display:block; height:100%; border-radius:4px; }
+  .fc-blend .fc-contrib { font-size:9.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; margin-top:2px; }
+  .fc-note { font-size:10.5px; color:var(--muted); font-weight:600; line-height:1.5; margin-top:8px; border-top:1px solid var(--line); padding-top:8px; }
+  .fc-dot { width:10px; height:10px; border-radius:50%; display:inline-block; vertical-align:-1px; margin-right:5px; }
+  @media (max-width:820px){ .fc-panels { grid-template-columns:1fr; } }
   /* The Draft fills its panel: header fixed, flow takes the rest, remaining line pinned */
   .tc-panel[data-q="draft"] { display:flex; flex-direction:column; }
   .tc-draftflow { position:relative; flex:1 1 auto; min-height:0; overflow-y:auto; margin:2px -6px 4px; padding:0 6px; }
@@ -969,24 +1023,36 @@
     </table>
   </section>
 
-  <!-- RESEARCH — precedent wizard over the full 2018-25 tracker: chips + range sliders -->
+  <!-- RESEARCH — two sub-tabs: precedent wizard (default) + team-fit grid -->
   <section id="viewResearch" class="view">
-    <div class="res-grid">
-      <div class="res-filters" id="resFilters"></div>
-      <div class="res-out">
-        <!-- Ask the data — static box (outside the re-rendered containers) → /api/ask -->
-        <div class="res-box res-ask">
-          <div class="res-chead" style="cursor:default">Ask the data</div>
-          <div class="res-askrow">
-            <input id="askQ" type="text" placeholder="Anything across the draft-day system — picks, pools, clients, precedent…"
-              autocomplete="off" onkeydown="if(event.key==='Enter')askDraft()">
-            <button class="ctl primary" id="askBtn" onclick="askDraft()">Ask</button>
+    <div class="res-subtabs">
+      <button id="rstResearch" class="res-subtab on" onclick="setResTab('research')">Player Research</button>
+      <button id="rstFit" class="res-subtab" onclick="setResTab('fit')">Team Fit</button>
+    </div>
+    <!-- Sub-tab 1: the precedent wizard over the full 2018-25 tracker (default landing) -->
+    <div id="resPaneResearch">
+      <div class="res-grid">
+        <div class="res-filters" id="resFilters"></div>
+        <div class="res-out">
+          <!-- Ask the data — static box (outside the re-rendered containers) → /api/ask -->
+          <div class="res-box res-ask">
+            <div class="res-chead" style="cursor:default">Ask the data</div>
+            <div class="res-askrow">
+              <input id="askQ" type="text" placeholder="Anything across the draft-day system — picks, pools, clients, precedent…"
+                autocomplete="off" onkeydown="if(event.key==='Enter')askDraft()">
+              <button class="ctl primary" id="askBtn" onclick="askDraft()">Ask</button>
+            </div>
+            <div id="askOut"></div>
           </div>
-          <div id="askOut"></div>
+          <div class="tc-wizsum" id="resSum" style="border-top:none;padding-top:0"></div>
+          <div id="resTable"></div>
         </div>
-        <div class="tc-wizsum" id="resSum" style="border-top:none;padding-top:0"></div>
-        <div id="resTable"></div>
       </div>
+    </div>
+    <!-- Sub-tab 2: team-fit grid — every player × every org, blended from the fit engine -->
+    <div id="resPaneFit" style="display:none">
+      <div id="rfControls"></div>
+      <div class="rf-gridwrap" id="rfGrid"></div>
     </div>
   </section>
 </main>
@@ -1004,6 +1070,7 @@
 <div id="ticker"></div>
 <div id="rksTip"></div>
 <div id="teamCard" class="tc-backdrop" onclick="if(event.target===this)closeTeamCard()"></div>
+<div id="fitCard" class="tc-backdrop" onclick="if(event.target===this)closeFitCard()"></div>
 
 <script>
   const $ = (id) => document.getElementById(id);
@@ -3154,6 +3221,268 @@
     $("resBnLab").textContent = `${fmtM(research.bnLo)} – ${research.bnHi>=BN_MAX?"$10M+":fmtM(research.bnHi)}`;
     if (resFindQ) resFindInput(resFindQ);   // rebuild the typeahead menu after the innerHTML swap
     renderResearchResults();
+    applyResTab();   // reflect the saved sub-tab (and draw the fit grid if that's where we land)
+  }
+
+  // ================= TEAM FIT — players × orgs, blended from the fit engine =================
+  // A fresher surfacing of the fit grades this system computes (interest / org-review dev-fit /
+  // type / money). Weights are adjustable and local to this module; the console keeps its tuned
+  // engine defaults elsewhere. Rooted entirely in DATA.composite, DATA.orgs, DATA.intel + live pools.
+  const RF_DIV = {
+    "AL East":["BAL","BOS","NYY","TB","TOR"], "AL Central":["CHW","CLE","DET","KC","MIN"],
+    "AL West":["HOU","LAA","ATH","SEA","TEX"], "NL East":["ATL","MIA","NYM","PHI","WSH"],
+    "NL Central":["CHC","CIN","MIL","PIT","STL"], "NL West":["ARI","COL","LAD","SD","SF"],
+  };
+  const RF_LENSES = [["combined","Combined"],["interest","Interest"],["dev","Org·dev"],["type","Type"],["money","Money"]];
+  const RF_LENSLBL = { combined:"Combined fit", interest:"Interest", dev:"Org·dev", type:"Type", money:"Money" };
+  const RF_WDEF = { interest:45, dev:20, type:15, money:20 };
+  const RF_DEF = () => ({ players:"clients", pos:new Set(), teamsOff:new Set(), gradeMin:0,
+    lens:"combined", weights:{...RF_WDEF}, wOpen:false, tOpen:false });
+  let resFit = RF_DEF(), resFitDrawn = false, resTab = "research", fitSel = null;
+  try {
+    const sv = JSON.parse(localStorage.getItem("dd:resFit") || "null");
+    if (sv) {
+      resFit.players = sv.players==="board" ? "board" : "clients";
+      resFit.pos = new Set(Array.isArray(sv.pos)?sv.pos:[]);
+      resFit.teamsOff = new Set(Array.isArray(sv.teamsOff)?sv.teamsOff:[]);
+      resFit.gradeMin = +sv.gradeMin || 0;
+      resFit.lens = RF_LENSLBL[sv.lens] ? sv.lens : "combined";
+      resFit.weights = Object.assign({...RF_WDEF}, sv.weights || {});
+      resFit.wOpen = !!sv.wOpen; resFit.tOpen = !!sv.tOpen;
+      if (sv.tab==="fit") resTab = "fit";
+    }
+  } catch (e) {}
+  function rfSave() {
+    try { localStorage.setItem("dd:resFit", JSON.stringify({
+      players:resFit.players, pos:[...resFit.pos], teamsOff:[...resFit.teamsOff], gradeMin:resFit.gradeMin,
+      lens:resFit.lens, weights:resFit.weights, wOpen:resFit.wOpen, tOpen:resFit.tOpen, tab:resTab })); } catch (e) {}
+  }
+  // ---- sub-tab switching (Player Research ↔ Team Fit) ----
+  function applyResTab() {
+    const rr=$("rstResearch"), rf=$("rstFit"), pr=$("resPaneResearch"), pf=$("resPaneFit");
+    if (!rr||!rf||!pr||!pf) return;
+    rr.classList.toggle("on", resTab==="research"); rf.classList.toggle("on", resTab==="fit");
+    pr.style.display = resTab==="research" ? "" : "none";
+    pf.style.display = resTab==="fit" ? "" : "none";
+    if (resTab==="fit") renderResFit();
+  }
+  window.setResTab = (t) => { resTab = t==="fit" ? "fit" : "research"; rfSave(); applyResTab(); };
+
+  // ---- data selection ----
+  function rfPlayerList() {
+    let list = resFit.players==="board" ? DATA.composite.slice()
+             : DATA.clientList.filter(c=>c.comp).map(c=>c.comp);
+    if (resFit.pos.size) list = list.filter(c => resFit.pos.has(posGroupOf(c.pos)));
+    list.sort((a,b) => (a.rank||9999)-(b.rank||9999));
+    const CAP = resFit.players==="board" ? 60 : 999;
+    return { list: list.slice(0, CAP), total: list.length, cap: CAP };
+  }
+  function rfTeamList() {
+    return Object.keys(DATA.orgs).filter(t=>!resFit.teamsOff.has(t))
+      .sort((a,b) => ((DATA.orgs[a].orgRank??99)-(DATA.orgs[b].orgRank??99)));
+  }
+  const rfWsum = () => { const w=resFit.weights; return (w.interest+w.dev+w.type+w.money)||1; };
+  function rfCellVal(f) {
+    switch (resFit.lens) {
+      case "interest": return Math.round(100*f.interestN);
+      case "dev":      return Math.round(100*f.devN);
+      case "type":     return Math.round(100*f.typeN);
+      case "money":    return Math.round(100*f.moneyN);
+      default: { const w=resFit.weights; return Math.round(100*(w.interest*f.interestN+w.dev*f.devN+w.type*f.typeN+w.money*f.moneyN)/rfWsum()); }
+    }
+  }
+  // light RdYlGn ramp — dark ink stays readable on every stop
+  function rfHeat(v) {
+    const stops=[[0,[244,214,211]],[35,[251,226,197]],[55,[253,243,201]],[72,[221,238,195]],[100,[150,210,150]]];
+    v=Math.max(0,Math.min(100,v)); let a=stops[0], b=stops[stops.length-1];
+    for (let i=0;i<stops.length-1;i++){ if (v>=stops[i][0] && v<=stops[i+1][0]){ a=stops[i]; b=stops[i+1]; break; } }
+    const t=(v-a[0])/((b[0]-a[0])||1);
+    const c=a[1].map((x,i)=>Math.round(x+(b[1][i]-x)*t));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+  }
+  const rfDcol = (v) => v>=0.66 ? "#1a7f37" : v>=0.4 ? "#e3b505" : "#e8820e";
+
+  function renderResFit() { renderRfControls(); renderRfGrid(); resFitDrawn = true; }
+
+  function renderRfControls() {
+    const el = $("rfControls"); if (!el) return;
+    const w = resFit.weights, wsum = rfWsum();
+    const chip = (on,lbl,onclick,extra="") => `<button class="tc-chip${on?' on':''}${extra?' '+extra:''}" onclick="${onclick}">${lbl}</button>`;
+    const playersRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Players</span>
+      ${chip(resFit.players==="clients","Our clients","rfSetPlayers('clients')")}
+      ${chip(resFit.players==="board","Full board","rfSetPlayers('board')")}</div>`;
+    const posRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Position</span>
+      ${["P","C","IF","OF"].map(p=>chip(resFit.pos.has(p),p,`rfPos('${p}')`)).join("")}
+      ${resFit.pos.size?chip(false,"✕ any","rfPosClear()","clear"):""}</div>`;
+    const lensRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Lens</span>
+      ${RF_LENSES.map(([k,l])=>chip(resFit.lens===k,l,`rfLens('${k}')`)).join("")}</div>`;
+    const gradeRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Grade ≥</span>
+      <input type="range" class="rf-grade" min="0" max="100" step="1" value="${resFit.gradeMin}" oninput="rfGrade(this.value)">
+      <span class="res-slab" id="rfGradeLab">${resFit.gradeMin}</span></div>`;
+    // teams filter (collapsible, grouped by division)
+    const nOn = 30 - resFit.teamsOff.size;
+    const tGrp = (name,ts) => { const allOff = ts.every(t=>resFit.teamsOff.has(t));
+      return `<div class="rf-tgrp"><button class="tc-chip grp${allOff?'':' on'}" onclick="rfDiv('${name}')">${name}</button>${
+        ts.map(t=>`<button class="tc-chip${resFit.teamsOff.has(t)?'':' on'}" onclick="rfTeam('${t}')">${t}</button>`).join("")}</div>`; };
+    const teamsBox = `<div class="res-box rf-tbox">
+      <div class="res-chead" onclick="rfToggleT()">Teams${resFit.teamsOff.size?` · ${nOn} of 30 on`:""}<span>${resFit.tOpen?"▾":"▸"}</span></div>
+      ${resFit.tOpen?`<div class="rf-tgrps">${Object.entries(RF_DIV).map(([n,ts])=>tGrp(n,ts)).join("")}
+        ${resFit.teamsOff.size?`<button class="tc-chip clear" onclick="rfTeamsAll()">✕ show all 30</button>`:""}</div>`:""}</div>`;
+    // blend weights (collapsible)
+    const sl = (k,l) => `<div class="rf-wrow"><span class="rf-wlab">${l}</span>
+      <input type="range" class="rf-wsl" min="0" max="100" step="1" value="${w[k]}" oninput="rfWeight('${k}',this.value)">
+      <span class="rf-wval" id="rfW_${k}">${Math.round(100*w[k]/wsum)}%</span></div>`;
+    const weightsBox = `<div class="res-box rf-wbox">
+      <div class="res-chead" onclick="rfToggleW()">Blend weights<span>${resFit.wOpen?"▾":"▸"}</span></div>
+      ${resFit.wOpen?`<div class="rf-wgrid">${sl("interest","Interest")}${sl("dev","Org·dev")}${sl("type","Type")}${sl("money","Money")}
+        <div class="rf-wfoot"><span>Combined = weighted blend of the four lenses. Selecting a single lens shows it raw.</span>
+        <button class="tc-chip clear" onclick="rfWeightReset()">Reset 45·20·15·20</button></div></div>`:""}</div>`;
+    el.innerHTML = `<div class="rf-controls">${playersRow}${posRow}${lensRow}${gradeRow}</div>${teamsBox}${weightsBox}`;
+  }
+  function rfWeightLabels() { const w=resFit.weights, s=rfWsum();
+    ["interest","dev","type","money"].forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=Math.round(100*w[k]/s)+"%"; }); }
+
+  function renderRfGrid() {
+    const wrap = $("rfGrid"); if (!wrap) return;
+    const state = currentState;
+    if (!state) { wrap.innerHTML = `<div class="placeholder">Waiting for draft state…</div>`; return; }
+    if (!DATA.composite.length || !Object.keys(DATA.orgs).length) {
+      wrap.innerHTML = `<div class="placeholder">Loading player board & org review…</div>`; return; }
+    const { list:players, total, cap } = rfPlayerList();
+    const teams = rfTeamList();
+    if (!players.length) { wrap.innerHTML = `<div class="placeholder">No players match those position filters.</div>`; return; }
+    if (!teams.length) { wrap.innerHTML = `<div class="placeholder">All teams are filtered out — turn some back on.</div>`; return; }
+    let h = `<table class="rf-grid"><thead><tr><th class="rf-corner">${teams.length}×${players.length}<small>${RF_LENSLBL[resFit.lens]}</small></th>`;
+    h += players.map(c => { const last = tcInitialName(c.name).split(" ").slice(-1)[0];
+      return `<th class="rf-ph" title="${_esc(c.name)} · ${c.pos} · #${c.rank}" onclick="openPlayer('${normName(c.name)}')"><span class="rf-phn">${_esc(last)} #${c.rank}</span></th>`; }).join("");
+    h += `</tr></thead><tbody>`;
+    for (const t of teams) {
+      const o = DATA.orgs[t] || {};
+      h += `<tr><th class="rf-th" onclick="openTeam('${t}')">${teamLogo(t,16)}<span class="rf-tab">${t}</span><span class="rf-tor">org #${o.orgRank!=null?Math.round(o.orgRank):"—"}</span></th>`;
+      for (const c of players) {
+        const key = normName(c.name), f = fit(c, t, key, state), v = rfCellVal(f);
+        const dim = v < resFit.gradeMin ? " rf-dim" : "";
+        h += `<td class="rf-cell${dim}" style="background:${rfHeat(v)}" title="${_esc(c.name)} → ${t}: ${v}" onclick="openFitCard('${key}','${t}')">${v}</td>`;
+      }
+      h += `</tr>`;
+    }
+    h += `</tbody></table>`;
+    if (resFit.players==="board" && total>cap) h = `<div class="rf-note">Showing the top ${cap} of ${total} board players by rank — filter by position to narrow, or switch to Our clients.</div>` + h;
+    wrap.innerHTML = h;
+  }
+
+  // ---- control handlers ----
+  window.rfSetPlayers = (v) => { resFit.players = v; rfSave(); renderResFit(); };
+  window.rfPos = (p) => { resFit.pos.has(p) ? resFit.pos.delete(p) : resFit.pos.add(p); rfSave(); renderResFit(); };
+  window.rfPosClear = () => { resFit.pos.clear(); rfSave(); renderResFit(); };
+  window.rfLens = (k) => { resFit.lens = k; rfSave(); renderResFit(); };
+  window.rfGrade = (v) => { resFit.gradeMin = +v; const l=$("rfGradeLab"); if(l) l.textContent=v; rfSave(); renderRfGrid(); };
+  window.rfTeam = (t) => { resFit.teamsOff.has(t) ? resFit.teamsOff.delete(t) : resFit.teamsOff.add(t); rfSave(); renderResFit(); };
+  window.rfDiv = (n) => { const ts=RF_DIV[n], allOff=ts.every(t=>resFit.teamsOff.has(t));
+    ts.forEach(t=>{ if(allOff) resFit.teamsOff.delete(t); else resFit.teamsOff.add(t); }); rfSave(); renderResFit(); };
+  window.rfTeamsAll = () => { resFit.teamsOff.clear(); rfSave(); renderResFit(); };
+  window.rfToggleT = () => { resFit.tOpen = !resFit.tOpen; rfSave(); renderRfControls(); };
+  window.rfToggleW = () => { resFit.wOpen = !resFit.wOpen; rfSave(); renderRfControls(); };
+  window.rfWeight = (k,v) => { resFit.weights[k] = +v; rfSave(); rfWeightLabels(); renderRfGrid(); };
+  window.rfWeightReset = () => { resFit.weights = {...RF_WDEF}; rfSave(); renderRfControls(); renderRfGrid(); };
+
+  // ---- fit card: player × team deep dive across every lens ----
+  window.openFitCard = (key, team) => { fitSel = { key, team }; renderFitCard(); };
+  window.closeFitCard = () => { fitSel = null; const bd=$("fitCard"); if(bd){ bd.classList.remove("on"); bd.innerHTML=""; } };
+  function renderFitCard() {
+    const bd = $("fitCard"); if (!bd || !fitSel) return;
+    const state = currentState; if (!state) return;
+    const comp = DATA.compByName.get(fitSel.key) || DATA.composite.find(c=>normName(c.name)===fitSel.key);
+    if (!comp) { closeFitCard(); return; }
+    const t = fitSel.team, key = fitSel.key, o = DATA.orgs[t] || {};
+    const teamName = (state.pools.find(p=>p.team===t)||{}).teamName || "";
+    const w = resFit.weights, wsum = rfWsum();
+    const f = fit(comp, t, key, state);
+    const combined = Math.round(100*(w.interest*f.interestN+w.dev*f.devN+w.type*f.typeN+w.money*f.moneyN)/wsum);
+    const isP = isPitcher(comp.pos);
+    const ti = teamInterest(key, t), li = latestIntel(key, t);
+    const land = tcNextLanding(state, t, comp) || teamNextPick(state, t);
+    const pool = state.poolsMap[t];
+    const pct = (x) => x==null ? "—" : Math.round(x*100)+"%";
+    const rkChip = (n) => { if (n==null) return `<span class="hg-pct">—</span>`; const c = n<=10?"rk-hi":n<=20?"rk-mid":"rk-lo"; return `<span class="hg-pct ${c}">#${Math.round(n)}</span>`; };
+
+    // Panel 1 — The Blend (independent lens grades + weighted contributions)
+    const lensRows = [["interest","Interest",f.interestN],["dev","Org·dev",f.devN],["type","Type",f.typeN],["money","Money",f.moneyN]]
+      .map(([k,l,v]) => { const wp=Math.round(100*w[k]/wsum), contrib=Math.round(100*(w[k]*v)/wsum);
+        return `<div class="fc-blend"><div class="fc-brow"><span>${l}</span><span>${Math.round(100*v)}<small> × ${wp}%</small></span></div>
+          <div class="db"><i style="width:${Math.round(v*100)}%;background:${rfDcol(v)}"></i></div>
+          <div class="fc-contrib">contributes +${contrib} to combined</div></div>`; }).join("");
+    const p1 = `<div class="tc-panel"><h4><span class="n">1</span> The Blend</h4>${lensRows}
+      <div class="fc-note">Each lens grade is independent (0–100). The blend weights them into the <b>${combined}</b> combined fit — adjust weights in the controls to restack.</div></div>`;
+
+    // Panel 2 — Interest (SV intel)
+    let p2i;
+    if (ti.n) {
+      const raw = (li && (li.note||li.full_text)||"").trim(), msg = raw.length>220 ? raw.slice(0,220)+"…" : raw;
+      p2i = `<div class="tc-kv"><span class="k"><span class="fc-dot" style="background:${intelColorHex(key,t)}"></span>Interest strength</span><span class="v">${Math.round(ti.strength*100)}</span></div>
+        <div class="tc-kv"><span class="k">Logged notes</span><span class="v">${ti.n}${contactBadges(key,t)?` ${contactBadges(key,t)}`:""}</span></div>
+        <div class="tc-kv"><span class="k">Peak score</span><span class="v">${ti.max||"—"}</span></div>
+        <div class="tc-kv"><span class="k">Latest</span><span class="v">${li&&li.date?li.date:"—"}</span></div>
+        ${msg?`<div class="fc-note">“${_esc(msg)}”</div>`:""}`;
+    } else {
+      p2i = `<div class="fc-note">No SV intel on file for ${t} on this player — the interest lens reads 0, so this fit leans on org-dev, type & money.</div>`;
+    }
+    const p2 = `<div class="tc-panel"><h4><span class="n">2</span> Interest</h4>${p2i}
+      <div class="tc-kv"><span class="k">Likely landing</span><span class="v">${land?`#${land.overall} · ${land.roundPick||("R"+land.round)}`:"no pick left"}</span></div></div>`;
+
+    // Panel 3 — Org-review dev-fit
+    const trends = o.trends || {}, dev = o.dev || {};
+    const tKeyN = isP ? ["ncaaPitcher","hsPitcher"] : ["ncaaPos","hsPos"];
+    const p3 = `<div class="tc-panel"><h4><span class="n">3</span> Org-review dev-fit</h4>
+      <div class="tc-kv"><span class="k">Org rank (COMP)</span><span class="v">${rkChip(o.orgRank)}</span></div>
+      <div class="tc-kv"><span class="k">MLB debut rate</span><span class="v">${pct(dev.mlbDebut)}</span></div>
+      <div class="tc-kv"><span class="k">Reached arb</span><span class="v">${pct(dev.arb)}</span></div>
+      <div class="tc-kv"><span class="k">${isP?"Pitcher debut":"Position debut"}</span><span class="v">${pct(isP?dev.pitDebut:dev.posDebut)}</span></div>
+      <div class="tc-kv"><span class="k">Homegrown on roster</span><span class="v">${o.homegrown!=null?o.homegrown:"—"}</span></div>
+      <div class="tc-kv"><span class="k">${isP?"NCAA":"NCAA"} ${isP?"arm":"bat"} trend</span><span class="v">${pct(trends[tKeyN[0]])}</span></div>
+      <div class="tc-kv"><span class="k">HS ${isP?"arm":"bat"} trend</span><span class="v">${pct(trends[tKeyN[1]])}</span></div>
+      <div class="fc-note">Dev-fit rewards orgs that graduate & retain this player's archetype. Org rank drives the lens; the rates show how that rank is earned.</div></div>`;
+
+    // Panel 4 — Type-fit
+    const lean = o.earlyPitcherPct!=null ? o.earlyPitcherPct : 50;
+    const sideMatch = isP ? lean : 100-lean;
+    const lvlPct = comp.level==="HS" ? o.hsPct : comp.level==="College" ? o.collegePct : null;
+    const p4 = `<div class="tc-panel"><h4><span class="n">4</span> Type-fit</h4>
+      <div class="tc-kv"><span class="k">Player archetype</span><span class="v">${isP?"Pitcher":"Position"} · ${comp.level||"—"}</span></div>
+      <div class="tc-kv"><span class="k">Org early-pick lean</span><span class="v">${o.earlyPitcherPct!=null?`${lean}% arms`:"—"}</span></div>
+      <div class="tc-kv"><span class="k">→ matches his side</span><span class="v">${o.earlyPitcherPct!=null?sideMatch+"%":"—"}</span></div>
+      <div class="tc-kv"><span class="k">Org HS / College mix</span><span class="v">${o.hsPct!=null?`${o.hsPct}% HS · ${o.collegePct}% COL`:"—"}</span></div>
+      <div class="tc-kv"><span class="k">→ matches his level</span><span class="v">${lvlPct!=null?lvlPct+"%":"—"}</span></div>
+      <div class="fc-note">How closely ${t}'s historical draft behavior (arm vs bat, HS vs college) matches this player's profile.</div></div>`;
+
+    // Panel 5 — Money
+    const bonus = land ? negBonus(comp, land.slot, land.overall) : null;
+    const fits = pool && bonus!=null ? pool.room >= bonus : null;
+    const p5 = `<div class="tc-panel"><h4><span class="n">5</span> Money</h4>
+      <div class="tc-kv"><span class="k">Pool room</span><span class="v">${pool?fmtM(pool.room):"—"}</span></div>
+      <div class="tc-kv"><span class="k">Pool ceiling</span><span class="v">${pool&&pool.ceiling?fmtM(pool.ceiling):"—"}</span></div>
+      <div class="tc-kv"><span class="k">Landing slot</span><span class="v">${land&&land.slot?fmtM(land.slot):"—"}</span></div>
+      <div class="tc-kv"><span class="k">Est. bonus to sign</span><span class="v">${bonus!=null?fmtM(bonus):"—"}${fits==null?"":fits?` <span class="tg lvl-jc">fits</span>`:` <span class="tg under">short</span>`}</span></div>
+      <div class="fc-note">Money reads the room the org has left vs. what it would take to sign him at his likeliest landing pick.</div></div>`;
+
+    bd.innerHTML = `<div class="tc-card fc-card">
+      <div class="tc-top">
+        <span class="tc-ttl">${_esc(comp.name)}</span>
+        <span class="fc-sub">${comp.pos} · ${comp.level||"—"} · #${comp.rank}${comp.agent?` · ${_esc(comp.agent)}`:""}</span>
+        <span class="fc-arrow">→</span>
+        ${teamLogo(t,22)}<span class="tc-abbr">${t}</span><span class="fc-sub">${teamName?_esc(teamName)+" · ":""}org #${o.orgRank!=null?Math.round(o.orgRank):"—"}</span>
+        <button class="tc-x" onclick="closeFitCard()">✕</button>
+      </div>
+      <div class="tc-band"><div class="tc-stats">
+        <div class="tc-stat"><div class="k">Combined fit</div><div class="v big">${combined}</div><div class="sub">${RF_LENSLBL[resFit.lens]==="Combined fit"?"weighted blend":"weighted"}</div></div>
+        <div class="tc-stat"><div class="k">Interest</div><div class="v">${Math.round(100*f.interestN)}</div></div>
+        <div class="tc-stat"><div class="k">Org·dev</div><div class="v">${Math.round(100*f.devN)}</div></div>
+        <div class="tc-stat"><div class="k">Type</div><div class="v">${Math.round(100*f.typeN)}</div></div>
+        <div class="tc-stat"><div class="k">Money</div><div class="v">${Math.round(100*f.moneyN)}</div></div>
+      </div></div>
+      <div class="fc-panels">${p1}${p2}${p3}${p4}${p5}</div>
+    </div>`;
+    bd.classList.add("on");
   }
   // ---------- Ask the data — freeform LLM query over the whole draft-day system ----------
   // Packs a compact snapshot (draft status, pools, client book, slot-history aggregates —
@@ -3714,6 +4043,7 @@
       const ae = document.activeElement;
       if (!(armed && ae && (ae.tagName==="INPUT" || ae.tagName==="SELECT"))) renderTeamCard(currentState);
     }
+    if (fitSel && $("fitCard") && $("fitCard").classList.contains("on")) renderFitCard();  // no inputs to wipe
     if (selected) {
       const ae = document.activeElement;   // don't wipe range/medical inputs mid-edit on live ticks
       if (!(ae && (ae.tagName==="INPUT" || ae.tagName==="SELECT"))) renderDetail();
@@ -3726,7 +4056,10 @@
       if (armed && ae && (ae.tagName==="INPUT" || ae.tagName==="SELECT")) return;
       renderBoard(currentState);
     }
-    else if (VIEW==="research") { if (!researchDrawn) renderResearch(); }  // static data — no tick re-render (sliders!)
+    else if (VIEW==="research") {
+      if (!researchDrawn) renderResearch();                         // static data — no tick re-render (sliders!)
+      else if (resTab==="fit") renderRfGrid();                      // fit grid tracks live pools/intel; controls untouched
+    }
     else renderBest();
   }
   function setView(v) { selected=null; VIEW=v; applyViewVis(); renderActive(); }
@@ -4024,10 +4357,19 @@
   // Companion PWA: SW only caches static art/fonts — live data always hits the network.
   if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("/sw.js"); } catch (e) {} }
 
+  // Shareable deep-links into Research: #teamfit opens the team-fit grid, #research the wizard.
+  const applyResHash = () => {
+    const hh = (location.hash||"").toLowerCase();
+    if (hh==="#teamfit" || hh==="#team-fit") { setView("research"); setResTab("fit"); }
+    else if (hh==="#research") { setView("research"); setResTab("research"); }
+  };
+  window.addEventListener("hashchange", applyResHash);
+
   (async () => {
     initOrgTooltip();
     applyTv();
     applyViewVis();   // sync tab/section classes (Board is the default view everywhere)
+    applyResHash();   // honor a #teamfit / #research deep-link on first load
     await loadStatic();
     try { await loadOrder(); } catch (e) {}   // slot table for demandFor() in all views
     await loadIntel().then(backfillLocalSettings);   // load shared intel, then migrate browser-only ranges/medicals
