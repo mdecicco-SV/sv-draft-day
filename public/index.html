@@ -810,6 +810,8 @@
   /* wide tables inside panels scroll sideways instead of stretching the sheet */
   body.mob .tc-panel { min-width:0; }
   body.mob .tc-panel table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  /* card panel 4 (org prospects): give player names real width — table scrolls sideways */
+  body.mob #teamCard .tc-panel[data-q="prospects"] .tc-upc td.pl { max-width:none; width:auto; min-width:150px; }
   body.mob .tc-draftflow { flex:none; overflow:visible; }  /* the expanded panel scrolls itself */
   body.mob .res-grid { grid-template-columns:1fr; gap:10px; }
   body.mob .res-filters { position:static; }
@@ -2871,7 +2873,7 @@
       if (lb3) h += `<div class="tc-kv" style="margin-top:8px"><span class="k">Logged ${last} bonus (${lb3.kind})</span><span class="v">${fmtM(lb3.amount)}${lb3.pick?` <span class="tc-onpace">at #${lb3.pick}</span>`:""}</span></div>`;
       h += `<div class="tc-hab-note" style="margin-top:${lb3?"6":"10"}px">${last} is a ${isHS?"HS":"college"} ${p?"pitcher":"position player"}. ${team} takes ${levPct!=null?levPct+"%":"—"} ${isHS?"HS":"college"} and leans ${leanPitcher?"pitcher":"hitter"} ${leanWhere} — this profile ${withLean?"fits":"runs against"} their habit at this spot.</div>`;
       // Pick Economics — if we got popped at THIS pick: slot vs his ask, pool room, leverage
-      h += `<div class="tc-pecon"><h5>Pick Economics · if we got popped here</h5>${pickEconRows(state, sel.c.key, c, pk, `R${pk.round} · this pick`)}</div>`;
+      h += `<div class="tc-pecon"><h5>Pick Economics</h5>${pickEconRows(state, sel.c.key, c, pk, `R${pk.round} · this pick`)}</div>`;
     }
     return h + `</div>`;
   }
@@ -3331,7 +3333,7 @@
   // Dossier variant — live read for whichever team is on the clock right now.
   function renderPickEconomics(state, c, comp) {
     const oc = state.onClock;
-    let h = `<div class="tc-pecon"><h5>Pick Economics · if we got popped here</h5>`;
+    let h = `<div class="tc-pecon"><h5>Pick Economics</h5>`;
     if (!oc) return h + `<div class="placeholder">No pick on the clock.</div></div>`;
     if (!comp) return h + `<div class="placeholder">Unranked — no market model for this spot.</div></div>`;
     return h + pickEconRows(state, c.key, comp, oc, `R${oc.round} · on the clock`) + `</div>`;
