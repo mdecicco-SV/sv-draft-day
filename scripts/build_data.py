@@ -12,7 +12,7 @@ from sv-teamintel for draft-day freshness.
 
 Run:  python3 scripts/build_data.py
 """
-import csv, json, os, datetime, urllib.request
+import csv, json, os, re, datetime, urllib.request
 from collections import Counter, defaultdict
 import openpyxl
 
@@ -209,6 +209,28 @@ def bucket(school_class):
     return None
 
 
+def pos_group(pos):
+    """Mirror posGroupOf() in public/index.html: collapse a raw Pos string to
+    P/C/IF/OF/? (case-insensitive, robust to empty/None)."""
+    p = (str(pos).strip().upper() if pos else "")
+    if re.search(r"P|RHP|LHP|SP|RP", p):
+        return "P"
+    if p == "C":
+        return "C"
+    if re.search(r"1B|2B|3B|SS|IF|INF", p):
+        return "IF"
+    if re.search(r"OF|CF|LF|RF", p):
+        return "OF"
+    return "?"
+
+
+def _pos_fracs(counter):
+    total = sum(counter.values())
+    if not total:
+        return {"P": 0.0, "C": 0.0, "IF": 0.0, "OF": 0.0}
+    return {g: round(counter[g] / total, 3) for g in ("P", "C", "IF", "OF")}
+
+
 def build_orgs(path):
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
 
@@ -247,10 +269,25 @@ def build_orgs(path):
         pos_ct = Counter()
         cls_ct = Counter()
         early_pos = Counter()   # rounds 1-3 only
+        pos_all_ct = Counter()    # NEW: every pick with a known Round, by pos group
+        pos_early_ct = Counter()  # NEW: rounds 1-3 only, by pos group
         recent_r1 = []
         for r in rows[hi + 1:]:
             if "Year" not in col or r[col["Year"]] is None:
                 continue
+
+            # NEW: per-position-group tally. Kept independent of the strict Year/Round
+            # parsing below (which drops the whole row on a ValueError) since Round can
+            # be formatted like "1s" or "CB-A" — extract the leading integer for "early"
+            # classification, but still count the pick in posAll even if that fails.
+            pos_raw = (str(r[col["Pos"]]).strip() if "Pos" in col and r[col["Pos"]] else "")
+            grp2 = pos_group(pos_raw)
+            if grp2 != "?" and "Round" in col and r[col["Round"]] not in (None, ""):
+                pos_all_ct[grp2] += 1
+                m = re.match(r"\s*(-?\d+)", str(r[col["Round"]]))
+                if m and int(m.group(1)) <= 3:
+                    pos_early_ct[grp2] += 1
+
             try:
                 yr = int(float(r[col["Year"]]))
                 rnd = int(float(r[col["Round"]])) if r[col.get("Round", -1)] is not None else None
@@ -285,6 +322,8 @@ def build_orgs(path):
             "collegePct": round(100 * (cls_ct["4YR"] + cls_ct["JUCO"]) / known) if known else None,
             "classN": known,
             "recentR1": recent_r1[:4],
+            "posDraftEarly": _pos_fracs(pos_early_ct),
+            "posDraft": _pos_fracs(pos_all_ct),
         }
 
     # merge richer org-review metrics (development outcomes, draft-type trends, homegrown)

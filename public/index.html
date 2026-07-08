@@ -631,6 +631,14 @@
   .fc-blend .db i { display:block; height:100%; border-radius:4px; }
   .fc-blend .fc-contrib { font-size:9.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; margin-top:2px; }
   .fc-note { font-size:10.5px; color:var(--muted); font-weight:600; line-height:1.5; margin-top:8px; border-top:1px solid var(--line); padding-top:8px; }
+  .fc-verdict { display:inline-block; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.4px; padding:2px 8px; border-radius:6px; margin-bottom:8px; }
+  .fc-verdict.strong { background:#dff2df; color:#1a7f37; }
+  .fc-verdict.onbrand { background:#eef0f3; color:var(--ink); }
+  .fc-verdict.neutral { background:#f2f2f2; color:var(--muted); }
+  .fc-verdict.against { background:#fbe4e1; color:#b3261e; }
+  .fc-reasons { list-style:none; padding:0; margin:0; }
+  .fc-reasons li { font-size:11.5px; font-weight:600; color:var(--ink); padding:4px 0; border-top:1px solid var(--line); }
+  .fc-reasons li:first-child { border-top:none; }
   .fc-dot { width:10px; height:10px; border-radius:50%; display:inline-block; vertical-align:-1px; margin-right:5px; }
   @media (max-width:820px){ .fc-panels { grid-template-columns:1fr; } }
   /* The Draft fills its panel: header fixed, flow takes the rest, remaining line pinned */
@@ -1388,7 +1396,7 @@
   const isPitcher = (pos) => /(^|\b)(P|RHP|LHP|SP|RP)\b/i.test(pos || "");
   const COLOR_HEX = { green:"#1a7f37","light green":"#86c98b", yellow:"#e3b505", orange:"#e8820e", red:"#C8102E" };
 
-  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[] };
+  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], fv:{}, fvScale:80 };
   let boardSelClients = new Set(); // empty = Big Board (show every pick's in-play cluster);
                                    // non-empty = focus these clients' intel across the board
   let playerMenuOpen = false;      // Players dropdown open state (survives board re-renders)
@@ -1542,6 +1550,13 @@
       }
       c.forEach(p => { p._key = normName(p.name); });   // cache normalized key (hot in sims)
       DATA.compByName = new Map(c.map(p => [p._key, p]));
+      // FV (future value) — optional feed; missing file degrades to an empty map (FV reads neutral).
+      try {
+        const fvRaw = await fetch("/data/fv.json",{cache:"no-store"}).then(r=>r.ok?r.json():{}).catch(()=>({}));
+        const m={}; let mx=0;
+        for (const k in fvRaw){ const v=+fvRaw[k]; if(Number.isFinite(v)){ m[normName(k)]=v; if(v>mx)mx=v; } }
+        DATA.fv=m; DATA.fvScale = mx>80 ? 100 : 80;
+      } catch(e){ DATA.fv={}; }
     } catch (e) {}
     await loadTeamIntel();
   }
@@ -1778,6 +1793,42 @@
     return picks[0] || null;
   }
 
+  // ---- FV (future value) lens: optional /data/fv.json, normName -> numeric grade ----
+  function fvNormOf(comp){ if(!comp) return null; const v=DATA.fv[normName(comp.name)];
+    if(!Number.isFinite(v)) return null;
+    return DATA.fvScale===100 ? Math.max(0,Math.min(1,v/100)) : Math.max(0,Math.min(1,(v-20)/60)); }
+  function fvRawOf(comp){ if(!comp) return null; const v=DATA.fv[normName(comp.name)]; return Number.isFinite(v)?v:null; }
+  // ---- Flavor lens helpers: org positional identity (Top-30 system composition + draft habit) ----
+  const _posSysCache=new Map();
+  function orgPosSystem(team){ if(_posSysCache.has(team)) return _posSysCache.get(team);
+    const list=(DATA.prospects&&DATA.prospects[team])||[]; const ct={P:0,C:0,IF:0,OF:0}; let n=0;
+    for(const p of list){ const g=posGroupOf(p.pos); if(ct[g]!=null){ct[g]++;n++;} }
+    const out=n?{P:ct.P/n,C:ct.C/n,IF:ct.IF/n,OF:ct.OF/n,n}:null; _posSysCache.set(team,out); return out; }
+  // self-relative positional match: org's most-drafted group -> 1.0, others proportional
+  function posMatch(dist, g){ if(!dist||!g||dist[g]==null) return null;
+    const mx=Math.max(dist.P||0,dist.C||0,dist.IF||0,dist.OF||0); return mx>0?Math.min(1,dist[g]/mx):0.5; }
+  // League baselines so "flavor" measures how much an org DEVIATES from the field (not just
+  // matches the majority — most orgs draft college, so raw shares read "on-brand" for everyone).
+  let _lgBase=null;
+  function leagueBaselines(){
+    if(_lgBase) return _lgBase;
+    const orgs=Object.values(DATA.orgs||{}), teams=Object.keys(DATA.orgs||{});
+    const mean=(a)=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+    const epp=mean(orgs.filter(o=>o.earlyPitcherPct!=null).map(o=>o.earlyPitcherPct/100)) || 0.5;
+    const col=mean(orgs.filter(o=>o.collegePct!=null).map(o=>o.collegePct/100)) || 0.75;
+    const sysAgg={P:[],C:[],IF:[],OF:[]};
+    for(const t of teams){ const ps=orgPosSystem(t); if(ps) for(const g of ["P","C","IF","OF"]) sysAgg[g].push(ps[g]); }
+    const sys={P:mean(sysAgg.P),C:mean(sysAgg.C),IF:mean(sysAgg.IF),OF:mean(sysAgg.OF)};
+    const habAgg={P:[],C:[],IF:[],OF:[]}; let hasHab=false;
+    for(const o of orgs){ if(o.posDraftEarly){ hasHab=true; for(const g of ["P","C","IF","OF"]) if(o.posDraftEarly[g]!=null) habAgg[g].push(o.posDraftEarly[g]); } }
+    const hab=hasHab?{P:mean(habAgg.P),C:mean(habAgg.C),IF:mean(habAgg.IF),OF:mean(habAgg.OF)}:null;
+    _lgBase={epp,col,sys,hab}; return _lgBase;
+  }
+  // deviation-from-league → 0..1 centered at 0.5 (0.5 = league-average org for this trait)
+  const _rel=(org,lg,gain=2.0)=>Math.max(0,Math.min(1,0.5+gain*((org||0)-(lg||0))));
+  // same, for small positional shares: scale the deviation by the league share so C (rare) is fair
+  const _relG=(org,lg)=>Math.max(0,Math.min(1,0.5+0.6*(((org||0)-(lg||0))/Math.max(lg||0,0.08))));
+
   // landing-spot fit FOR the client: interest 45 / dev 20 / type 15 / money 20, where
   // interest is the full-history aggregate (teamInterest). Interest-dominant by design.
   function fit(comp, team, clientKey, state) {
@@ -1785,6 +1836,7 @@
     const interestN = clientKey ? teamInterest(clientKey, team).strength : 0;
     const devN = o.orgRank != null ? Math.max(0, (31 - o.orgRank)/30) : 0.5;
     let typeN = 0.5;
+    let flavorN = 0.5;
     if (comp) {
       const lean = (o.earlyPitcherPct!=null?o.earlyPitcherPct:50)/100;
       const posN = isPitcher(comp.pos) ? lean : (1-lean);
@@ -1792,14 +1844,76 @@
       if (comp.level==="HS" && o.hsPct!=null) lvlN = o.hsPct/100;
       else if (comp.level==="College" && o.collegePct!=null) lvlN = o.collegePct/100;
       typeN = (posN + lvlN)/2;
+      // Flavor: positional identity match — arm/bat + level leans, plus (when present)
+      // early-draft positional habit and current Top-30 system composition.
+      const g = comp.posGroup || posGroupOf(comp.pos);
+      const B = leagueBaselines();
+      const armShare = o.earlyPitcherPct!=null ? o.earlyPitcherPct/100 : B.epp;
+      // arm/bat: is THIS org more inclined to the player's side than the field?
+      const armSig = isPitcher(comp.pos) ? _rel(armShare, B.epp) : _rel(1-armShare, 1-B.epp);
+      const colShare = o.collegePct!=null ? o.collegePct/100 : B.col;
+      const lvlSig = comp.level==="College" ? _rel(colShare, B.col)
+                   : comp.level==="HS" ? _rel(1-colShare, 1-B.col) : 0.5;
+      const sig = [armSig, lvlSig];
+      if (o.posDraftEarly && o.posDraftEarly[g]!=null && B.hab) sig.push(_relG(o.posDraftEarly[g], B.hab[g]));  // draft habit (Phase B)
+      const ps = orgPosSystem(team); if (ps && ps[g]!=null) sig.push(_relG(ps[g], B.sys[g]));                    // current system composition
+      flavorN = sig.reduce((a,b)=>a+b,0)/sig.length;
     }
+    const fvv = comp ? fvNormOf(comp) : null;
+    const fvN = fvv==null ? 0.5 : fvv;
+    const fvKnown = fvv!=null;
     const pool = state.poolsMap[team];
     const moneyN = pool && pool.ceiling ? Math.max(0, Math.min(1, pool.room/pool.ceiling)) : 0.5;
     const score = Math.round(100*(0.45*interestN + 0.20*devN + 0.15*typeN + 0.20*moneyN));
     // org fit = interest/dev/type only (money excluded), renormalized — lets a strong intel/org
     // fit surface at a slot even when the team's money doesn't work.
     const orgScore = Math.round(100*(0.45*interestN + 0.20*devN + 0.15*typeN)/0.80);
-    return { score, orgScore, interestN, devN, typeN, moneyN };
+    return { score, orgScore, interestN, devN, typeN, moneyN, flavorN, fvN, fvKnown };
+  }
+
+  // "Is player Y team X's flavor, and why?" — verdict + 2-4 concise reason strings.
+  const flavorVerdict = (n) => n>=0.62 ? "Strong flavor" : n>=0.54 ? "On-brand" : n>=0.46 ? "Neutral" : "Against type";
+  function flavorReasons(comp, team, state) {
+    try {
+      const o = DATA.orgs[team] || {};
+      const f = fit(comp, team, comp ? normName(comp.name) : null, state);
+      const verdict = flavorVerdict(f.flavorN);
+      const reasons = [];
+      // FV
+      const raw = fvRawOf(comp);
+      if (raw != null) {
+        if (DATA.fvScale===100) reasons.push(`FV ${raw}/100 — ${raw>=75?"elite":raw>=60?"solid":"modest"} upside`);
+        else reasons.push(`FV ${raw} — ${raw>=60?"elite":raw>=50?"solid":"modest"} upside`);
+      } else reasons.push(`FV pending — not yet scored`);
+      const isP = comp ? isPitcher(comp.pos) : false;
+      const B = leagueBaselines();
+      const brand = (dev) => dev>=0.03 ? "on-brand" : dev<=-0.03 ? "off-brand" : "league-average";
+      // arm/bat lean vs the FIELD (not a fixed 55/45) — flavor is about deviating from the norm
+      if (comp && o.earlyPitcherPct!=null) {
+        const ep = Math.round(o.earlyPitcherPct), armShare = o.earlyPitcherPct/100;
+        const dev = isP ? (armShare-B.epp) : ((1-armShare)-(1-B.epp));
+        reasons.push(isP ? `spends ${ep}% of early picks on arms vs ${Math.round(B.epp*100)}% league — ${brand(dev)}`
+                          : `drafts hitters early ${100-ep}% vs ${Math.round((1-B.epp)*100)}% league — ${brand(dev)}`);
+      }
+      // HS / College mix vs the player's level, relative to the field
+      if (comp && comp.level==="HS" && o.hsPct!=null)
+        reasons.push(`${Math.round(o.hsPct)}% HS drafters vs ${Math.round((1-B.col)*100)}% league — ${brand((o.hsPct/100)-(1-B.col))} for a prep`);
+      else if (comp && comp.level==="College" && o.collegePct!=null)
+        reasons.push(`${Math.round(o.collegePct)}% college drafters vs ${Math.round(B.col*100)}% league — ${brand((o.collegePct/100)-B.col)} for a college player`);
+      // current system composition (Top-30)
+      const g = comp ? (comp.posGroup || posGroupOf(comp.pos)) : null;
+      const ps = orgPosSystem(team);
+      if (ps && g && ps[g]!=null) {
+        const lead = ["P","C","IF","OF"].reduce((a,b)=>(ps[a]||0)>=(ps[b]||0)?a:b);
+        reasons.push(lead===g ? `Top-30 already skews ${lead} (${Math.round((ps[lead]||0)*100)}%) — matches his group` : `Top-30 skews ${lead} (${Math.round((ps[lead]||0)*100)}%); he's ${g} (${Math.round((ps[g]||0)*100)}%)`);
+      }
+      // early-draft positional habit (Phase B data; absent until rebuild)
+      if (comp && o.posDraftEarly && g && o.posDraftEarly[g]!=null) {
+        const hm = posMatch(o.posDraftEarly, g);
+        reasons.push(`drafts ${g} early ${Math.round((o.posDraftEarly[g]||0)*100)}% — ${hm!=null&&hm>=0.66?"on":"off"}-brand`);
+      }
+      return { verdict, reasons: reasons.slice(0,4) };
+    } catch (e) { return { verdict:"Neutral", reasons:[] }; }
   }
 
   // ---------- VIEW: OUR CLIENTS ----------
@@ -3258,16 +3372,16 @@
 
   // ================= TEAM FIT — players × orgs, blended from the fit engine =================
   // A fresher surfacing of the fit grades this system computes (interest / org-review dev-fit /
-  // type / money). Weights are adjustable and local to this module; the console keeps its tuned
+  // flavor / money / FV). Weights are adjustable and local to this module; the console keeps its tuned
   // engine defaults elsewhere. Rooted entirely in DATA.composite, DATA.orgs, DATA.intel + live pools.
   const RF_DIV = {
     "AL East":["BAL","BOS","NYY","TB","TOR"], "AL Central":["CHW","CLE","DET","KC","MIN"],
     "AL West":["HOU","LAA","ATH","SEA","TEX"], "NL East":["ATL","MIA","NYM","PHI","WSH"],
     "NL Central":["CHC","CIN","MIL","PIT","STL"], "NL West":["ARI","COL","LAD","SD","SF"],
   };
-  const RF_LENSES = [["combined","Combined"],["interest","Interest"],["dev","Org·dev"],["type","Type"],["money","Money"]];
-  const RF_LENSLBL = { combined:"Combined fit", interest:"Interest", dev:"Org·dev", type:"Type", money:"Money" };
-  const RF_WDEF = { interest:45, dev:20, type:15, money:20 };
+  const RF_LENSES = [["combined","Combined"],["interest","Interest"],["dev","Org·dev"],["flavor","Flavor"],["money","Money"],["fv","FV"]];
+  const RF_LENSLBL = { combined:"Combined fit", interest:"Interest", dev:"Org·dev", flavor:"Flavor", money:"Money", fv:"FV" };
+  const RF_WDEF = { interest:35, dev:15, flavor:20, money:15, fv:15 };
   const RF_DEF = () => ({ clientsSide:true, clientsOff:new Set(), boardSide:false, boardOn:new Set(),
     pos:new Set(), teamsOff:new Set(), gradeMin:0, lens:"combined", weights:{...RF_WDEF},
     wOpen:false, tOpen:false, sortCol:null, sortDir:"desc" });
@@ -3285,6 +3399,9 @@
       resFit.gradeMin = +sv.gradeMin || 0;
       resFit.lens = RF_LENSLBL[sv.lens] ? sv.lens : "combined";
       resFit.weights = Object.assign({...RF_WDEF}, sv.weights || {});
+      // migrate: Type renamed to Flavor; new FV lens gets its default weight
+      if ('type' in resFit.weights){ resFit.weights.flavor = resFit.weights.flavor ?? resFit.weights.type; delete resFit.weights.type; }
+      for (const k of ["interest","dev","flavor","money","fv"]) if (resFit.weights[k]==null) resFit.weights[k]=RF_WDEF[k];
       resFit.wOpen = !!sv.wOpen; resFit.tOpen = !!sv.tOpen;
       resFit.sortCol = typeof sv.sortCol==="string" ? sv.sortCol : null;
       resFit.sortDir = sv.sortDir==="asc" ? "asc" : "desc";
@@ -3341,14 +3458,15 @@
     return Object.keys(DATA.orgs).filter(t=>!resFit.teamsOff.has(t))
       .sort((a,b) => ((DATA.orgs[a].orgRank??99)-(DATA.orgs[b].orgRank??99)));
   }
-  const rfWsum = () => { const w=resFit.weights; return (w.interest+w.dev+w.type+w.money)||1; };
+  const rfWsum = () => { const w=resFit.weights; return (w.interest+w.dev+w.flavor+w.money+w.fv)||1; };
   function rfCellVal(f) {
     switch (resFit.lens) {
       case "interest": return Math.round(100*f.interestN);
       case "dev":      return Math.round(100*f.devN);
-      case "type":     return Math.round(100*f.typeN);
+      case "flavor":   return Math.round(100*f.flavorN);
       case "money":    return Math.round(100*f.moneyN);
-      default: { const w=resFit.weights; return Math.round(100*(w.interest*f.interestN+w.dev*f.devN+w.type*f.typeN+w.money*f.moneyN)/rfWsum()); }
+      case "fv":       return Math.round(100*f.fvN);
+      default: { const w=resFit.weights; return Math.round(100*(w.interest*f.interestN+w.dev*f.devN+w.flavor*f.flavorN+w.money*f.moneyN+w.fv*f.fvN)/rfWsum()); }
     }
   }
   // light RdYlGn ramp — dark ink stays readable on every stop
@@ -3408,13 +3526,13 @@
       <span class="rf-wval" id="rfW_${k}">${Math.round(100*w[k]/wsum)}%</span></div>`;
     const weightsBox = `<div class="res-box rf-wbox">
       <div class="res-chead" onclick="rfToggleW()">Blend weights<span>${resFit.wOpen?"▾":"▸"}</span></div>
-      ${resFit.wOpen?`<div class="rf-wgrid">${sl("interest","Interest")}${sl("dev","Org·dev")}${sl("type","Type")}${sl("money","Money")}
-        <div class="rf-wfoot"><span>Combined = weighted blend of the four lenses. Selecting a single lens shows it raw.</span>
-        <button class="tc-chip clear" onclick="rfWeightReset()">Reset 45·20·15·20</button></div></div>`:""}</div>`;
+      ${resFit.wOpen?`<div class="rf-wgrid">${sl("interest","Interest")}${sl("dev","Org·dev")}${sl("flavor","Flavor")}${sl("money","Money")}${sl("fv","FV")}
+        <div class="rf-wfoot"><span>Combined = weighted blend of the five lenses. Selecting a single lens shows it raw.</span>
+        <button class="tc-chip clear" onclick="rfWeightReset()">Reset 35·15·20·15·15</button></div></div>`:""}</div>`;
     el.innerHTML = `<div class="rf-controls">${playersRow}${posRow}${lensRow}${gradeRow}</div>${teamsBox}${weightsBox}`;
   }
   function rfWeightLabels() { const w=resFit.weights, s=rfWsum();
-    ["interest","dev","type","money"].forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=Math.round(100*w[k]/s)+"%"; }); }
+    ["interest","dev","flavor","money","fv"].forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=Math.round(100*w[k]/s)+"%"; }); }
 
   function renderRfGrid() {
     const wrap = $("rfGrid"); if (!wrap) return;
@@ -3447,7 +3565,7 @@
       for (const c of players) {
         const key = normName(c.name), f = fit(c, t, key, state), v = rfCellVal(f);
         const dim = v < resFit.gradeMin ? " rf-dim" : "", sortCls = resFit.sortCol===key ? " rf-colsort" : "";
-        h += `<td class="rf-cell${dim}${sortCls}" style="background:${rfHeat(v)}" title="${_esc(c.name)} → ${t}: ${v}" onclick="openFitCard('${key}','${t}')">${v}</td>`;
+        h += `<td class="rf-cell${dim}${sortCls}" style="background:${rfHeat(v)}" title="${_esc(c.name)} → ${t}: ${v} — ${flavorVerdict(f.flavorN)}" onclick="openFitCard('${key}','${t}')">${v}</td>`;
       }
       h += `</tr>`;
     }
@@ -3513,7 +3631,7 @@
     const teamName = (state.pools.find(p=>p.team===t)||{}).teamName || "";
     const w = resFit.weights, wsum = rfWsum();
     const f = fit(comp, t, key, state);
-    const combined = Math.round(100*(w.interest*f.interestN+w.dev*f.devN+w.type*f.typeN+w.money*f.moneyN)/wsum);
+    const combined = Math.round(100*(w.interest*f.interestN+w.dev*f.devN+w.flavor*f.flavorN+w.money*f.moneyN+w.fv*f.fvN)/wsum);
     const isP = isPitcher(comp.pos);
     const ti = teamInterest(key, t), li = latestIntel(key, t);
     const land = tcNextLanding(state, t, comp) || teamNextPick(state, t);
@@ -3522,7 +3640,7 @@
     const rkChip = (n) => { if (n==null) return `<span class="hg-pct">—</span>`; const c = n<=10?"rk-hi":n<=20?"rk-mid":"rk-lo"; return `<span class="hg-pct ${c}">#${Math.round(n)}</span>`; };
 
     // Panel 1 — The Blend (independent lens grades + weighted contributions)
-    const lensRows = [["interest","Interest",f.interestN],["dev","Org·dev",f.devN],["type","Type",f.typeN],["money","Money",f.moneyN]]
+    const lensRows = [["interest","Interest",f.interestN],["dev","Org·dev",f.devN],["flavor","Flavor",f.flavorN],["money","Money",f.moneyN],["fv","FV",f.fvN]]
       .map(([k,l,v]) => { const wp=Math.round(100*w[k]/wsum), contrib=Math.round(100*(w[k]*v)/wsum);
         return `<div class="fc-blend"><div class="fc-brow"><span>${l}</span><span>${Math.round(100*v)}<small> × ${wp}%</small></span></div>
           <div class="db"><i style="width:${Math.round(v*100)}%;background:${rfDcol(v)}"></i></div>
@@ -3558,17 +3676,23 @@
       <div class="tc-kv"><span class="k">HS ${isP?"arm":"bat"} trend</span><span class="v">${pct(trends[tKeyN[1]])}</span></div>
       <div class="fc-note">Dev-fit rewards orgs that graduate & retain this player's archetype. Org rank drives the lens; the rates show how that rank is earned.</div></div>`;
 
-    // Panel 4 — Type-fit
+    // Panel 4 — Flavor (positional identity match + explainer)
     const lean = o.earlyPitcherPct!=null ? o.earlyPitcherPct : 50;
     const sideMatch = isP ? lean : 100-lean;
     const lvlPct = comp.level==="HS" ? o.hsPct : comp.level==="College" ? o.collegePct : null;
-    const p4 = `<div class="tc-panel" data-q="type"><h4><span class="n">4</span> Type-fit</h4>
+    const fr = flavorReasons(comp, t, state);
+    const vcls = fr.verdict==="Strong flavor" ? "strong" : fr.verdict==="On-brand" ? "onbrand" : fr.verdict==="Against type" ? "against" : "neutral";
+    const fvRaw = fvRawOf(comp);
+    const p4 = `<div class="tc-panel" data-q="flavor"><h4><span class="n">4</span> Flavor — their type?</h4>
+      <span class="fc-verdict ${vcls}">${_esc(fr.verdict)} · ${Math.round(100*f.flavorN)}</span>
+      ${fr.reasons.length?`<ul class="fc-reasons">${fr.reasons.map(r=>`<li>${_esc(r)}</li>`).join("")}</ul>`:""}
       <div class="tc-kv"><span class="k">Player archetype</span><span class="v">${isP?"Pitcher":"Position"} · ${comp.level||"—"}</span></div>
       <div class="tc-kv"><span class="k">Org early-pick lean</span><span class="v">${o.earlyPitcherPct!=null?`${lean}% arms`:"—"}</span></div>
       <div class="tc-kv"><span class="k">→ matches his side</span><span class="v">${o.earlyPitcherPct!=null?sideMatch+"%":"—"}</span></div>
       <div class="tc-kv"><span class="k">Org HS / College mix</span><span class="v">${o.hsPct!=null?`${o.hsPct}% HS · ${o.collegePct}% COL`:"—"}</span></div>
       <div class="tc-kv"><span class="k">→ matches his level</span><span class="v">${lvlPct!=null?lvlPct+"%":"—"}</span></div>
-      <div class="fc-note">How closely ${t}'s historical draft behavior (arm vs bat, HS vs college) matches this player's profile.</div></div>`;
+      <div class="tc-kv"><span class="k">FV</span><span class="v">${fvRaw!=null?(DATA.fvScale===100?fvRaw+"/100":fvRaw):"pending"}</span></div>
+      <div class="fc-note">Flavor blends ${t}'s draft habits (arm vs bat, HS vs college, early positional picks) with what their Top-30 system already looks like — is he their type?</div></div>`;
 
     // Panel 5 — Money
     const bonus = land ? negBonus(comp, land.slot, land.overall) : null;
@@ -3592,8 +3716,9 @@
         <div class="tc-stat"><div class="k">Combined fit</div><div class="v big">${combined}</div><div class="sub">${RF_LENSLBL[resFit.lens]==="Combined fit"?"weighted blend":"weighted"}</div></div>
         <div class="tc-stat"><div class="k">Interest</div><div class="v">${Math.round(100*f.interestN)}</div></div>
         <div class="tc-stat"><div class="k">Org·dev</div><div class="v">${Math.round(100*f.devN)}</div></div>
-        <div class="tc-stat"><div class="k">Type</div><div class="v">${Math.round(100*f.typeN)}</div></div>
+        <div class="tc-stat"><div class="k">Flavor</div><div class="v">${Math.round(100*f.flavorN)}</div></div>
         <div class="tc-stat"><div class="k">Money</div><div class="v">${Math.round(100*f.moneyN)}</div></div>
+        <div class="tc-stat"><div class="k">FV</div><div class="v">${f.fvKnown?Math.round(100*f.fvN):"—"}</div>${f.fvKnown?"":`<div class="sub">pending</div>`}</div>
       </div></div>
       <div class="fc-panels">${mobPanels(p1+p2+p3+p4+p5, fitPanelOpen)}</div>
     </div>`;
