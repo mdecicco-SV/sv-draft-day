@@ -276,11 +276,19 @@
   .bcard .bc-team { font-weight:900; font-size:14px; line-height:1.1; display:flex; align-items:center; gap:4px; }
   .bcard .bc-slot { font-size:10px; color:var(--muted); }
   .bcard .bc-player { font-weight:700; font-size:11px; flex:1; margin-top:3px; line-height:1.3; }
-  /* click-to-edit agency on the drafted-player vitals card */
-  .ag-edit { cursor:pointer; border-bottom:1px dashed var(--line); }
+  /* click-to-edit agency (player cards + Best Available table) — inline, no popup */
+  .ag-edit { cursor:pointer; border-bottom:1px dashed var(--line); white-space:nowrap; }
   .ag-edit:hover { color:var(--good); border-bottom-color:var(--good); }
-  .ag-pencil { font-size:10px; opacity:.45; margin-left:2px; }
+  .ag-edit.editing { border-bottom-color:transparent; }
+  .ag-pencil { font-size:10px; opacity:.35; margin-left:2px; }
   .ag-edit:hover .ag-pencil { opacity:1; }
+  .ag-input { font:inherit; color:inherit; width:12ch; max-width:160px; padding:1px 4px;
+    border:1px solid var(--good); border-radius:4px; background:var(--bg,#fff); outline:none; }
+  /* Best Available: drafted players toggled back on — dimmed, with where they actually went */
+  table.ba tr.ba-drafted { opacity:.5; }
+  table.ba tr.ba-drafted:hover { opacity:.8; }
+  .ba-gone { font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap; display:inline-flex; align-items:center; gap:4px; }
+  .ba-gone .tg { font-size:9px; }
   /* drafted-tile advisory lines: pos · agency · school, then bonus when known */
   .bcard .bc-meta { font-size:9px; color:var(--muted); font-weight:600; line-height:1.3; margin-top:1px; }
   .bcard .bc-bonus { font-size:10px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px; display:flex; align-items:center; gap:3px; flex-wrap:wrap; }
@@ -1066,6 +1074,7 @@
       <label>Level <select id="fLevel" onchange="renderBest()"><option>All</option><option>HS</option><option>College</option><option>JUCO</option></select></label>
       <label>Pos <select id="fPos" onchange="renderBest()"><option>All</option><option>P</option><option>C</option><option>IF</option><option>OF</option></select></label>
       <label><input type="checkbox" id="fSv" onchange="renderBest()"> SV clients only</label>
+      <label><input type="checkbox" id="fDrafted" onchange="renderBest()"> Show drafted</label>
       <input id="fQuery" placeholder="search name / school" oninput="renderBest()" style="min-width:180px" />
       <span class="count" id="baCount"></span>
     </div>
@@ -1221,16 +1230,40 @@
   let AGENCIES = {};   // normName -> agency string
   try { AGENCIES = JSON.parse(localStorage.getItem("dd:agencies") || "{}"); } catch (e) {}
   const agentOf = (comp) => comp ? (AGENCIES[normName(comp.name)] || comp.agent || "") : "";
-  window.editAgency = (key) => {
+  const escAttr = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  // Inline-editable agency cell: renders a click-to-edit chip; used on the player cards and
+  // the Best Available table. `key` must already be quote-escaped by the caller.
+  const agEditCell = (key, comp) => {
+    const v = agentOf(comp);
+    return `<span class="ag-edit" title="Click to edit agency" onclick="beginAgencyEdit(this,'${key}',event)">`
+      + `<span class="ag-val">${v ? escAttr(v) : "—"}</span> <span class="ag-pencil">✎</span></span>`;
+  };
+  // Click → swap the chip for an inline input in place (no popup). Enter/blur commits, Esc cancels.
+  // stopPropagation keeps a table row's click-to-open from firing while editing.
+  window.beginAgencyEdit = (el, key, e) => {
+    if (e) e.stopPropagation();
+    if (el.querySelector("input")) return;             // already editing
     const cur = AGENCIES[key] || (DATA.compByName.get(key)?.agent) || "";
-    const next = window.prompt("Representing agency", cur);
-    if (next === null) return;                       // cancelled
-    const val = next.trim();
+    el.classList.add("editing");
+    el.innerHTML = `<input class="ag-input" value="${escAttr(cur)}" placeholder="agency" spellcheck="false">`;
+    const inp = el.querySelector("input");
+    inp.focus(); inp.select();
+    inp.onclick = (ev) => ev.stopPropagation();
+    inp.onkeydown = (ev) => {
+      ev.stopPropagation();
+      if (ev.key==="Enter") inp.blur();
+      else if (ev.key==="Escape") { inp.dataset.cancel="1"; inp.blur(); }
+    };
+    inp.onblur = () => { if (inp.dataset.cancel) { renderActive(); return; } commitAgency(key, inp.value); };
+  };
+  function commitAgency(key, val) {
+    val = (val||"").trim();
+    const prev = AGENCIES[key] || "";
     if (val) AGENCIES[key] = val; else delete AGENCIES[key];
     try { localStorage.setItem("dd:agencies", JSON.stringify(AGENCIES)); } catch (e) {}
     renderActive();
-    postIntel({ kind:"agency", player_name:clientName(key), note:val }, true);   // share (best-effort)
-  };
+    if (val !== prev) postIntel({ kind:"agency", player_name:clientName(key), note:val }, true);  // share (best-effort)
+  }
   const TEAMINTEL_URL = "https://sv-teamintel.vercel.app/teamintel.json";
   // sv-teamintel's shared per-pick "in play" checkboxes (Draft Card `pk|player|team` overrides):
   // key ABSENT = in play at every one of that team's picks; present = whitelist of pick numbers.
@@ -2149,31 +2182,46 @@
   function renderBest() {
     if (!currentState) return;
     hideRanks(); // rows re-render in place — don't strand an open hover card
-    const drafted = new Set(currentState.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
+    const draftedBy = new Map(currentState.picks.filter(p=>p.isDrafted&&p.player).map(p=>[normName(p.player), p]));
     const lvl = $("fLevel").value, pos = $("fPos").value, svOnly = $("fSv").checked, q = normName($("fQuery").value);
+    const showDrafted = $("fDrafted")?.checked;
     const clickable = MODE==="mock" && !mock.running && currentState.onClock;
     const rows = DATA.composite.filter(p => {
-      if (drafted.has(normName(p.name))) return false;
+      if (draftedBy.has(normName(p.name)) && !showDrafted) return false;
       if (lvl!=="All" && p.level!==lvl) return false;
       if (pos!=="All" && p.posGroup!==pos) return false;
       if (svOnly && !DATA.clients.has(normName(p.name))) return false;
       if (q && !(normName(p.name).includes(q) || normName(p.school).includes(q))) return false;
       return true;
     });
-    $("baCount").textContent = `${rows.length} available${clickable?" · mock paused: use a row's Draft button":""}`;
+    // DATA.composite is board-rank order, so drafted rows slot back into their original board
+    // position — the gap between their rank and where they actually went is the comparison.
+    const openCount = rows.filter(p=>!draftedBy.has(normName(p.name))).length;
+    const goneCount = rows.length - openCount;
+    $("baCount").textContent = `${openCount} available${showDrafted&&goneCount?` · ${goneCount} drafted shown`:""}${clickable?" · mock paused: use a row's Draft button":""}`;
     // Row click opens the player profile — drafting is only ever the explicit Draft button
     // (shown when a paused mock is on the clock), so a stray click can't take a player.
     $("baBody").innerHTML = rows.map(p => {
       const ours = DATA.clients.has(normName(p.name)), qn = p.name.replace(/'/g,"\\'");
       const pkey = normName(p.name).replace(/'/g,"\\'");
       const nSrc = RANK_SRCS.filter(([f]) => p[f]!=null).length;
-      return `<tr class="${ours?"sv":""} clickrow" onclick="openPlayer('${pkey}')">
+      const dpk = draftedBy.get(normName(p.name));
+      // where he actually went vs his board rank: +N = slipped past rank, −N = went ahead of it
+      let lastCol;
+      if (dpk) {
+        const delta = p.rank!=null && dpk.overall!=null ? dpk.overall - p.rank : null;
+        const dtag = delta==null ? "" : ` <span class="tg ${delta>2?'under':delta<-2?'over':'fit'}">${delta>0?`+${delta}`:delta} vs board</span>`;
+        lastCol = `<span class="ba-gone">→ #${dpk.overall} ${dpk.team}${dtag}</span>`;
+      } else {
+        lastCol = clickable?`<button class="ctl ba-draft-btn" onclick="event.stopPropagation();draftManual('${qn}')">Draft</button>`:"";
+      }
+      return `<tr class="${ours?"sv":""}${dpk?" ba-drafted":""} clickrow" onclick="openPlayer('${pkey}')">
         <td class="rk">#${p.rank}</td><td>${p.name} ${ours?'<span class="svtag">SV</span>':""}${MOBILE.matches&&p.school?`<div class="ba-sub">${p.school}</div>`:""}</td>
         <td>${p.pos}</td><td><span class="lvl ${p.level}">${p.level}</span></td>
-        <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${p.commit||"—"}</td><td class="hide-sm">${p.agent||"—"}</td><td class="hide-sm">${fmtAge(p.age)}</td><td>${fmtBT(p)}</td>
+        <td class="hide-sm">${p.school||""}</td><td class="hide-sm">${p.commit||"—"}</td><td class="hide-sm">${ours?(agentOf(p)||"—"):agEditCell(pkey, p)}</td><td class="hide-sm">${fmtAge(p.age)}</td><td>${fmtBT(p)}</td>
         <td class="sr-col hide-sm"><span class="rks-chip" onmouseenter="showRanks(this,'${pkey}')" onmouseleave="hideRanks()">${nSrc?`${nSrc} board${nSrc>1?"s":""}`:"—"}</span></td>
         <td class="hide-sm">${trendCell(p)}</td>
-        <td class="ba-draft">${clickable?`<button class="ctl ba-draft-btn" onclick="event.stopPropagation();draftManual('${qn}')">Draft</button>`:""}</td></tr>`;
+        <td class="ba-draft">${lastCol}</td></tr>`;
     }).join("") || `<tr><td colspan="12" style="color:#9aa0a6;padding:14px">No players match these filters.</td></tr>`;
   }
   // Composite-rank trend across ranking editions (baked from rank_history.json; the point
@@ -4052,9 +4100,7 @@
     const positions = [...new Set([pk.pos, comp?.pos].filter(Boolean).flatMap(s=>String(s).split(/[\/,]/).map(x=>x.trim())).filter(Boolean))].join(" / ");
     const level = comp ? levelClass(comp).replace("College-","College ") : (pk.schoolClass || "—");
     const eb = effectiveBonus(pk), lb = bonusFor(c.key);
-    const agKey = c.key.replace(/'/g,"\\'");
-    const ag = agentOf(comp);
-    const agCell = `<span class="ag-edit" title="Click to edit agency" onclick="editAgency('${agKey}')">${ag || "—"} <span class="ag-pencil">✎</span></span>`;
+    const agCell = agEditCell(c.key.replace(/'/g,"\\'"), comp);
     let h = `<div class="cc"><div class="detail-head">${teamLogo(pk.team,32)}<span class="big">${displayName}</span>
       <span class="pl">drafted #${pk.overall} · ${roundLabel(pk.round)} · ${pk.teamName||pk.team}</span></div>`;
     h += `<div class="pool-row" style="margin-top:12px">${[
@@ -4161,7 +4207,7 @@
       // Non-SV players: agency is click-to-edit; SV clients keep the static (self) representation.
       isClient
         ? (comp ? ["Agency", comp.agent||"—", comp.agent?"representation":"none listed"] : null)
-        : ["Agency", `<span class="ag-edit" title="Click to edit agency" onclick="editAgency('${kqk}')">${agentOf(comp)||"—"} <span class="ag-pencil">✎</span></span>`, "click to edit"],
+        : ["Agency", agEditCell(kqk, comp), "click to edit"],
     ].filter(Boolean);
     const rkChips = comp ? RANK_SRCS.map(([f,label,mk]) => {
       const d = srcAsOf(mk);
