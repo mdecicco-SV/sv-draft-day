@@ -1,0 +1,352 @@
+{
+  "Aiden Robbins": {
+    "fv": 43,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 99
+  },
+  "Logan Schmidt": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Myles Bailey": {
+    "fv": 45,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 100
+  },
+  "Ace Reese": {
+    "fv": 47,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Tre Broussard": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Blake Bowen": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Carson Tinney": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Joseph Contreras": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Coleman Borthwick": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Gavin Grahovac": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Aidan Teel": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Roch Cholowsky": {
+    "fv": 55,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Drew Burress": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Alex Kranzler": {
+    "fv": 35,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "draftProb": 83
+  },
+  "Maddox Molony": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Kyle Jones": {
+    "fv": 39,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 82
+  },
+  "Savion Sims": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Connor Comeau": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Chris Hacopian": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Beau Peterson": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Jackson Flora": {
+    "fv": 50,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Joe Tiroly": {
+    "fv": 40,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 92
+  },
+  "Aiden Ruiz": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Chase Brunson": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Ben Tryon": {
+    "fv": 37,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 59
+  },
+  "Justin Lebron": {
+    "fv": 47,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Brady Neal": {
+    "fv": 38,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 76
+  },
+  "Lucas Steele": {
+    "fv": 35,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 2 (Regular)",
+    "draftProb": 22
+  },
+  "Carson Wiggins": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Rocco Maniscalco": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Caden Sorrell": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Boston Torres": {
+    "fv": 39,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 85
+  },
+  "Ethan Lay": {
+    "fv": 32,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "draftProb": 30
+  },
+  "Denton Lord": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Keon Johnson": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Zion Rose": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Jensen Hirschkorn": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Tyler Spangler": {
+    "fv": 47,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Jacob Lombard": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Cameron Flukey": {
+    "fv": 47,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Grady Emerson": {
+    "fv": 50,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Mason Eckelman": {
+    "fv": 39,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 83
+  },
+  "Liam Peterson": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "AJ Gracia": {
+    "fv": 50,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Eric Becker": {
+    "fv": 47,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Braydon Wisener": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Sawyer Strosnider*": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Bryce Fowler": {
+    "fv": 33,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 2 (Regular)",
+    "draftProb": 7
+  },
+  "Joey Volchko": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Ryder Helfrick": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Gio Rojas": {
+    "fv": 47,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Vahn Lackey": {
+    "fv": 50,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Chris Rembert*": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Will Brick": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Kaden Waechter": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Duke McCarron": {
+    "fv": 30,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "draftProb": 17
+  },
+  "Carson Bolemon": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Lee Ellis": {
+    "fv": 37,
+    "source": "SVM",
+    "asOf": "2026-05-13",
+    "tier": "Tier 1 (Impact)",
+    "draftProb": 53
+  },
+  "Tyler Bell*": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Jarren Advincula": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Henry Ford": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Caden Bogenpohl": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Derek Curiel*": {
+    "fv": 42,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Shane Sdao": {
+    "fv": 40,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  },
+  "Trevor Condon": {
+    "fv": 45,
+    "source": "FG",
+    "asOf": "2026-06-29"
+  }
+}
