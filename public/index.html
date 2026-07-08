@@ -631,6 +631,13 @@
   .fc-blend .db i { display:block; height:100%; border-radius:4px; }
   .fc-blend .fc-contrib { font-size:9.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; margin-top:2px; }
   .fc-note { font-size:10.5px; color:var(--muted); font-weight:600; line-height:1.5; margin-top:8px; border-top:1px solid var(--line); padding-top:8px; }
+  /* fit-card consensus-board strip (rank + trend feed) */
+  .fc-board { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:7px 22px; border-bottom:1px solid var(--line); background:#fbfbfc; font-size:12px; }
+  .fc-board-k { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+  .fc-board b { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; }
+  .fc-board .rt-up { color:#1a7f37; font-weight:900; } .fc-board .rt-down { color:#c8102e; font-weight:900; } .fc-board .rt-flat { color:var(--muted); font-weight:900; }
+  .fc-board-src { font-size:10.5px; font-weight:700; color:var(--muted); }
+  .fc-board-note { margin-left:auto; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); }
   .fc-verdict { display:inline-block; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.4px; padding:2px 8px; border-radius:6px; margin-bottom:8px; }
   .fc-verdict.strong { background:#dff2df; color:#1a7f37; }
   .fc-verdict.onbrand { background:#eef0f3; color:var(--ink); }
@@ -1396,7 +1403,7 @@
   const isPitcher = (pos) => /(^|\b)(P|RHP|LHP|SP|RP)\b/i.test(pos || "");
   const COLOR_HEX = { green:"#1a7f37","light green":"#86c98b", yellow:"#e3b505", orange:"#e8820e", red:"#C8102E" };
 
-  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], fv:{}, fvMeta:{}, fvScale:80 };
+  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], fv:{}, fvMeta:{}, fvScale:80, rankTrend:{} };
   let boardSelClients = new Set(); // empty = Big Board (show every pick's in-play cluster);
                                    // non-empty = focus these clients' intel across the board
   let playerMenuOpen = false;      // Players dropdown open state (survives board re-renders)
@@ -1563,6 +1570,13 @@
         }
         DATA.fv=m; DATA.fvMeta=meta; DATA.fvScale = mx>80 ? 100 : 80;
       } catch(e){ DATA.fv={}; }
+      // Rank + trend — optional consensus-board feed (rankings-tracker composite/trend/mock).
+      // Distinct from FV: market position + momentum, not projected value.
+      try {
+        const rt = await fetch("/data/ranktrend.json",{cache:"no-store"}).then(r=>r.ok?r.json():{}).catch(()=>({}));
+        const m={}; for (const k in rt){ if(rt[k]) m[normName(k)]=rt[k]; }
+        DATA.rankTrend=m;
+      } catch(e){ DATA.rankTrend={}; }
     } catch (e) {}
     await loadTeamIntel();
   }
@@ -1806,6 +1820,19 @@
   function fvRawOf(comp){ if(!comp) return null; const v=DATA.fv[normName(comp.name)]; return Number.isFinite(v)?v:null; }
   function fvMetaOf(comp){ return comp ? (DATA.fvMeta[normName(comp.name)]||null) : null; }
   const fvSrcLabel = (s) => s==="FG" ? "FanGraphs" : s==="SVM" ? "SV model" : s || "";
+  // ---- Rank + trend (consensus board position + momentum), separate from FV ----
+  function rankTrendOf(comp){ return comp ? (DATA.rankTrend[normName(comp.name)]||null) : null; }
+  // net spots risen (positive = moved up the board) → arrow + color; accepts trend:"up|down|flat" or delta
+  function rtArrow(rt){ if(!rt) return null;
+    const d = Number.isFinite(rt.delta) ? rt.delta : rt.trend==="up" ? 1 : rt.trend==="down" ? -1 : 0;
+    if (d>0) return {ch:"▲", cls:"rt-up", n:rt.delta}; if (d<0) return {ch:"▼", cls:"rt-down", n:rt.delta};
+    return {ch:"▬", cls:"rt-flat", n:0}; }
+  function rtSummary(comp){ const rt=rankTrendOf(comp); if(!rt) return "";
+    const a=rtArrow(rt), r = rt.rank!=null ? `#${Math.round(rt.rank*10)/10}` : "";
+    const mv = a && Number.isFinite(a.n) && a.n!==0 ? ` ${a.ch}${Math.abs(a.n)}` : a ? ` ${a.ch}` : "";
+    const src = rt.sources ? ` · ${rt.sources} src` : "";
+    const mock = rt.mock && rt.mock.team ? ` · mock ${rt.mock.team}${rt.mock.pick?" #"+rt.mock.pick:""}` : "";
+    return `board ${r}${mv}${src}${mock}`.trim(); }
   // ---- Flavor lens helpers: org positional identity (Top-30 system composition + draft habit) ----
   const _posSysCache=new Map();
   function orgPosSystem(team){ if(_posSysCache.has(team)) return _posSysCache.get(team);
@@ -3566,7 +3593,8 @@
       // header text is rotated 180° (vertical-rl), which flips the glyph — emit the inverse so
       // descending reads as a visual down-arrow (biggest fit on top)
       const isSort = resFit.sortCol===key, arrow = isSort ? (resFit.sortDir==="asc"?" ▼":" ▲") : "";
-      return `<th class="rf-ph${isSort?' rf-sorted':''}" title="Sort teams by ${resFit.lens==="combined"?"fit":RF_LENSLBL[resFit.lens]} for ${_esc(c.name)}" onclick="rfSortCol('${key}')"><span class="rf-phn">${_esc(last)} #${c.rank}${arrow}</span></th>`; }).join("");
+      const rtS = rtSummary(c);
+      return `<th class="rf-ph${isSort?' rf-sorted':''}" title="Sort teams by ${resFit.lens==="combined"?"fit":RF_LENSLBL[resFit.lens]} for ${_esc(c.name)}${rtS?" · "+rtS:""}" onclick="rfSortCol('${key}')"><span class="rf-phn">${_esc(last)} #${c.rank}${arrow}</span></th>`; }).join("");
     h += `</tr></thead><tbody>`;
     for (const t of teams) {
       const o = DATA.orgs[t] || {};
@@ -3721,6 +3749,13 @@
         ${teamLogo(t,22)}<span class="tc-abbr">${t}</span><span class="fc-sub">${teamName?_esc(teamName)+" · ":""}org #${o.orgRank!=null?Math.round(o.orgRank):"—"}</span>
         <button class="tc-x" onclick="closeFitCard()">✕</button>
       </div>
+      ${(()=>{ const rt=rankTrendOf(comp); if(!rt) return ""; const a=rtArrow(rt);
+        return `<div class="fc-board"><span class="fc-board-k">Consensus board</span>
+          <b>${rt.rank!=null?"#"+(Math.round(rt.rank*10)/10):"—"}</b>
+          ${a?`<span class="${a.cls}">${a.ch}${Number.isFinite(a.n)&&a.n!==0?Math.abs(a.n):""}</span>`:""}
+          ${rt.sources?`<span class="fc-board-src">${rt.sources} sources</span>`:""}
+          ${rt.mock&&rt.mock.team?`<span class="fc-board-src">latest mock → ${_esc(rt.mock.team)}${rt.mock.pick?" #"+rt.mock.pick:""}${rt.mock.source?` (${_esc(rt.mock.source)})`:""}</span>`:""}
+          <span class="fc-board-note">market position — distinct from FV</span></div>`; })()}
       <div class="tc-band"><div class="tc-stats">
         <div class="tc-stat"><div class="k">Combined fit</div><div class="v big">${combined}</div><div class="sub">${RF_LENSLBL[resFit.lens]==="Combined fit"?"weighted blend":"weighted"}</div></div>
         <div class="tc-stat"><div class="k">Interest</div><div class="v">${Math.round(100*f.interestN)}</div></div>
