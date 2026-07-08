@@ -1396,7 +1396,7 @@
   const isPitcher = (pos) => /(^|\b)(P|RHP|LHP|SP|RP)\b/i.test(pos || "");
   const COLOR_HEX = { green:"#1a7f37","light green":"#86c98b", yellow:"#e3b505", orange:"#e8820e", red:"#C8102E" };
 
-  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], fv:{}, fvScale:80 };
+  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], fv:{}, fvMeta:{}, fvScale:80 };
   let boardSelClients = new Set(); // empty = Big Board (show every pick's in-play cluster);
                                    // non-empty = focus these clients' intel across the board
   let playerMenuOpen = false;      // Players dropdown open state (survives board re-renders)
@@ -1553,9 +1553,15 @@
       // FV (future value) — optional feed; missing file degrades to an empty map (FV reads neutral).
       try {
         const fvRaw = await fetch("/data/fv.json",{cache:"no-store"}).then(r=>r.ok?r.json():{}).catch(()=>({}));
-        const m={}; let mx=0;
-        for (const k in fvRaw){ const v=+fvRaw[k]; if(Number.isFinite(v)){ m[normName(k)]=v; if(v>mx)mx=v; } }
-        DATA.fv=m; DATA.fvScale = mx>80 ? 100 : 80;
+        const m={}, meta={}; let mx=0;
+        // accepts flat { name: 60 } OR rich { name: { fv, source, tier, asOf, draftProb } }
+        for (const k in fvRaw){ const rec=fvRaw[k];
+          const v = (rec && typeof rec==="object") ? +rec.fv : +rec;
+          if(!Number.isFinite(v)) continue;
+          const nk=normName(k); m[nk]=v; if(v>mx)mx=v;
+          if(rec && typeof rec==="object") meta[nk]={ source:rec.source||null, tier:rec.tier||null, asOf:rec.asOf||null, draftProb:(rec.draftProb ?? rec.draft_prob_pct ?? null) };
+        }
+        DATA.fv=m; DATA.fvMeta=meta; DATA.fvScale = mx>80 ? 100 : 80;
       } catch(e){ DATA.fv={}; }
     } catch (e) {}
     await loadTeamIntel();
@@ -1798,6 +1804,8 @@
     if(!Number.isFinite(v)) return null;
     return DATA.fvScale===100 ? Math.max(0,Math.min(1,v/100)) : Math.max(0,Math.min(1,(v-20)/60)); }
   function fvRawOf(comp){ if(!comp) return null; const v=DATA.fv[normName(comp.name)]; return Number.isFinite(v)?v:null; }
+  function fvMetaOf(comp){ return comp ? (DATA.fvMeta[normName(comp.name)]||null) : null; }
+  const fvSrcLabel = (s) => s==="FG" ? "FanGraphs" : s==="SVM" ? "SV model" : s || "";
   // ---- Flavor lens helpers: org positional identity (Top-30 system composition + draft habit) ----
   const _posSysCache=new Map();
   function orgPosSystem(team){ if(_posSysCache.has(team)) return _posSysCache.get(team);
@@ -1882,8 +1890,9 @@
       // FV
       const raw = fvRawOf(comp);
       if (raw != null) {
-        if (DATA.fvScale===100) reasons.push(`FV ${raw}/100 — ${raw>=75?"elite":raw>=60?"solid":"modest"} upside`);
-        else reasons.push(`FV ${raw} — ${raw>=60?"elite":raw>=50?"solid":"modest"} upside`);
+        const meta = fvMetaOf(comp), src = meta && meta.source ? ` (${fvSrcLabel(meta.source)})` : "";
+        if (DATA.fvScale===100) reasons.push(`FV ${raw}/100${src} — ${raw>=75?"elite":raw>=60?"solid":"modest"} upside`);
+        else reasons.push(`FV ${raw}${src} — ${raw>=60?"elite":raw>=50?"solid":"modest"} upside`);
       } else reasons.push(`FV pending — not yet scored`);
       const isP = comp ? isPitcher(comp.pos) : false;
       const B = leagueBaselines();
@@ -3682,7 +3691,7 @@
     const lvlPct = comp.level==="HS" ? o.hsPct : comp.level==="College" ? o.collegePct : null;
     const fr = flavorReasons(comp, t, state);
     const vcls = fr.verdict==="Strong flavor" ? "strong" : fr.verdict==="On-brand" ? "onbrand" : fr.verdict==="Against type" ? "against" : "neutral";
-    const fvRaw = fvRawOf(comp);
+    const fvRaw = fvRawOf(comp), fvMeta = fvMetaOf(comp);
     const p4 = `<div class="tc-panel" data-q="flavor"><h4><span class="n">4</span> Flavor — their type?</h4>
       <span class="fc-verdict ${vcls}">${_esc(fr.verdict)} · ${Math.round(100*f.flavorN)}</span>
       ${fr.reasons.length?`<ul class="fc-reasons">${fr.reasons.map(r=>`<li>${_esc(r)}</li>`).join("")}</ul>`:""}
@@ -3691,7 +3700,7 @@
       <div class="tc-kv"><span class="k">→ matches his side</span><span class="v">${o.earlyPitcherPct!=null?sideMatch+"%":"—"}</span></div>
       <div class="tc-kv"><span class="k">Org HS / College mix</span><span class="v">${o.hsPct!=null?`${o.hsPct}% HS · ${o.collegePct}% COL`:"—"}</span></div>
       <div class="tc-kv"><span class="k">→ matches his level</span><span class="v">${lvlPct!=null?lvlPct+"%":"—"}</span></div>
-      <div class="tc-kv"><span class="k">FV</span><span class="v">${fvRaw!=null?(DATA.fvScale===100?fvRaw+"/100":fvRaw):"pending"}</span></div>
+      <div class="tc-kv"><span class="k">FV${fvMeta&&fvMeta.source?` · ${fvSrcLabel(fvMeta.source)}`:""}</span><span class="v">${fvRaw!=null?(DATA.fvScale===100?fvRaw+"/100":fvRaw)+(fvMeta&&fvMeta.tier?` <span class="tg lvl-col">${_esc(fvMeta.tier)}</span>`:""):"pending"}</span></div>
       <div class="fc-note">Flavor blends ${t}'s draft habits (arm vs bat, HS vs college, early positional picks) with what their Top-30 system already looks like — is he their type?</div></div>`;
 
     // Panel 5 — Money
