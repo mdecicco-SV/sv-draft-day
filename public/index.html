@@ -1427,7 +1427,7 @@
   let ppPanelOpen = { comps:true };
   try { ppPanelOpen = JSON.parse(localStorage.getItem("dd:ppPanels")) || ppPanelOpen; } catch (e) {}
   // Team-fit card accordion (mobile) — one-open, like the team card.
-  let fitPanelOpen = { blend:true };
+  let fitPanelOpen = { why:true };
   try { fitPanelOpen = JSON.parse(localStorage.getItem("dd:fitPanels")) || fitPanelOpen; } catch (e) {}
   const mobPanels = (html, open = mPanelOpen) => !MOBILE.matches ? html :
     html.replace(/<div class="tc-panel" data-q="(\w+)">/g, (m, q) => open[q] ? m : `<div class="tc-panel collapsed" data-q="${q}">`);
@@ -1524,16 +1524,18 @@
 
   async function loadStatic() {
     try {
-      const [c, o, lev, hg, meta, pros] = await Promise.all([
+      const [c, o, lev, hg, meta, pros, dh] = await Promise.all([
         fetch("/data/composite.json").then(r=>r.json()),
         fetch("/data/orgs.json").then(r=>r.json()),
         fetch("/data/leverage.json").then(r=>r.json()).catch(()=>null),
         fetch("/data/homegrown.json").then(r=>r.json()).catch(()=>null),
         fetch("/data/meta.json").then(r=>r.json()).catch(()=>null),
         fetch("/data/prospects.json").then(r=>r.json()).catch(()=>null),
+        fetch("/data/drafthist.json").then(r=>r.json()).catch(()=>null),
       ]);
       DATA.composite = c; DATA.orgs = o; DATA.leverage = lev; DATA.meta = meta;
       DATA.prospects = pros || {};   // Org Review MLB.com T30 per org (build_prospects.py)
+      DATA.drafthist = dh;           // 2018-25 rounds 1-10 picks + outcomes (build_drafthist.py)
       // homegrown-by-level (baked from MLB StatsAPI, keyed by team id) → org records,
       // with each team's league rank on the two homegrown percentages
       if (hg) {
@@ -1869,6 +1871,88 @@
   // same, for small positional shares: scale the deviation by the league share so C (rare) is fair
   const _relG=(org,lg)=>Math.max(0,Math.min(1,0.5+0.6*(((org||0)-(lg||0))/Math.max(lg||0,0.08))));
 
+  // ---- Track-record lens: org draft history by position group + price bucket (drafthist.json,
+  // 2018-25 rounds 1-10, outcome baked per pick: mlb / t30 / act / out). A "hit" = reached MLB
+  // or currently a Top-30 prospect — young classes deflate every org's raw rate equally (same
+  // year mix), so vs-league comparison stays fair.
+  const HIST_BUCKETS = [[0,5e5,"<$500K"],[5e5,1e6,"$500K–$1M"],[1e6,4e6,"$1M–$4M"],[4e6,Infinity,"$4M+"]];
+  const bucketOf = (bon) => bon==null ? -1 : HIST_BUCKETS.findIndex(([lo,hi])=>bon>=lo&&bon<hi);
+  const isHit = (p) => p.out==="mlb" || p.out==="t30";
+  // player's price bucket from his market value (slot $ at his composite rank) — team-independent
+  const playerBucket = (comp) => { const m = slotForRank(comp&&comp.rank); return { est: m||null, idx: bucketOf(m) }; };
+  let _histAgg = null;
+  function histAgg() {
+    if (_histAgg) return _histAgg;
+    if (!DATA.drafthist || !DATA.drafthist.orgs) return null;
+    const blank = () => ({ n:0, hit:0, mlb:0, t30:0 });
+    const lgG = {}, lgB = {}, teams = {};
+    for (const [t, picks] of Object.entries(DATA.drafthist.orgs)) {
+      const byG = {}, byB = {};
+      for (const p of picks) {
+        const bi = bucketOf(p.bon), h = isHit(p);
+        for (const [store, key] of [[byG,p.g],[lgG,p.g],[byB,bi],[lgB,bi]]) {
+          if (key==null || key==="?" || key===-1) continue;
+          const s = store[key] || (store[key] = blank());
+          s.n++; if (h) s.hit++; if (p.out==="mlb") s.mlb++; if (p.out==="t30") s.t30++;
+        }
+      }
+      teams[t] = { byG, byB, picks };
+    }
+    return _histAgg = { teams, lgG, lgB };
+  }
+  // shrink small samples toward the league rate, then read the deviation as a 0-1 signal
+  const _shrunk = (s, lgRate, K=6) => s && s.n ? (s.hit + K*lgRate)/(s.n + K) : lgRate;
+  function histSignal(team, g, bIdx) {
+    const A = histAgg();
+    if (!A || !A.teams[team]) return { histN:0.5, known:false };
+    const T = A.teams[team], out = { histN:0.5, known:true };
+    const sigs = [];
+    if (g && g!=="?" && A.lgG[g]) {
+      const lg = A.lgG[g].hit/A.lgG[g].n, s = T.byG[g];
+      out.pos = { ...(s||{n:0,hit:0,mlb:0,t30:0}), lgRate:lg, rate:_shrunk(s,lg) };
+      sigs.push(Math.max(0, Math.min(1, 0.5 + 2.5*(out.pos.rate - lg))));
+    }
+    if (bIdx>=0 && A.lgB[bIdx]) {
+      const lg = A.lgB[bIdx].hit/A.lgB[bIdx].n, s = T.byB[bIdx];
+      out.bucket = { ...(s||{n:0,hit:0,mlb:0,t30:0}), lgRate:lg, rate:_shrunk(s,lg), label:HIST_BUCKETS[bIdx][2] };
+      sigs.push(Math.max(0, Math.min(1, 0.5 + 2.5*(out.bucket.rate - lg))));
+    }
+    if (sigs.length) out.histN = sigs.reduce((a,b)=>a+b,0)/sigs.length;
+    return out;
+  }
+  // Pipeline lens: how much of the player's position group the org's Top-30 already carries,
+  // vs the league norm for that group (a SS isn't judged against pitcher counts). More than
+  // the field = they collect his type.
+  function pipeSignal(team, g) {
+    const ps = orgPosSystem(team), B = leagueBaselines();
+    if (!ps || !g || g==="?" || ps[g]==null) return { pipeN:0.5, known:false };
+    return { pipeN:_relG(ps[g], B.sys[g]), known:true,
+      count: Math.round(ps[g]*ps.n), total: ps.n, lgAvg: B.sys[g]*ps.n };
+  }
+  // The comp: the org's most recent pick that looks like this player — cascade from strictest
+  // (group + HS/college + bats-or-throws side + price bucket) down to group-only.
+  function findComp(team, comp, bIdx) {
+    const A = histAgg(); if (!A || !A.teams[team] || !comp) return null;
+    const picks = A.teams[team].picks;   // pre-sorted: newest year first
+    const g = comp.posGroup || posGroupOf(comp.pos);
+    const lvl = comp.level==="HS" ? "HS" : comp.level==="College" ? "C" : null;
+    const side = isPitcher(comp.pos) ? (comp.throws||null) : (comp.bats||null);
+    const sideOf = (p) => p.g==="P" ? p.t : p.b;
+    const tiers = [
+      [p => p.g===g && (!lvl||p.lvl===lvl) && (!side||sideOf(p)===side) && (bIdx<0||bucketOf(p.bon)===bIdx), "same level · side · price"],
+      [p => p.g===g && (!lvl||p.lvl===lvl) && (bIdx<0||bucketOf(p.bon)===bIdx), "same level · price"],
+      [p => p.g===g && (bIdx<0||bucketOf(p.bon)===bIdx), "same price"],
+      [p => p.g===g && (!lvl||p.lvl===lvl), "same level"],
+      [p => p.g===g, "same position group"],
+    ];
+    for (const [test, label] of tiers) {
+      const hit = picks.find(test);
+      if (hit) return { pick: hit, match: label };
+    }
+    return null;
+  }
+  const OUT_LBL = { mlb:["MLB","reached the majors"], t30:["T30","current Top-30 prospect"], act:["IN SYS","still in the system"], out:["OUT","out of pro ball"] };
+
   // landing-spot fit FOR the client: interest 45 / dev 20 / type 15 / money 20, where
   // interest is the full-history aggregate (teamInterest). Interest-dominant by design.
   function fit(comp, team, clientKey, state) {
@@ -1902,13 +1986,19 @@
     const fvv = comp ? fvNormOf(comp) : null;
     const fvN = fvv==null ? 0.5 : fvv;
     const fvKnown = fvv!=null;
+    // Track record + pipeline (drafthist-driven; 0.5-neutral until the file loads)
+    const g = comp ? (comp.posGroup || posGroupOf(comp.pos)) : null;
+    const pb = comp ? playerBucket(comp) : { est:null, idx:-1 };
+    const hist = comp ? histSignal(team, g, pb.idx) : { histN:0.5, known:false };
+    const pipe = comp ? pipeSignal(team, g) : { pipeN:0.5, known:false };
     const pool = state.poolsMap[team];
     const moneyN = pool && pool.ceiling ? Math.max(0, Math.min(1, pool.room/pool.ceiling)) : 0.5;
     const score = Math.round(100*(0.45*interestN + 0.20*devN + 0.15*typeN + 0.20*moneyN));
     // org fit = interest/dev/type only (money excluded), renormalized — lets a strong intel/org
     // fit surface at a slot even when the team's money doesn't work.
     const orgScore = Math.round(100*(0.45*interestN + 0.20*devN + 0.15*typeN)/0.80);
-    return { score, orgScore, interestN, devN, typeN, moneyN, flavorN, fvN, fvKnown };
+    return { score, orgScore, interestN, devN, typeN, moneyN, flavorN, fvN, fvKnown,
+      histN:hist.histN, hist, pipeN:pipe.pipeN, pipe, bucketEst:pb.est, bucketIdx:pb.idx };
   }
 
   // "Is player Y team X's flavor, and why?" — verdict + 2-4 concise reason strings.
@@ -3420,9 +3510,17 @@
     "AL West":["HOU","LAA","ATH","SEA","TEX"], "NL East":["ATL","MIA","NYM","PHI","WSH"],
     "NL Central":["CHC","CIN","MIL","PIT","STL"], "NL West":["ARI","COL","LAD","SD","SF"],
   };
-  const RF_LENSES = [["combined","Combined"],["interest","Interest"],["dev","Org·dev"],["flavor","Flavor"],["money","Money"],["fv","FV"]];
-  const RF_LENSLBL = { combined:"Combined fit", interest:"Interest", dev:"Org·dev", flavor:"Flavor", money:"Money", fv:"FV" };
-  const RF_WDEF = { interest:35, dev:15, flavor:20, money:15, fv:15 };
+  // Four lenses, each answering a question Mike can say out loud on a call:
+  //   Interest — is this org actually on him? (SV intel)
+  //   Track record — have they hit on his position at his price before? (drafthist 2018-25)
+  //   Pipeline — does their Top-30 already collect his position group?
+  //   Money — can they pay him where he lands?
+  // (Old dev / flavor / FV lenses folded in or dropped: FV is the same for every org so it
+  // never re-ranks teams; org-wide dev now lives inside Track record's league-shrunk rates;
+  // flavor's HS/college + arm/bat story survives as "why" bullets on the fit card.)
+  const RF_LENSES = [["combined","Combined"],["interest","Interest"],["hist","Track record"],["pipe","Pipeline"],["money","Money"]];
+  const RF_LENSLBL = { combined:"Combined fit", interest:"Interest", hist:"Track record", pipe:"Pipeline", money:"Money" };
+  const RF_WDEF = { interest:40, hist:25, pipe:10, money:25 };
   const RF_DEF = () => ({ clientsSide:true, clientsOff:new Set(), boardSide:false, boardOn:new Set(),
     pos:new Set(), teamsOff:new Set(), gradeMin:0, lens:"combined", weights:{...RF_WDEF},
     wOpen:false, tOpen:false, sortCol:null, sortDir:"desc" });
@@ -3439,10 +3537,11 @@
       resFit.teamsOff = new Set(Array.isArray(sv.teamsOff)?sv.teamsOff:[]);
       resFit.gradeMin = +sv.gradeMin || 0;
       resFit.lens = RF_LENSLBL[sv.lens] ? sv.lens : "combined";
-      resFit.weights = Object.assign({...RF_WDEF}, sv.weights || {});
-      // migrate: Type renamed to Flavor; new FV lens gets its default weight
-      if ('type' in resFit.weights){ resFit.weights.flavor = resFit.weights.flavor ?? resFit.weights.type; delete resFit.weights.type; }
-      for (const k of ["interest","dev","flavor","money","fv"]) if (resFit.weights[k]==null) resFit.weights[k]=RF_WDEF[k];
+      // migrate: pre-simplification saves carried dev/flavor/fv weights — a stale mix has no
+      // meaning under the 4-lens blend, so any save without a 'hist' weight resets to defaults
+      resFit.weights = (sv.weights && sv.weights.hist!=null)
+        ? Object.assign({...RF_WDEF}, sv.weights) : {...RF_WDEF};
+      for (const k of Object.keys(resFit.weights)) if (RF_WDEF[k]==null) delete resFit.weights[k];
       resFit.wOpen = !!sv.wOpen; resFit.tOpen = !!sv.tOpen;
       resFit.sortCol = typeof sv.sortCol==="string" ? sv.sortCol : null;
       resFit.sortDir = sv.sortDir==="asc" ? "asc" : "desc";
@@ -3499,16 +3598,26 @@
     return Object.keys(DATA.orgs).filter(t=>!resFit.teamsOff.has(t))
       .sort((a,b) => ((DATA.orgs[a].orgRank??99)-(DATA.orgs[b].orgRank??99)));
   }
-  const rfWsum = () => { const w=resFit.weights; return (w.interest+w.dev+w.flavor+w.money+w.fv)||1; };
+  const rfWsum = () => { const w=resFit.weights; return (w.interest+w.hist+w.pipe+w.money)||1; };
+  const rfCombined = (f) => { const w=resFit.weights;
+    return Math.round(100*(w.interest*f.interestN+w.hist*f.histN+w.pipe*f.pipeN+w.money*f.moneyN)/rfWsum()); };
   function rfCellVal(f) {
     switch (resFit.lens) {
       case "interest": return Math.round(100*f.interestN);
-      case "dev":      return Math.round(100*f.devN);
-      case "flavor":   return Math.round(100*f.flavorN);
+      case "hist":     return Math.round(100*f.histN);
+      case "pipe":     return Math.round(100*f.pipeN);
       case "money":    return Math.round(100*f.moneyN);
-      case "fv":       return Math.round(100*f.fvN);
-      default: { const w=resFit.weights; return Math.round(100*(w.interest*f.interestN+w.dev*f.devN+w.flavor*f.flavorN+w.money*f.moneyN+w.fv*f.fvN)/rfWsum()); }
+      default:         return rfCombined(f);
     }
+  }
+  // one short clause per lens that moved — the cell tooltip's "why"
+  function rfWhyShort(f) {
+    const parts = [];
+    if (f.interestN>=0.4) parts.push("live interest"); else if (f.interestN>0) parts.push("some intel");
+    if (f.histN>=0.58) parts.push("proven at his position/price"); else if (f.histN<=0.42) parts.push("thin track record here");
+    if (f.pipeN>=0.62) parts.push("collects his type"); else if (f.pipeN<=0.38) parts.push("light on his group");
+    if (f.moneyN>=0.6) parts.push("money works"); else if (f.moneyN<=0.3) parts.push("pool is tight");
+    return parts.join(" · ") || "neutral across the board";
   }
   // light RdYlGn ramp — dark ink stays readable on every stop
   function rfHeat(v) {
@@ -3567,13 +3676,13 @@
       <span class="rf-wval" id="rfW_${k}">${Math.round(100*w[k]/wsum)}%</span></div>`;
     const weightsBox = `<div class="res-box rf-wbox">
       <div class="res-chead" onclick="rfToggleW()">Blend weights<span>${resFit.wOpen?"▾":"▸"}</span></div>
-      ${resFit.wOpen?`<div class="rf-wgrid">${sl("interest","Interest")}${sl("dev","Org·dev")}${sl("flavor","Flavor")}${sl("money","Money")}${sl("fv","FV")}
-        <div class="rf-wfoot"><span>Combined = weighted blend of the five lenses. Selecting a single lens shows it raw.</span>
-        <button class="tc-chip clear" onclick="rfWeightReset()">Reset 35·15·20·15·15</button></div></div>`:""}</div>`;
+      ${resFit.wOpen?`<div class="rf-wgrid">${sl("interest","Interest")}${sl("hist","Track record")}${sl("pipe","Pipeline")}${sl("money","Money")}
+        <div class="rf-wfoot"><span>Combined = weighted blend of the four lenses. Selecting a single lens shows it raw.</span>
+        <button class="tc-chip clear" onclick="rfWeightReset()">Reset 40·25·10·25</button></div></div>`:""}</div>`;
     el.innerHTML = `<div class="rf-controls">${playersRow}${posRow}${lensRow}${gradeRow}</div>${teamsBox}${weightsBox}`;
   }
   function rfWeightLabels() { const w=resFit.weights, s=rfWsum();
-    ["interest","dev","flavor","money","fv"].forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=Math.round(100*w[k]/s)+"%"; }); }
+    ["interest","hist","pipe","money"].forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=Math.round(100*w[k]/s)+"%"; }); }
 
   function renderRfGrid() {
     const wrap = $("rfGrid"); if (!wrap) return;
@@ -3607,7 +3716,7 @@
       for (const c of players) {
         const key = normName(c.name), f = fit(c, t, key, state), v = rfCellVal(f);
         const dim = v < resFit.gradeMin ? " rf-dim" : "", sortCls = resFit.sortCol===key ? " rf-colsort" : "";
-        h += `<td class="rf-cell${dim}${sortCls}" style="background:${rfHeat(v)}" title="${_esc(c.name)} → ${t}: ${v} — ${flavorVerdict(f.flavorN)}" onclick="openFitCard('${key}','${t}')">${v}</td>`;
+        h += `<td class="rf-cell${dim}${sortCls}" style="background:${rfHeat(v)}" title="${_esc(c.name)} → ${t}: ${v} — ${rfWhyShort(f)}" onclick="openFitCard('${key}','${t}')">${v}</td>`;
       }
       h += `</tr>`;
     }
@@ -3673,22 +3782,37 @@
     const teamName = (state.pools.find(p=>p.team===t)||{}).teamName || "";
     const w = resFit.weights, wsum = rfWsum();
     const f = fit(comp, t, key, state);
-    const combined = Math.round(100*(w.interest*f.interestN+w.dev*f.devN+w.flavor*f.flavorN+w.money*f.moneyN+w.fv*f.fvN)/wsum);
+    const combined = rfCombined(f);
     const isP = isPitcher(comp.pos);
     const ti = teamInterest(key, t), li = latestIntel(key, t);
     const land = tcNextLanding(state, t, comp) || teamNextPick(state, t);
     const pool = state.poolsMap[t];
     const pct = (x) => x==null ? "—" : Math.round(x*100)+"%";
     const rkChip = (n) => { if (n==null) return `<span class="hg-pct">—</span>`; const c = n<=10?"rk-hi":n<=20?"rk-mid":"rk-lo"; return `<span class="hg-pct ${c}">#${Math.round(n)}</span>`; };
+    const g = comp.posGroup || posGroupOf(comp.pos);
+    const theComp = findComp(t, comp, f.bucketIdx);
+    const outChip = (o) => { const [lbl] = OUT_LBL[o]||["?"]; const cls = o==="mlb"?"fit":o==="t30"?"late":o==="out"?"early":"";
+      return `<span class="tg ${cls}" title="${(OUT_LBL[o]||["","" ])[1]}">${lbl}</span>`; };
+    const bonus = land ? negBonus(comp, land.slot, land.overall) : null;
 
-    // Panel 1 — The Blend (independent lens grades + weighted contributions)
-    const lensRows = [["interest","Interest",f.interestN],["dev","Org·dev",f.devN],["flavor","Flavor",f.flavorN],["money","Money",f.moneyN],["fv","FV",f.fvN]]
-      .map(([k,l,v]) => { const wp=Math.round(100*w[k]/wsum), contrib=Math.round(100*(w[k]*v)/wsum);
-        return `<div class="fc-blend"><div class="fc-brow"><span>${l}</span><span>${Math.round(100*v)}<small> × ${wp}%</small></span></div>
-          <div class="db"><i style="width:${Math.round(v*100)}%;background:${rfDcol(v)}"></i></div>
-          <div class="fc-contrib">contributes +${contrib} to combined</div></div>`; }).join("");
-    const p1 = `<div class="tc-panel" data-q="blend"><h4><span class="n">1</span> The Blend</h4>${lensRows}
-      <div class="fc-note">Each lens grade is independent (0–100). The blend weights them into the <b>${combined}</b> combined fit — adjust weights in the controls to restack.</div></div>`;
+    // Panel 1 — Why: the answer Mike gives on a call, one plain sentence per lens.
+    const whyBullets = [];
+    whyBullets.push(ti.n
+      ? `Interest: ${ti.n} note${ti.n>1?"s":""} logged, strength ${Math.round(ti.strength*100)}${li&&li.date?` (latest ${li.date})`:""} — they're on him.`
+      : `Interest: no SV intel logged for ${t} — this fit rides on history and money.`);
+    if (f.hist && f.hist.pos) { const P=f.hist.pos;
+      whyBullets.push(`${g} track record: ${P.hit} of ${P.n} hits since '18 (${pct(P.hit/Math.max(P.n,1))} vs ${pct(P.lgRate)} league).`); }
+    if (f.hist && f.hist.bucket) { const B=f.hist.bucket;
+      whyBullets.push(`At his price (${B.label}): ${B.hit} of ${B.n} hits (${pct(B.n?B.hit/B.n:null)} vs ${pct(B.lgRate)} league).`); }
+    if (f.pipe && f.pipe.known)
+      whyBullets.push(`Pipeline: ${f.pipe.count} ${g} in their Top-30 vs ${f.pipe.lgAvg.toFixed(1)} league — ${f.pipeN>=0.58?"they collect his type":f.pipeN<=0.42?"light on his group":"about the field's mix"}.`);
+    if (pool && bonus!=null)
+      whyBullets.push(`Money: ${fmtM(pool.room)} of room vs ~${fmtM(bonus)} to sign — ${pool.room>=bonus?"fits":"short"}.`);
+    if (theComp) { const p=theComp.pick;
+      whyBullets.push(`The comp: ${p.name} '${String(p.y).slice(2)} (${p.pos} ${p.lvl==="HS"?"HS":"COL"}, ${p.bon?fmtM(p.bon):"—"}) — ${(OUT_LBL[p.out]||["",""])[1]}.`); }
+    const p1 = `<div class="tc-panel" data-q="why"><h4><span class="n">1</span> Why ${t}?</h4>
+      <ul class="fc-reasons">${whyBullets.map(r=>`<li>${_esc(r)}</li>`).join("")}</ul>
+      <div class="fc-note">Combined <b>${combined}</b> = Interest ${Math.round(100*w.interest/wsum)}% · Track record ${Math.round(100*w.hist/wsum)}% · Pipeline ${Math.round(100*w.pipe/wsum)}% · Money ${Math.round(100*w.money/wsum)}%.</div></div>`;
 
     // Panel 2 — Interest (SV intel)
     let p2i;
@@ -3705,39 +3829,33 @@
     const p2 = `<div class="tc-panel" data-q="interest"><h4><span class="n">2</span> Interest</h4>${p2i}
       <div class="tc-kv"><span class="k">Likely landing</span><span class="v">${land?`#${land.overall} · ${land.roundPick||("R"+land.round)}`:"no pick left"}</span></div></div>`;
 
-    // Panel 3 — Org-review dev-fit
-    const trends = o.trends || {}, dev = o.dev || {};
-    const tKeyN = isP ? ["ncaaPitcher","hsPitcher"] : ["ncaaPos","hsPos"];
-    const p3 = `<div class="tc-panel" data-q="dev"><h4><span class="n">3</span> Org-review dev-fit</h4>
-      <div class="tc-kv"><span class="k">Org rank (COMP)</span><span class="v">${rkChip(o.orgRank)}</span></div>
-      <div class="tc-kv"><span class="k">MLB debut rate</span><span class="v">${pct(dev.mlbDebut)}</span></div>
-      <div class="tc-kv"><span class="k">Reached arb</span><span class="v">${pct(dev.arb)}</span></div>
-      <div class="tc-kv"><span class="k">${isP?"Pitcher debut":"Position debut"}</span><span class="v">${pct(isP?dev.pitDebut:dev.posDebut)}</span></div>
-      <div class="tc-kv"><span class="k">Homegrown on roster</span><span class="v">${o.homegrown!=null?o.homegrown:"—"}</span></div>
-      <div class="tc-kv"><span class="k">${isP?"NCAA":"NCAA"} ${isP?"arm":"bat"} trend</span><span class="v">${pct(trends[tKeyN[0]])}</span></div>
-      <div class="tc-kv"><span class="k">HS ${isP?"arm":"bat"} trend</span><span class="v">${pct(trends[tKeyN[1]])}</span></div>
-      <div class="fc-note">Dev-fit rewards orgs that graduate & retain this player's archetype. Org rank drives the lens; the rates show how that rank is earned.</div></div>`;
+    // Panel 3 — Track record: this org × his position × his price, 2018-25 rounds 1-10.
+    const histRow = (lbl, S) => S ? `<div class="tc-kv"><span class="k">${lbl}</span><span class="v">${S.hit} of ${S.n} hit${S.mlb||S.t30?` <span class="sub">(${S.mlb} MLB · ${S.t30} T30)</span>`:""} · ${pct(S.n?S.hit/S.n:null)} vs ${pct(S.lgRate)} lg</span></div>` : "";
+    const compBlock = theComp ? (()=>{ const p=theComp.pick;
+      return `<div class="fc-note" style="margin-top:8px"><b>The comp</b> (${theComp.match}): ${_esc(p.name)} — ${p.y} R${p.rd} (#${p.ov}), ${p.pos} ${p.lvl==="HS"?"HS":"COL"}${p.b?`, ${p.g==="P"?"throws "+(p.t||"?"):"bats "+p.b}`:""}, ${p.bon?fmtM(p.bon):"bonus n/a"} ${outChip(p.out)}</div>`; })()
+      : `<div class="fc-note" style="margin-top:8px">No comparable pick found — ${t} hasn't taken a ${g} like him in rounds 1-10 since 2018.</div>`;
+    const p3 = `<div class="tc-panel" data-q="hist"><h4><span class="n">3</span> Track record — his position & price</h4>
+      ${f.hist&&f.hist.known?`
+      ${histRow(`${g} picks since '18`, f.hist.pos)}
+      ${f.hist.bucket?histRow(`${f.hist.bucket.label} picks`, f.hist.bucket):""}
+      <div class="tc-kv"><span class="k">His price bucket</span><span class="v">${f.bucketIdx>=0?HIST_BUCKETS[f.bucketIdx][2]:"—"}${f.bucketEst?` <span class="sub">(market ≈ ${fmtM(f.bucketEst)} at #${comp.rank})</span>`:""}</span></div>
+      <div class="tc-kv"><span class="k">Lens grade</span><span class="v">${Math.round(100*f.histN)}</span></div>
+      ${compBlock}
+      <div class="fc-note">A "hit" = reached MLB or sits on a current Top-30. Small samples are shrunk toward the league rate, so 2-for-3 doesn't read as elite.</div>`
+      :`<div class="fc-note">Draft-history feed not loaded — this lens reads neutral (50).</div>`}</div>`;
 
-    // Panel 4 — Flavor (positional identity match + explainer)
-    const lean = o.earlyPitcherPct!=null ? o.earlyPitcherPct : 50;
-    const sideMatch = isP ? lean : 100-lean;
-    const lvlPct = comp.level==="HS" ? o.hsPct : comp.level==="College" ? o.collegePct : null;
-    const fr = flavorReasons(comp, t, state);
-    const vcls = fr.verdict==="Strong flavor" ? "strong" : fr.verdict==="On-brand" ? "onbrand" : fr.verdict==="Against type" ? "against" : "neutral";
-    const fvRaw = fvRawOf(comp), fvMeta = fvMetaOf(comp);
-    const p4 = `<div class="tc-panel" data-q="flavor"><h4><span class="n">4</span> Flavor — their type?</h4>
-      <span class="fc-verdict ${vcls}">${_esc(fr.verdict)} · ${Math.round(100*f.flavorN)}</span>
-      ${fr.reasons.length?`<ul class="fc-reasons">${fr.reasons.map(r=>`<li>${_esc(r)}</li>`).join("")}</ul>`:""}
-      <div class="tc-kv"><span class="k">Player archetype</span><span class="v">${isP?"Pitcher":"Position"} · ${comp.level||"—"}</span></div>
-      <div class="tc-kv"><span class="k">Org early-pick lean</span><span class="v">${o.earlyPitcherPct!=null?`${lean}% arms`:"—"}</span></div>
-      <div class="tc-kv"><span class="k">→ matches his side</span><span class="v">${o.earlyPitcherPct!=null?sideMatch+"%":"—"}</span></div>
-      <div class="tc-kv"><span class="k">Org HS / College mix</span><span class="v">${o.hsPct!=null?`${o.hsPct}% HS · ${o.collegePct}% COL`:"—"}</span></div>
-      <div class="tc-kv"><span class="k">→ matches his level</span><span class="v">${lvlPct!=null?lvlPct+"%":"—"}</span></div>
-      <div class="tc-kv"><span class="k">FV${fvMeta&&fvMeta.source?` · ${fvSrcLabel(fvMeta.source)}`:""}</span><span class="v">${fvRaw!=null?(DATA.fvScale===100?fvRaw+"/100":fvRaw)+(fvMeta&&fvMeta.tier?` <span class="tg lvl-col">${_esc(fvMeta.tier)}</span>`:""):"pending"}</span></div>
-      <div class="fc-note">Flavor blends ${t}'s draft habits (arm vs bat, HS vs college, early positional picks) with what their Top-30 system already looks like — is he their type?</div></div>`;
+    // Panel 4 — Pipeline: his position group in their current Top-30, vs the league norm.
+    const p4 = `<div class="tc-panel" data-q="pipe"><h4><span class="n">4</span> Pipeline — his group in their Top-30</h4>
+      ${f.pipe&&f.pipe.known?`
+      <div class="tc-kv"><span class="k">${g} in their Top-30</span><span class="v">${f.pipe.count} of ${f.pipe.total}</span></div>
+      <div class="tc-kv"><span class="k">League average</span><span class="v">${f.pipe.lgAvg.toFixed(1)}</span></div>
+      <div class="tc-kv"><span class="k">Lens grade</span><span class="v">${Math.round(100*f.pipeN)}</span></div>
+      <div class="tc-kv"><span class="k">Draft habits</span><span class="v">${o.earlyPitcherPct!=null?`${isP?o.earlyPitcherPct:100-o.earlyPitcherPct}% early picks on ${isP?"arms":"bats"}`:"—"}</span></div>
+      <div class="tc-kv"><span class="k">HS / College mix</span><span class="v">${o.hsPct!=null?`${o.hsPct}% HS · ${o.collegePct}% COL`:"—"}</span></div>
+      <div class="fc-note">Counts are judged against the league norm for ${g} (every org carries more arms than shortstops). Above the field = they collect his type.</div>`
+      :`<div class="fc-note">No Top-30 feed for ${t} — this lens reads neutral (50).</div>`}</div>`;
 
     // Panel 5 — Money
-    const bonus = land ? negBonus(comp, land.slot, land.overall) : null;
     const fits = pool && bonus!=null ? pool.room >= bonus : null;
     const p5 = `<div class="tc-panel" data-q="money"><h4><span class="n">5</span> Money</h4>
       <div class="tc-kv"><span class="k">Pool room</span><span class="v">${pool?fmtM(pool.room):"—"}</span></div>
@@ -3762,12 +3880,11 @@
           ${rt.asOf?`<span class="fc-board-src">${_esc(rt.asOf)}</span>`:""}
           <span class="fc-board-note">market position — distinct from FV</span></div>`; })()}
       <div class="tc-band"><div class="tc-stats">
-        <div class="tc-stat"><div class="k">Combined fit</div><div class="v big">${combined}</div><div class="sub">${RF_LENSLBL[resFit.lens]==="Combined fit"?"weighted blend":"weighted"}</div></div>
+        <div class="tc-stat"><div class="k">Combined fit</div><div class="v big">${combined}</div><div class="sub">weighted blend</div></div>
         <div class="tc-stat"><div class="k">Interest</div><div class="v">${Math.round(100*f.interestN)}</div></div>
-        <div class="tc-stat"><div class="k">Org·dev</div><div class="v">${Math.round(100*f.devN)}</div></div>
-        <div class="tc-stat"><div class="k">Flavor</div><div class="v">${Math.round(100*f.flavorN)}</div></div>
+        <div class="tc-stat"><div class="k">Track record</div><div class="v">${Math.round(100*f.histN)}</div></div>
+        <div class="tc-stat"><div class="k">Pipeline</div><div class="v">${Math.round(100*f.pipeN)}</div></div>
         <div class="tc-stat"><div class="k">Money</div><div class="v">${Math.round(100*f.moneyN)}</div></div>
-        <div class="tc-stat"><div class="k">FV</div><div class="v">${f.fvKnown?Math.round(100*f.fvN):"—"}</div>${f.fvKnown?"":`<div class="sub">pending</div>`}</div>
       </div></div>
       <div class="fc-panels">${mobPanels(p1+p2+p3+p4+p5, fitPanelOpen)}</div>
     </div>`;
@@ -4590,6 +4707,11 @@
     });
     document.addEventListener("mousemove", (e) => {
       if (tip.style.display !== "block") return;
+      // live re-renders can replace the hovered node without ever firing
+      // mouseout, leaving the tip glued to the cursor — self-heal here
+      if (!(e.target.closest && (e.target.closest("[data-org]") || e.target.closest("[data-intel-key]")))) {
+        tip.style.display = "none"; return;
+      }
       let x = e.clientX + 14, y = e.clientY + 16;
       if (x + tip.offsetWidth > innerWidth) x = e.clientX - tip.offsetWidth - 14;
       if (y + tip.offsetHeight > innerHeight) y = e.clientY - tip.offsetHeight - 16;
@@ -4598,6 +4720,7 @@
     document.addEventListener("mouseout", (e) => {
       if (e.target.closest && (e.target.closest("[data-org]") || e.target.closest("[data-intel-key]"))) tip.style.display = "none";
     });
+    document.addEventListener("scroll", () => { tip.style.display = "none"; }, true);
   }
 
   // One-time backfill: ranges/medicals set before the shared-sync feature existed live only in

@@ -11,3 +11,4 @@ scratch/
 .env.*.local
 .sv-draft-console-pat
 .env*.local
+__pycache__/
