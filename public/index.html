@@ -4158,7 +4158,10 @@
       (comp && !isP) ? ["Throws", comp.throws||"—", ""] : null,
       ["School", schoolShort(comp?.school)||"—", ""],
       (comp && (comp.level==="HS" || comp.commit)) ? ["Commit", comp.commit||"—", comp.commit?"college commitment":"none listed"] : null,
-      comp ? ["Agency", comp.agent||"—", comp.agent?"representation":"none listed"] : null,
+      // Non-SV players: agency is click-to-edit; SV clients keep the static (self) representation.
+      isClient
+        ? (comp ? ["Agency", comp.agent||"—", comp.agent?"representation":"none listed"] : null)
+        : ["Agency", `<span class="ag-edit" title="Click to edit agency" onclick="editAgency('${kqk}')">${agentOf(comp)||"—"} <span class="ag-pencil">✎</span></span>`, "click to edit"],
     ].filter(Boolean);
     const rkChips = comp ? RANK_SRCS.map(([f,label,mk]) => {
       const d = srcAsOf(mk);
