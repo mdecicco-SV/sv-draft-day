@@ -470,6 +470,10 @@
   .tc-upc td { font-size:var(--fs-1h); font-weight:700; padding:3px 4px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .tc-upc td.pl { max-width:1px; width:38%; overflow:hidden; text-overflow:ellipsis; font-weight:700; }
   .tc-upc td .tg { font-size:9px; padding:1px 4px; }
+  .tc-upc td .t100b { flex:0 0 auto; color:var(--red); font-size:9px; font-weight:800; border:1px solid var(--red); border-radius:3px; padding:0 4px; margin-left:5px; vertical-align:middle; }
+  /* badge must survive the name cell's ellipsis: name shrinks, badge doesn't */
+  .tc-upc td.pl .plwrap { display:flex; align-items:center; min-width:0; }
+  .tc-upc td.pl .plwrap .pln { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tc-upc td.cur { color:var(--red); }
   .tc-cur-tag { font-size:9px; font-weight:800; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:1px 5px; margin-left:6px; }
   .tc-fit-strip { margin:0 22px 16px; border:1px solid var(--line); border-radius:12px; padding:13px 16px; display:flex; gap:22px; align-items:center; flex-wrap:wrap; background:#fbfbfc; }
@@ -3835,7 +3839,7 @@
   // depth he'd be walking into with this org.
   function renderTcProspects(team, sel) {
     let h = `<div class="tc-panel" data-q="prospects"><h4><span class="n">4</span> Top 30 Org Prospects</h4>`;
-    h += `<div class="tc-sub">MLB.com T30 · Org Review</div>`;
+    h += `<div class="tc-sub">Composite · MLB.com + Baseball America</div>`;
     const rows = (DATA.prospects && DATA.prospects[teamAlias(team)]) || [];
     if (!rows.length) return h + `<div class="placeholder">No prospect list for ${team}.</div></div>`;
     const selGrp = sel && sel.c.comp ? (sel.c.comp.posGroup || posGroupOf(sel.c.comp.pos)) : null;
@@ -3844,17 +3848,18 @@
       const match = selGrp && posGroupOf(r.pos)===selGrp;
       return `<tr${match?' style="background:#fff5f6"':''}>
         <td style="color:var(--muted)">${r.rank}</td>
-        <td class="pl">${r.name}</td>
-        <td style="${match?'color:var(--red);font-weight:800':'color:var(--muted)'}">${r.pos}</td>
+        <td class="pl">${r.t100?`<span class="plwrap"><span class="pln">${r.name}</span><span class="t100b" title="Top 100 — ${[r.t100.mlb?"MLB.com #"+r.t100.mlb:"",r.t100.ba?"BA #"+r.t100.ba:""].filter(Boolean).join(" · ")}">T100</span></span>`:r.name}</td>
+        <td style="${match?'color:var(--red);font-weight:800':'color:var(--muted)'}">${r.pos||"—"}</td>
         <td style="color:var(--muted)">${r.level||"—"}</td>
         <td>${r.age!=null?r.age:"—"}</td>
         <td>${r.eta!=null?"'"+String(r.eta).slice(2):"—"}</td></tr>`;
     }).join("");
     h += `</tbody></table>`;
     if (selGrp) {
-      const nm = rows.filter(r=>posGroupOf(r.pos)===selGrp).length;
+      const shown = rows.slice(0,30);
+      const nm = shown.filter(r=>posGroupOf(r.pos)===selGrp).length;
       const last = tcInitialName(sel.c.name).split(" ").slice(-1)[0];
-      h += `<div class="tc-feed-more">${nm} of ${rows.length} in ${last}'s position group</div>`;
+      h += `<div class="tc-feed-more">${nm} of ${shown.length} in ${last}'s position group</div>`;
     }
     return h + `</div>`;
   }
