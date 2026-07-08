@@ -1,0 +1,464 @@
+{
+  "Bo Lowrance": {
+    "composite": 31.4,
+    "rank": 20,
+    "source": "MLB Pipeline",
+    "type": "mock-draft",
+    "team": "BOS",
+    "asOf": "2026-06-25",
+    "trend": {
+      "delta": -480,
+      "dir": "up",
+      "first": 500,
+      "last": 20
+    }
+  },
+  "Max Phillips": {
+    "composite": 163,
+    "rank": 36,
+    "source": "Overslot",
+    "type": "top-hs-draft-prospects",
+    "team": null,
+    "asOf": "2025-12-12",
+    "trend": {
+      "delta": -464,
+      "dir": "up",
+      "first": 500,
+      "last": 36
+    }
+  },
+  "Taj Marchand": {
+    "composite": 54.1,
+    "rank": 66,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-24",
+    "trend": {
+      "delta": -382,
+      "dir": "up",
+      "first": 448,
+      "last": 66
+    }
+  },
+  "Phinn Beaird": {
+    "composite": 270.3,
+    "rank": 448,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-24",
+    "trend": {
+      "delta": 361,
+      "dir": "down",
+      "first": 87,
+      "last": 448
+    }
+  },
+  "Kyle Rogosienski": {
+    "composite": 191.5,
+    "rank": 124,
+    "source": "Perfect Game",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-11-11",
+    "trend": {
+      "delta": -282,
+      "dir": "up",
+      "first": 406,
+      "last": 124
+    }
+  },
+  "Will Rhine": {
+    "composite": 273,
+    "rank": 34,
+    "source": "Overslot",
+    "type": "top-college-draft-prospects",
+    "team": null,
+    "asOf": "2025-10-28",
+    "trend": {
+      "delta": -240,
+      "dir": "up",
+      "first": 274,
+      "last": 34
+    }
+  },
+  "Lucas Lawrence": {
+    "composite": 355,
+    "rank": 277,
+    "source": "Baseball America",
+    "type": "top-hs-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-05",
+    "trend": {
+      "delta": -223,
+      "dir": "up",
+      "first": 500,
+      "last": 277
+    }
+  },
+  "Lucas Steele": {
+    "composite": 289.5,
+    "rank": 180,
+    "source": "Overslot",
+    "type": "top-college-draft-prospects",
+    "team": null,
+    "asOf": "2025-08-25",
+    "trend": {
+      "delta": -219,
+      "dir": "up",
+      "first": 399,
+      "last": 180
+    }
+  },
+  "Griffin Loy": {
+    "composite": 385.5,
+    "rank": 488,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-24",
+    "trend": {
+      "delta": 211,
+      "dir": "down",
+      "first": 277,
+      "last": 488
+    }
+  },
+  "Bryce Fowler": {
+    "composite": 447,
+    "rank": 447,
+    "source": "Joe Doyle",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-07-09",
+    "trend": {
+      "delta": 190,
+      "dir": "down",
+      "first": 257,
+      "last": 447
+    }
+  },
+  "Joe Tiroly": {
+    "composite": 216.5,
+    "rank": 238,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-24",
+    "trend": {
+      "delta": 185,
+      "dir": "down",
+      "first": 53,
+      "last": 238
+    }
+  },
+  "Will Myhand": {
+    "composite": 433.5,
+    "rank": 383,
+    "source": "PBR",
+    "type": "top-hs-draft-prospects",
+    "team": null,
+    "asOf": "2026-03-13",
+    "trend": {
+      "delta": 161,
+      "dir": "down",
+      "first": 222,
+      "last": 383
+    }
+  },
+  "Ryan DeSanto": {
+    "composite": 382.5,
+    "rank": 367,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-07-11",
+    "trend": {
+      "delta": 143,
+      "dir": "down",
+      "first": 224,
+      "last": 367
+    }
+  },
+  "Brady Neal": {
+    "composite": 375,
+    "rank": 355,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-24",
+    "trend": {
+      "delta": -102,
+      "dir": "up",
+      "first": 457,
+      "last": 355
+    }
+  },
+  "Ben Tryon": {
+    "composite": 250,
+    "rank": 250,
+    "source": "Overslot",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-01",
+    "trend": {
+      "delta": 84,
+      "dir": "down",
+      "first": 166,
+      "last": 250
+    }
+  },
+  "Chris Grasso": {
+    "composite": 221,
+    "rank": 309,
+    "source": "Perfect Game",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-11-11",
+    "trend": {
+      "delta": 79,
+      "dir": "down",
+      "first": 230,
+      "last": 309
+    }
+  },
+  "Hunter Wieckowski": {
+    "composite": 85.5,
+    "rank": 36,
+    "source": "Baseball America",
+    "type": "top-hs-draft-prospects",
+    "team": null,
+    "asOf": "2025-12-01",
+    "trend": {
+      "delta": -72,
+      "dir": "up",
+      "first": 108,
+      "last": 36
+    }
+  },
+  "Jake Munroe": {
+    "composite": 224,
+    "rank": 256,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-07-11",
+    "trend": {
+      "delta": -72,
+      "dir": "up",
+      "first": 328,
+      "last": 256
+    }
+  },
+  "Trevor Condon": {
+    "composite": 21.2,
+    "rank": 19,
+    "source": "MLB Pipeline",
+    "type": "mock-draft",
+    "team": "CLE",
+    "asOf": "2026-06-25",
+    "trend": {
+      "delta": -55,
+      "dir": "up",
+      "first": 74,
+      "last": 19
+    }
+  },
+  "Myles Bailey": {
+    "composite": 79,
+    "rank": 94,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-24",
+    "trend": {
+      "delta": 48,
+      "dir": "down",
+      "first": 46,
+      "last": 94
+    }
+  },
+  "Jace Moran": {
+    "composite": 54,
+    "rank": 85,
+    "source": "Overslot",
+    "type": "top-hs-draft-prospects",
+    "team": null,
+    "asOf": "2025-12-12",
+    "trend": {
+      "delta": 27,
+      "dir": "down",
+      "first": 58,
+      "last": 85
+    }
+  },
+  "Caleb Daniel": {
+    "composite": 71,
+    "rank": 61,
+    "source": "Baseball America",
+    "type": "top-college-draft-prospects",
+    "team": null,
+    "asOf": "2026-05-20",
+    "trend": {
+      "delta": 21,
+      "dir": "down",
+      "first": 40,
+      "last": 61
+    }
+  },
+  "Kyle Jones": {
+    "composite": 105.5,
+    "rank": 72,
+    "source": "Baseball America",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2026-06-24",
+    "trend": {
+      "delta": 18,
+      "dir": "down",
+      "first": 54,
+      "last": 72
+    }
+  },
+  "Aiden Robbins": {
+    "composite": 37,
+    "rank": 27,
+    "source": "MLB Pipeline",
+    "type": "mock-draft",
+    "team": "NYM",
+    "asOf": "2026-06-25",
+    "trend": {
+      "delta": -17,
+      "dir": "up",
+      "first": 44,
+      "last": 27
+    }
+  },
+  "David Vargas": {
+    "composite": 114,
+    "rank": 109,
+    "source": "Perfect Game",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-11-14",
+    "trend": {
+      "delta": 15,
+      "dir": "down",
+      "first": 94,
+      "last": 109
+    }
+  },
+  "Dax Kilby": {
+    "composite": 40.7,
+    "rank": 50,
+    "source": "Baseball America",
+    "type": "other",
+    "team": null,
+    "asOf": "2026-05-07",
+    "trend": {
+      "delta": 10,
+      "dir": "down",
+      "first": 40,
+      "last": 50
+    }
+  },
+  "Michael Dattalo": {
+    "composite": 297,
+    "rank": 297,
+    "source": "Joe Doyle",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-07-09",
+    "trend": {
+      "delta": 10,
+      "dir": "down",
+      "first": 287,
+      "last": 297
+    }
+  },
+  "Noah Milburn": {
+    "composite": 357.5,
+    "rank": 332,
+    "source": "Perfect Game",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-11-11",
+    "trend": {
+      "delta": 9,
+      "dir": "down",
+      "first": 323,
+      "last": 332
+    }
+  },
+  "Aaron Watson": {
+    "composite": 41.9,
+    "rank": 28,
+    "source": "ESPN",
+    "type": "mock-draft",
+    "team": null,
+    "asOf": "2025-07-13",
+    "trend": {
+      "delta": -6,
+      "dir": "up",
+      "first": 34,
+      "last": 28
+    }
+  },
+  "Brisen Tweedy": {
+    "composite": 365,
+    "rank": 365,
+    "source": "Perfect Game",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-07-09",
+    "trend": {
+      "delta": 6,
+      "dir": "down",
+      "first": 359,
+      "last": 365
+    }
+  },
+  "Eamon McDermott": {
+    "composite": 397.5,
+    "rank": 481,
+    "source": "Joe Doyle",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-07-09",
+    "trend": {
+      "delta": -5,
+      "dir": "up",
+      "first": 486,
+      "last": 481
+    }
+  },
+  "Ty Finkbeiner": {
+    "composite": 483,
+    "rank": 483,
+    "source": "Perfect Game",
+    "type": "top-mlb-draft-prospects",
+    "team": null,
+    "asOf": "2025-07-09",
+    "trend": {
+      "delta": 5,
+      "dir": "down",
+      "first": 478,
+      "last": 483
+    }
+  },
+  "Cameron Flukey": {
+    "composite": 12.8,
+    "rank": 18,
+    "source": "MLB Pipeline",
+    "type": "mock-draft",
+    "team": "CIN",
+    "asOf": "2026-06-25",
+    "trend": {
+      "delta": -10,
+      "dir": "up",
+      "first": 28,
+      "last": 18
+    }
+  }
+}

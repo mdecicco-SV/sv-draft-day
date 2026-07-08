@@ -1821,18 +1821,19 @@
   function fvMetaOf(comp){ return comp ? (DATA.fvMeta[normName(comp.name)]||null) : null; }
   const fvSrcLabel = (s) => s==="FG" ? "FanGraphs" : s==="SVM" ? "SV model" : s || "";
   // ---- Rank + trend (consensus board position + momentum), separate from FV ----
+  // Feed shape: { composite (consensus rank), rank/source/type/team (latest data point),
+  //   asOf, trend:{dir,delta,first,last} }. We show composite + trend DIRECTION (the raw
+  //   delta is a 500-default artifact) + the latest source read.
   function rankTrendOf(comp){ return comp ? (DATA.rankTrend[normName(comp.name)]||null) : null; }
-  // net spots risen (positive = moved up the board) → arrow + color; accepts trend:"up|down|flat" or delta
-  function rtArrow(rt){ if(!rt) return null;
-    const d = Number.isFinite(rt.delta) ? rt.delta : rt.trend==="up" ? 1 : rt.trend==="down" ? -1 : 0;
-    if (d>0) return {ch:"▲", cls:"rt-up", n:rt.delta}; if (d<0) return {ch:"▼", cls:"rt-down", n:rt.delta};
-    return {ch:"▬", cls:"rt-flat", n:0}; }
+  function rtConsensus(rt){ return rt ? (rt.composite!=null ? rt.composite : rt.rank!=null ? rt.rank : null) : null; }
+  function rtArrow(rt){ const d=((rt&&rt.trend&&rt.trend.dir)||"").toLowerCase();
+    return d.startsWith("u") ? {ch:"▲",cls:"rt-up"} : d.startsWith("d") ? {ch:"▼",cls:"rt-down"} : {ch:"▬",cls:"rt-flat"}; }
+  function rtLatest(rt){ if(!rt||!rt.source) return "";
+    const isMock=(rt.type||"").includes("mock");
+    return isMock && rt.team ? `${rt.source} mock → ${rt.team}${rt.rank!=null?" #"+rt.rank:""}` : `${rt.source}${rt.rank!=null?" #"+rt.rank:""}`; }
   function rtSummary(comp){ const rt=rankTrendOf(comp); if(!rt) return "";
-    const a=rtArrow(rt), r = rt.rank!=null ? `#${Math.round(rt.rank*10)/10}` : "";
-    const mv = a && Number.isFinite(a.n) && a.n!==0 ? ` ${a.ch}${Math.abs(a.n)}` : a ? ` ${a.ch}` : "";
-    const src = rt.sources ? ` · ${rt.sources} src` : "";
-    const mock = rt.mock && rt.mock.team ? ` · mock ${rt.mock.team}${rt.mock.pick?" #"+rt.mock.pick:""}` : "";
-    return `board ${r}${mv}${src}${mock}`.trim(); }
+    const c=rtConsensus(rt), a=rtArrow(rt), lat=rtLatest(rt);
+    return `board ${c!=null?"#"+(Math.round(c*10)/10):"—"} ${a.ch}${lat?" · "+lat:""}`.trim(); }
   // ---- Flavor lens helpers: org positional identity (Top-30 system composition + draft habit) ----
   const _posSysCache=new Map();
   function orgPosSystem(team){ if(_posSysCache.has(team)) return _posSysCache.get(team);
@@ -3749,12 +3750,12 @@
         ${teamLogo(t,22)}<span class="tc-abbr">${t}</span><span class="fc-sub">${teamName?_esc(teamName)+" · ":""}org #${o.orgRank!=null?Math.round(o.orgRank):"—"}</span>
         <button class="tc-x" onclick="closeFitCard()">✕</button>
       </div>
-      ${(()=>{ const rt=rankTrendOf(comp); if(!rt) return ""; const a=rtArrow(rt);
+      ${(()=>{ const rt=rankTrendOf(comp); if(!rt) return ""; const c=rtConsensus(rt), a=rtArrow(rt), lat=rtLatest(rt);
         return `<div class="fc-board"><span class="fc-board-k">Consensus board</span>
-          <b>${rt.rank!=null?"#"+(Math.round(rt.rank*10)/10):"—"}</b>
-          ${a?`<span class="${a.cls}">${a.ch}${Number.isFinite(a.n)&&a.n!==0?Math.abs(a.n):""}</span>`:""}
-          ${rt.sources?`<span class="fc-board-src">${rt.sources} sources</span>`:""}
-          ${rt.mock&&rt.mock.team?`<span class="fc-board-src">latest mock → ${_esc(rt.mock.team)}${rt.mock.pick?" #"+rt.mock.pick:""}${rt.mock.source?` (${_esc(rt.mock.source)})`:""}</span>`:""}
+          <b>${c!=null?"#"+(Math.round(c*10)/10):"—"}</b>
+          <span class="${a.cls}">${a.ch}</span>
+          ${lat?`<span class="fc-board-src">latest: ${_esc(lat)}</span>`:""}
+          ${rt.asOf?`<span class="fc-board-src">${_esc(rt.asOf)}</span>`:""}
           <span class="fc-board-note">market position — distinct from FV</span></div>`; })()}
       <div class="tc-band"><div class="tc-stats">
         <div class="tc-stat"><div class="k">Combined fit</div><div class="v big">${combined}</div><div class="sub">${RF_LENSLBL[resFit.lens]==="Combined fit"?"weighted blend":"weighted"}</div></div>
