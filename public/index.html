@@ -187,6 +187,11 @@
   .ba-filters select, .ba-filters input { font:inherit; padding:6px 9px; border:1px solid var(--line); border-radius:8px; }
   .ba-filters label { font-size:12px; font-weight:700; color:var(--muted); display:inline-flex; align-items:center; gap:5px; }
   .ba-filters .count { margin-left:auto; color:var(--muted); font-size:13px; font-weight:700; }
+  /* controls wrapper is transparent to layout on desktop; the collapse toggle is mobile-only */
+  .ba-filt-controls { display:contents; }
+  .ba-filt-toggle { display:none; }
+  .ba-filt-toggle .caret { display:inline-block; transition:transform .15s; }
+  .ba-filters.collapsed .ba-filt-toggle .caret { transform:rotate(-90deg); }
   /* border-collapse:separate + no overflow:hidden — both break position:sticky on the thead */
   table.ba { width:100%; border-collapse:separate; border-spacing:0; background:#fff; border:1px solid var(--line); border-radius:10px; }
   table.ba th { text-align:left; font-size:var(--fs-1); text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line); background:#fafafa;
@@ -868,6 +873,16 @@
   body.mob #viewBoard .ba-filters { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
   body.mob #viewBoard .ba-filters label, body.mob #viewBoard .ba-filters .count { white-space:nowrap; }
   body.mob #tvCtl, body.mob #viewBoard .ba-filters > button.ctl { display:none; }
+  /* Best Available filters on mobile: a tidy collapsible 2-row block (no more clipped controls) */
+  body.mob #viewBest .ba-filters { align-items:center; row-gap:6px; }
+  body.mob #viewBest .ba-filt-toggle { display:inline-flex; align-items:center; gap:6px; font:inherit;
+    font-size:13px; font-weight:800; color:var(--ink); padding:6px 10px; border:1px solid var(--line);
+    border-radius:8px; background:var(--card); cursor:pointer; }
+  body.mob #viewBest .ba-filters .count { font-size:12px; }
+  body.mob #viewBest .ba-filt-controls { display:flex; flex-wrap:wrap; gap:8px; width:100%; order:3; }
+  body.mob #viewBest .ba-filt-controls label { flex:0 0 auto; }
+  body.mob #viewBest .ba-filt-controls #fQuery { flex:1 1 100%; min-width:0; }
+  body.mob #viewBest .ba-filters.collapsed .ba-filt-controls { display:none; }
   #mJump { display:none; }
   body.mob #mJump { display:inline-flex; position:fixed; right:12px; bottom:calc(66px + env(safe-area-inset-bottom)); z-index:60;
     align-items:center; gap:5px; background:var(--red); color:#fff; border:0; border-radius:999px;
@@ -1071,11 +1086,14 @@
   <!-- BEST AVAILABLE -->
   <section id="viewBest" class="view">
     <div class="ba-filters">
-      <label>Level <select id="fLevel" onchange="renderBest()"><option>All</option><option>HS</option><option>College</option><option>JUCO</option></select></label>
-      <label>Pos <select id="fPos" onchange="renderBest()"><option>All</option><option>P</option><option>C</option><option>IF</option><option>OF</option></select></label>
-      <label><input type="checkbox" id="fSv" onchange="renderBest()"> SV clients only</label>
-      <label><input type="checkbox" id="fDrafted" onchange="renderBest()"> Show drafted</label>
-      <input id="fQuery" placeholder="search name / school / agency" oninput="renderBest()" style="min-width:180px" />
+      <button class="ba-filt-toggle" onclick="toggleBaFilters(event)" aria-expanded="true">Filters <span class="caret">▾</span></button>
+      <div class="ba-filt-controls">
+        <label>Level <select id="fLevel" onchange="renderBest()"><option>All</option><option>HS</option><option>College</option><option>JUCO</option></select></label>
+        <label>Pos <select id="fPos" onchange="renderBest()"><option>All</option><option>P</option><option>C</option><option>IF</option><option>OF</option></select></label>
+        <label><input type="checkbox" id="fSv" onchange="renderBest()"> SV clients only</label>
+        <label><input type="checkbox" id="fDrafted" onchange="renderBest()"> Show drafted</label>
+        <input id="fQuery" placeholder="search name / school / agency" oninput="renderBest()" style="min-width:180px" />
+      </div>
       <span class="count" id="baCount"></span>
     </div>
     <table class="ba">
@@ -2179,6 +2197,13 @@
   }
 
   // ---------- VIEW: BEST AVAILABLE ----------
+  window.toggleBaFilters = (e) => {
+    if (e) e.stopPropagation();
+    const bar = document.querySelector("#viewBest .ba-filters");
+    if (!bar) return;
+    const collapsed = bar.classList.toggle("collapsed");
+    bar.querySelector(".ba-filt-toggle")?.setAttribute("aria-expanded", String(!collapsed));
+  };
   function renderBest() {
     if (!currentState) return;
     hideRanks(); // rows re-render in place — don't strand an open hover card
