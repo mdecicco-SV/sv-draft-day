@@ -28,8 +28,9 @@ OUT = Path(__file__).resolve().parent.parent / "public" / "data" / "prospects.js
 MISS = 31          # rank charged to a source that leaves the player off its T30
 FUZZY_MIN = 0.85   # SequenceMatcher floor for name-variant matching
 
-STATSAPI_TEAMS = "https://statsapi.mlb.com/api/v1/teams?sportIds=11,12,13,14,16,17&season=2026"
-SPORT_LEVEL = {11: "AAA", 12: "AA", 13: "A+", 14: "A", 16: "ROK", 17: "ROK"}
+STATSAPI = "https://statsapi.mlb.com/api/v1"
+STATSAPI_TEAMS = STATSAPI + "/teams?sportIds=1,11,12,13,14,16,17&season=2026"
+SPORT_LEVEL = {1: "MLB", 11: "AAA", 12: "AA", 13: "A+", 14: "A", 16: "ROK", 17: "ROK"}
 
 # full team/org names (BA + MLB.com Pipeline both use these) -> live-feed abbrevs
 TEAM_ABBREV = {
@@ -46,6 +47,16 @@ TEAM_ABBREV = {
 }
 
 SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
+
+# BA name -> MLB.com Pipeline name, where the outlets tag the same player
+# differently enough that no automatic matcher should guess (nicknames)
+ALIASES = {
+    ("NYM", "Cameron Tilly"): "Cam Tilly",
+    ("NYY", "Jeffrey Heuer"): "Mac Heuer",
+    ("PIT", "Triston Gray"): "Murf Gray",
+}
+
+FILL = Path(__file__).resolve().parent / "prospect_fill.csv"
 
 
 def norm(name):
@@ -78,21 +89,37 @@ def parse_bonus(s):
         return None
 
 
-def affiliate_levels():
-    """affiliate club name -> AAA/AA/A+/A/ROK via statsapi."""
+def statsapi_teams():
+    """All parent clubs + affiliates. Returns (name -> level, id -> (level, org_abbrev))."""
     with urllib.request.urlopen(STATSAPI_TEAMS, timeout=30) as r:
         teams = json.load(r)["teams"]
-    return {t["name"]: SPORT_LEVEL.get((t.get("sport") or {}).get("id")) for t in teams}
+    by_name, by_id = {}, {}
+    for t in teams:
+        level = SPORT_LEVEL.get((t.get("sport") or {}).get("id"))
+        parent = t["name"] if level == "MLB" else t.get("parentOrgName")
+        by_name[t["name"]] = level
+        by_id[t["id"]] = (level, TEAM_ABBREV.get(parent or ""))
+    return by_name, by_id
+
+
+_TEAMS_CACHE = None
+
+
+def teams_maps():
+    global _TEAMS_CACHE
+    if _TEAMS_CACHE is None:
+        try:
+            _TEAMS_CACHE = statsapi_teams()
+        except Exception as e:
+            print(f"WARNING: statsapi teams lookup failed ({e}); levels will be blank",
+                  file=sys.stderr)
+            _TEAMS_CACHE = ({}, {})
+    return _TEAMS_CACHE
 
 
 def read_mlb_pipeline(path):
     """MLB.com Pipeline scrape: org,rank,player,position,eta,age,...,current_team,overall_grade,mlb_id."""
-    try:
-        levels = affiliate_levels()
-    except Exception as e:
-        print(f"WARNING: statsapi affiliate lookup failed ({e}); levels will be blank",
-              file=sys.stderr)
-        levels = {}
+    levels = teams_maps()[0]
     out, unmapped = {}, set()
     for row in csv.DictReader(open(path)):
         team = abbrev(row["org"])
@@ -100,8 +127,7 @@ def read_mlb_pipeline(path):
         if rank is None:
             continue
         club = (row.get("current_team") or "").strip()
-        # current_team can be the parent club — the prospect is in the majors
-        level = "MLB" if club in TEAM_ABBREV else levels.get(club)
+        level = levels.get(club)   # includes parent clubs -> "MLB" (prospect in the majors)
         if club and level is None:
             unmapped.add(club)
         out.setdefault(team, []).append({
@@ -112,7 +138,6 @@ def read_mlb_pipeline(path):
             "pos": (row.get("position") or "").strip().upper(),
             "level": level,
             "age": to_int(row.get("age")),
-            "eta": to_int(row.get("eta")),
             "_id": (row.get("mlb_id") or "").strip() or None,
         })
     if unmapped:
@@ -161,9 +186,21 @@ def read_ba(path):
         rank = to_int(row.get("T-30 Rank"))
         if rank is None:
             continue
-        out.setdefault(abbrev(team_full), []).append(
-            {"rank": rank, "name": (row.get("Player") or "").strip()})
+        team = abbrev(team_full)
+        name = (row.get("Player") or "").strip()
+        name = ALIASES.get((team, name), name)
+        out.setdefault(team, []).append({"rank": rank, "name": name})
     return out
+
+
+def rerank(out):
+    """Composite order: mean of source ranks (missing source counts MISS)."""
+    for rows in out.values():
+        rows.sort(key=lambda p: (((p["mlb"] or MISS) + (p["ba"] or MISS)) / 2,
+                                 min(p["mlb"] or MISS, p["ba"] or MISS),
+                                 norm(p["name"])))
+        for i, p in enumerate(rows, 1):
+            p["rank"] = i
 
 
 def merge_ba(out, ba, verbose=True):
@@ -192,16 +229,12 @@ def merge_ba(out, ba, verbose=True):
                 p["ba"] = b["rank"]
             else:
                 rows.append({"rank": None, "mlb": None, "ba": b["rank"], "name": b["name"],
-                             "pos": "", "level": None, "age": None, "eta": None})
+                             "pos": "", "level": None, "age": None})
                 ba_only.append((team, b["rank"], b["name"]))
                 stats["ba_only"] += 1
     for team, rows in out.items():
         stats["mlb_only"] += sum(1 for p in rows if p["ba"] is None)
-        rows.sort(key=lambda p: (((p["mlb"] or MISS) + (p["ba"] or MISS)) / 2,
-                                 min(p["mlb"] or MISS, p["ba"] or MISS),
-                                 norm(p["name"])))
-        for i, p in enumerate(rows, 1):
-            p["rank"] = i
+    rerank(out)
     if verbose:
         print(f"BA merge: {stats['exact']} exact, {stats['fuzzy']} fuzzy, "
               f"{stats['ba_only']} BA-only appended, {stats['mlb_only']} MLB-only")
@@ -210,6 +243,136 @@ def merge_ba(out, ba, verbose=True):
         for t, r, n in ba_only:
             print(f"  BAonly {t}: #{r} {n}")
     return out
+
+
+def enrich_ba_only(out):
+    """BA's T30 file is name+rank only. Fill pos/level/age for those entries
+    from the statsapi people search, accepting only hits whose current club
+    belongs to the same org (guards against same-name players elsewhere)."""
+    import datetime, urllib.parse
+    by_id = teams_maps()[1]
+    if not by_id:
+        return
+    today = datetime.date.today()
+    done = missed = 0
+    misses = []
+
+    def search(q):
+        url = (STATSAPI + "/people/search?hydrate=currentTeam&names="
+               + urllib.parse.quote(q))
+        with urllib.request.urlopen(url, timeout=20) as r:
+            return json.load(r).get("people", [])
+
+    def org_hits(people, team):
+        return [q for q in people
+                if by_id.get((q.get("currentTeam") or {}).get("id"), (None, None))[1] == team]
+
+    folded = 0
+    for team, rows in out.items():
+        idmap = {e["_id"]: e for e in rows if e.get("_id")}
+        for p in list(rows):
+            if p["pos"] or p["level"] or p["age"] is not None:
+                continue
+            # registered names differ from BA's (Leo vs Leonardo), so fall back
+            # to a surname search scoped to the org, then best-name similarity
+            queries = [p["name"]]
+            toks = p["name"].split()
+            if len(toks) > 1:
+                queries.append(" ".join(toks[1:]))
+                if len(toks) > 2:
+                    queries.append(toks[-1])
+            hits, tried = [], 0
+            try:
+                for q in queries:
+                    people = search(q)
+                    tried += len(people)
+                    hits = org_hits(people, team)
+                    if hits:
+                        break
+            except Exception as e:
+                misses.append((team, p["name"], f"lookup failed: {e}"))
+                missed += 1
+                continue
+            if not hits:
+                misses.append((team, p["name"], f"{tried} result(s), none in org"))
+                missed += 1
+                continue
+            # surname alone isn't identity — require compatible first names
+            # (exact, or one prefixes the other: Leo/Leonardo, Cam/Cameron)
+            def first_ok(q):
+                a = (norm(p["name"]).split() or [""])[0]
+                b = (norm(q.get("fullName") or "").split() or [""])[0]
+                return a == b or (min(len(a), len(b)) >= 3
+                                  and (a.startswith(b) or b.startswith(a)))
+            named = [q for q in hits if first_ok(q)]
+            if not named:
+                misses.append((team, p["name"],
+                               "org hit(s) with wrong first name: "
+                               + ", ".join(repr(q.get("fullName")) for q in hits[:3])))
+                missed += 1
+                continue
+            named.sort(key=lambda q: difflib.SequenceMatcher(
+                None, norm(p["name"]), norm(q.get("fullName") or "")).ratio(), reverse=True)
+            q = named[0]
+            if norm(q.get("fullName") or "") != norm(p["name"]):
+                print(f"  ~match {team}: BA {p['name']!r} -> statsapi {q.get('fullName')!r}")
+            # identity check: BA spelled an MLB.com T30 player differently and the
+            # name merge missed him — fold the BA rank into the existing entry
+            pid = str(q.get("id") or "") or None
+            existing = idmap.get(pid)
+            if existing is not None and existing is not p:
+                if existing["ba"] is None:
+                    existing["ba"] = p["ba"]
+                rows.remove(p)
+                folded += 1
+                print(f"  dedup  {team}: BA {p['name']!r} is MLB.com {existing['name']!r} — merged")
+                continue
+            if pid:
+                p["_id"] = pid
+                idmap[pid] = p
+            pos = (q.get("primaryPosition") or {}).get("abbreviation") or ""
+            if pos == "P":
+                hand = ((q.get("pitchHand") or {}).get("code") or "").upper()
+                pos = {"R": "RHP", "L": "LHP"}.get(hand, "P")
+            p["pos"] = pos
+            p["level"] = by_id[q["currentTeam"]["id"]][0]
+            bd = q.get("birthDate")
+            if bd:
+                b = datetime.date.fromisoformat(bd)
+                p["age"] = today.year - b.year - ((today.month, today.day) < (b.month, b.day))
+            done += 1
+    rerank(out)
+    print(f"statsapi enrich: {done} BA-only players filled, {folded} duplicates folded, "
+          f"{missed} unresolved")
+    for t, n, why in misses:
+        print(f"  miss   {t}: {n} ({why})", file=sys.stderr)
+
+
+def apply_fill(out, path):
+    """Hand-curated pos/level/age for players no feed or API covers
+    (scripts/prospect_fill.csv, sourced from BA team pages). Fills blanks only."""
+    filled, unmatched = 0, []
+    entries = {(t, norm(p["name"])): p for t, rows in out.items() for p in rows}
+    for row in csv.DictReader(open(path)):
+        p = entries.get(((row.get("team") or "").strip(), norm(row.get("name") or "")))
+        if p is None:
+            unmatched.append(f"{row.get('team')}/{row.get('name')}")
+            continue
+        hit = False
+        if not p["pos"] and (row.get("pos") or "").strip():
+            p["pos"] = row["pos"].strip().upper()
+            hit = True
+        if p["level"] is None and (row.get("level") or "").strip():
+            p["level"] = row["level"].strip()
+            hit = True
+        if p["age"] is None and to_int(row.get("age")) is not None:
+            p["age"] = to_int(row.get("age"))
+            hit = True
+        filled += hit
+    print(f"fill: {filled} players patched from {path.name}")
+    if unmatched:
+        print(f"WARNING: fill rows matching no entry: {', '.join(unmatched)}",
+              file=sys.stderr)
 
 
 def read_top100(path, rankcol):
@@ -273,6 +436,9 @@ def main():
 
     if args.ba:
         out = merge_ba(out, read_ba(args.ba))
+        enrich_ba_only(out)
+        if FILL.exists():
+            apply_fill(out, FILL)
     if args.mlb100 or args.ba100:
         attach_t100(out,
                     read_top100(args.mlb100, "rank") if args.mlb100 else ({}, {}),
@@ -280,7 +446,7 @@ def main():
 
     # lean output — per-source ranks feed the composite but aren't published;
     # t100 rides along only on players holding a league-wide top-100 spot
-    keep = ("rank", "name", "pos", "level", "age", "eta")
+    keep = ("rank", "name", "pos", "level", "age")
     out = {t: [{**{k: p.get(k) for k in keep},
                 **({"t100": p["t100"]} if p.get("t100") else {})}
                for p in rows] for t, rows in out.items()}

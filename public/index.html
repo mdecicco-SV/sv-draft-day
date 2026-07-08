@@ -3843,16 +3843,16 @@
     const rows = (DATA.prospects && DATA.prospects[teamAlias(team)]) || [];
     if (!rows.length) return h + `<div class="placeholder">No prospect list for ${team}.</div></div>`;
     const selGrp = sel && sel.c.comp ? (sel.c.comp.posGroup || posGroupOf(sel.c.comp.pos)) : null;
-    h += `<table class="tc-upc"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th>Age</th><th>ETA</th></tr></thead><tbody>`;
+    h += `<table class="tc-upc"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th>Age</th></tr></thead><tbody>`;
     h += rows.slice(0,30).map(r=>{
       const match = selGrp && posGroupOf(r.pos)===selGrp;
+      const nm = tcInitialName(r.name);
       return `<tr${match?' style="background:#fff5f6"':''}>
         <td style="color:var(--muted)">${r.rank}</td>
-        <td class="pl">${r.t100?`<span class="plwrap"><span class="pln">${r.name}</span><span class="t100b" title="Top 100 — ${[r.t100.mlb?"MLB.com #"+r.t100.mlb:"",r.t100.ba?"BA #"+r.t100.ba:""].filter(Boolean).join(" · ")}">T100</span></span>`:r.name}</td>
+        <td class="pl" title="${r.name}">${r.t100?`<span class="plwrap"><span class="pln">${nm}</span><span class="t100b" title="Top 100 — ${[r.t100.mlb?"MLB.com #"+r.t100.mlb:"",r.t100.ba?"BA #"+r.t100.ba:""].filter(Boolean).join(" · ")}">T100</span></span>`:nm}</td>
         <td style="${match?'color:var(--red);font-weight:800':'color:var(--muted)'}">${r.pos||"—"}</td>
         <td style="color:var(--muted)">${r.level||"—"}</td>
-        <td>${r.age!=null?r.age:"—"}</td>
-        <td>${r.eta!=null?"'"+String(r.eta).slice(2):"—"}</td></tr>`;
+        <td>${r.age!=null?r.age:"—"}</td></tr>`;
     }).join("");
     h += `</tbody></table>`;
     if (selGrp) {
