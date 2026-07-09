@@ -3,12 +3,15 @@
 Track-record upgrade: how much big-league value has each org actually extracted
 from picks like <this player>, vs what those picks were expected to return?
 
-Two value metrics, different coverage — they complement, not compete:
-  bWAR  Baseball-Reference career WAR (2008-2025). Broad + mature → it carries the
-        expected-value curve and the org WAR-over-expected (WOE) that grades orgs.
+Era = draft classes 2018+ (matches slot-history/aWAR coverage; first 2018-class
+debut was Sept 2019). Two value metrics, different coverage — they complement,
+not compete:
+  bWAR  Baseball-Reference career WAR, realized-to-date. Carries the
+        era-internal expected-value curve and the org WAR-over-expected (WOE)
+        that grades orgs.
   aWAR  SV / MLBPA Mod3 metric (public/data/aWAR.xlsx). Draft classes 2018-2024
-        only, so it can't anchor a mature curve — instead it's the FEATURED value
-        on recent-class comps, plus a recent-class aWAR/pick org stat.
+        only — it's the FEATURED value on recent-class comps, plus a
+        recent-class aWAR/pick org stat.
 
 Sources (free, no keys, run anywhere):
   statsapi.mlb.com/api/v1/draft/{year}                 draft sweep, overall <= 315
@@ -18,18 +21,22 @@ Sources (free, no keys, run anywhere):
 Method:
   - Career bWAR per player = sum across both B-Ref files; aggregates use max(WAR,0)
     ("value produced"); per-pick rows keep the raw number.
-  - Expected-bWAR curve: mean clamped career bWAR by pick band, MATURE classes only
-    (2008-2019 — outcomes largely realized).
-  - Org WOE (mature): per org × {overall, posGroup, pickBand, HS/College}:
-    woe = (warSum - expSum) / (n + K), K=8 — shrink toward league, same idea as
-    histSignal() in index.html.
+  - Expected-bWAR curve: mean clamped career bWAR by pick band, over ALL swept
+    picks (2018-2025) — realized-to-date career bWAR by pick band. Era-internal
+    and roughly zero-centered by construction (young classes depress both sides
+    equally across orgs).
+  - Org WOE: per org × {overall, posGroup, pickBand, HS/College}, over ALL
+    swept picks: woe = (warSum - expSum) / (n + K), K=8 — shrink toward league,
+    same idea as histSignal() in index.html.
   - aWAR: career aWAR per MLB.com Id (latest-Season "Career thru Season aWAR"),
     joined to the sweep by id (name fallback, "Last, First" -> normName). Attached
     as `aw` on per-pick rows; recent-class (2018-24) aWAR/pick baked per org.
   - Per-pick rows per org (newest first): {y, ov, n, g, lvl, bon, w(bWAR), aw?}.
   - Debut speed: median years from draft to MLB debut (statsapi mlbDebutDate),
-    split HS vs College, mature classes only (year <= MATURE_THROUGH) — baked as
-    orgs[t].debutSpeed = {all, HS, College} alongside all/byG.
+    split HS vs College, over all swept picks that debuted (they're all 2018+
+    classes now, no maturity gate needed) — baked as orgs[t].debutSpeed =
+    {all, HS, College} alongside all/byG, plus league-wide medians in
+    meta.lgDebutSpeed = {HS, College, all}.
 
 Usage: python3 scripts/build_warhist.py [--awar path.xlsx|csv] [--cache-dir DIR]
 """
@@ -41,8 +48,8 @@ ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, "public", "data", "warhist.json")
 AWAR_DEFAULT = os.path.join(ROOT, "public", "data", "aWAR.xlsx")
 
-YEARS = list(range(2008, 2026))
-MATURE_THROUGH = 2019          # classes with enough run for career WAR to mean something
+YEARS = list(range(2018, 2026))
+ERA_FROM = 2018                # proven-value era = draft classes 2018+ (slot-history/aWAR coverage)
 RECENT_FROM = 2018             # aWAR coverage starts here
 MAX_OVERALL = 315              # ~rounds 1-10 in the modern format
 SHRINK_K = 8
@@ -316,10 +323,9 @@ def main():
     debuted_n = sum(1 for p in picks if p["debutYear"])
     print(f"debuts: {debuted_n}/{len(picks)} picks have an MLB debut year", file=sys.stderr)
 
-    # expected-bWAR curve from mature classes
+    # expected-bWAR curve over the full swept era (2018+, realized-to-date)
     curve = {k: [0, 0.0] for k in BAND_KEYS}
     for p in picks:
-        if p["y"] > MATURE_THROUGH: continue
         b = band_of(p["ov"])
         if b: curve[b][0] += 1; curve[b][1] += p["warC"]
     exp_mean = {k: (round(s / n, 2) if n else 0.0) for k, (n, s) in curve.items()}
@@ -338,7 +344,6 @@ def main():
         # recent-class aWAR/pick (2018-24) — the SV-native production read
         if p["y"] >= RECENT_FROM and "aw" in p:
             o["aw"]["n"] += 1; o["aw"]["sum"] += max(p["aw"], 0.0)
-        if p["y"] > MATURE_THROUGH: continue
         e = exp_of(p["ov"])
         add(o["all"], p["warC"], e)
         if p["g"] != "?": add(o["byG"].setdefault(p["g"], blank()), p["warC"], e)
@@ -370,15 +375,26 @@ def main():
             rec["debutSpeed"] = debut_speed
         out_orgs[t] = rec
 
+    # league-wide debut-speed medians (all swept 2018+ picks that debuted) — baked
+    # into meta so the front end reads these instead of hardcoding.
+    lg_hs = [p["debutYear"] - p["y"] for p in picks if p["debutYear"] and p["lvl"] == "HS"]
+    lg_college = [p["debutYear"] - p["y"] for p in picks if p["debutYear"] and p["lvl"] == "College"]
+    lg_all = [p["debutYear"] - p["y"] for p in picks if p["debutYear"]]
+    lg_debut_speed = {"HS": median(lg_hs), "College": median(lg_college), "all": median(lg_all)}
+
     payload = {
         "meta": {
-            "years": [YEARS[0], YEARS[-1]], "matureThrough": MATURE_THROUGH,
+            "years": [YEARS[0], YEARS[-1]], "eraFrom": ERA_FROM,
             "recentFrom": RECENT_FROM, "maxOverall": MAX_OVERALL, "k": SHRINK_K, "clamped": True,
             "awar": bool(args.awar),
             "builtAt": datetime.datetime.now().isoformat(timespec="seconds"),
             "posNote": "pos group = current primaryPosition (drafted position not in feed)",
+            "eraNote": "era = slot-history/aWAR coverage range (draft classes 2018+; "
+                       "first 2018-class MLB debut was Sept '19) — expMean/WOE/debutSpeed "
+                       "are realized-to-date over this full era, no maturity gate",
             "debutSpeedNote": "median years from draft to MLB debut, HS vs College picks, "
-                               "mature classes only (year <= matureThrough); non-debuted picks excluded",
+                               "over all swept (2018+) picks; non-debuted picks excluded",
+            "lgDebutSpeed": lg_debut_speed,
         },
         "expBands": BAND_KEYS,
         "expMean": exp_mean,
@@ -390,13 +406,9 @@ def main():
     print("expected career bWAR by band:", json.dumps(exp_mean))
     kc = out_orgs.get("KC", {})
     print("sample KC all:", json.dumps(kc.get("all")), "| awRecent:", json.dumps(kc.get("awRecent")))
-
-    lg_hs = [p["debutYear"] - p["y"] for p in picks
-             if p["y"] <= MATURE_THROUGH and p["debutYear"] and p["lvl"] == "HS"]
-    lg_college = [p["debutYear"] - p["y"] for p in picks
-                  if p["y"] <= MATURE_THROUGH and p["debutYear"] and p["lvl"] == "College"]
-    print(f"league debut speed — HS median {median(lg_hs)}y (n={len(lg_hs)}), "
-          f"College median {median(lg_college)}y (n={len(lg_college)})")
+    print(f"league debut speed — HS median {lg_debut_speed['HS']}y (n={len(lg_hs)}), "
+          f"College median {lg_debut_speed['College']}y (n={len(lg_college)}), "
+          f"all median {lg_debut_speed['all']}y (n={len(lg_all)})")
 
 if __name__ == "__main__":
     main()
