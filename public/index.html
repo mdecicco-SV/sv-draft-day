@@ -681,6 +681,11 @@
   .rf-otile.sel { background:#fdeecd; border-color:#e8920e; }
   .rf-otile:hover { border-color:rgba(0,0,0,.4); }
   .rf-selcap { font-size:11.5px; color:var(--muted); margin:2px 0 6px; }
+  /* long filter labels (COMPOSITE) get their own air — never collide with the chip/value */
+  .rf-lab-air { width:auto !important; min-width:52px; margin-right:12px; }
+  .rf-rankmenu { min-width:300px; padding:14px 16px; }
+  .rf-rankmenu .res-slab { margin-left:6px; }
+  .rf-rankmenu .dual { margin-top:10px; }
   .rf-wgrid { margin-top:9px; }
   /* Fine-tune slider grid — contained (minmax(0,1fr)) but generous: the box is wide,
      use it. Full-width tracks, roomy gutters, labels that never collide with values. */
@@ -4437,17 +4442,37 @@
   // ---- data selection ----
   // Columns = (SV clients side, minus any toggled off) ∪ (board side, only those toggled on).
   // Each side has a binary master (clientsSide / boardSide) so a whole side can be shut off.
+  // Shared population predicate — Position / Class / Level / Composite band apply to
+  // EVERYTHING on the tab (both column sides, board auto-fill, pins, hidden fits).
+  function rfPasses(c) {
+    if (resFit.pos.size && !baPosTokens(c).some(t => resFit.pos.has(t))) return false;
+    if (resFit.cls.size && !resFit.cls.has(rfCompCls(c))) return false;
+    if (resFit.lvl.size && !resFit.lvl.has(rfCompLvl(c))) return false;
+    if ((resFit.rkLo > 1 || resFit.rkHi) && !(c.rank >= resFit.rkLo && (!resFit.rkHi || c.rank <= resFit.rkHi))) return false;
+    return true;
+  }
+  const RF_BOARD_CAP = 100;
+  // Rest of Board is REFLEXIVE: toggled on, it auto-populates with whatever the filters
+  // select from the full composite (minus clients) — no filters = top 100 by rank;
+  // filtered = the appropriate subset (top 100 of it if larger). Manual pins ride along.
+  function rfBoardAuto() {
+    const clientKeys = new Set(DATA.clientList.filter(c=>c.comp).map(c=>c.key));
+    return DATA.composite.filter(c => !clientKeys.has(normName(c.name)) && rfPasses(c))
+      .slice().sort((a,b)=>(a.rank||9999)-(b.rank||9999)).slice(0, RF_BOARD_CAP);
+  }
   function rfPlayerList() {
     const clients = DATA.clientList.filter(c=>c.comp);
     const clientKeys = new Set(clients.map(c=>c.key));
     let list = [];
-    if (resFit.clientsSide) for (const c of clients) if (!resFit.clientsOff.has(c.key)) list.push(c.comp);
-    if (resFit.boardSide) for (const key of resFit.boardOn) {
-      if (clientKeys.has(key)) continue; const comp = DATA.compByName.get(key); if (comp) list.push(comp); }
-    if (resFit.pos.size) list = list.filter(c => baPosTokens(c).some(t => resFit.pos.has(t)));
-    if (resFit.cls.size) list = list.filter(c => resFit.cls.has(rfCompCls(c)));
-    if (resFit.lvl.size) list = list.filter(c => resFit.lvl.has(rfCompLvl(c)));
-    if (resFit.rkLo > 1 || resFit.rkHi) list = list.filter(c => c.rank >= resFit.rkLo && (!resFit.rkHi || c.rank <= resFit.rkHi));
+    if (resFit.clientsSide) for (const c of clients) if (!resFit.clientsOff.has(c.key) && rfPasses(c.comp)) list.push(c.comp);
+    if (resFit.boardSide) {
+      for (const c of rfBoardAuto()) list.push(c);
+      for (const key of resFit.boardOn) {   // explicit pins (still filter-gated)
+        if (clientKeys.has(key)) continue;
+        const comp = DATA.compByName.get(key);
+        if (comp && rfPasses(comp)) list.push(comp);
+      }
+    }
     const seen = new Set();
     list = list.filter(c => { const k=normName(c.name); if (seen.has(k)) return false; seen.add(k); return true; });
     list.sort((a,b) => (a.rank||9999)-(b.rank||9999));
@@ -4464,13 +4489,8 @@
   function rfBoardFiltered() {
     const clientKeys = new Set(DATA.clientList.filter(c=>c.comp).map(c=>c.key));
     const q = rfBoardQuery.trim().toLowerCase();
-    let list = DATA.composite.filter(c => !clientKeys.has(normName(c.name)));
+    let list = DATA.composite.filter(c => !clientKeys.has(normName(c.name)) && rfPasses(c));
     if (q) list = list.filter(c => (c.name||"").toLowerCase().includes(q));
-    // population filters apply here too — "add all shown" honors the tab's chips
-    if (resFit.pos.size) list = list.filter(c => baPosTokens(c).some(t => resFit.pos.has(t)));
-    if (resFit.cls.size) list = list.filter(c => resFit.cls.has(rfCompCls(c)));
-    if (resFit.lvl.size) list = list.filter(c => resFit.lvl.has(rfCompLvl(c)));
-    if (resFit.rkLo > 1 || resFit.rkHi) list = list.filter(c => c.rank >= resFit.rkLo && (!resFit.rkHi || c.rank <= resFit.rkHi));
     return list;
   }
   // Board dropdown list HTML (non-client composite, filtered by the search box + chips) —
@@ -4536,14 +4556,15 @@
       <button class="tc-chip rf-caret" onclick="rfMenu('clients',event)">▾</button>${clientsMenu}</span>`;
     const boardFilteredN = !rfBoardMenu ? 0 : rfBoardFiltered().length;
     const boardMenu = !rfBoardMenu ? "" : `<div class="res-posmenu rf-menu rf-menu-wide" onclick="event.stopPropagation()">
+      <div class="rf-selcap" style="margin:0 0 8px">Auto-populates from the tab filters (top ${RF_BOARD_CAP} by rank). Pin players below to keep them in view (filters permitting).</div>
       <input id="rfBoardSearch" class="res-findin" type="search" placeholder="Search the board…" autocomplete="off" value="${rfBoardQuery.replace(/"/g,"&quot;")}" oninput="rfBoardSearch(this.value)">
       <div class="res-posrow">
-        <button class="tc-chip grp" onclick="rfBoardAddAll(event)">+ add all shown (${boardFilteredN>100?"top 100":boardFilteredN})</button>
+        <button class="tc-chip grp" onclick="rfBoardAddAll(event)">+ pin all shown (${boardFilteredN>100?"top 100":boardFilteredN})</button>
         ${resFit.boardOn.size?`<button class="tc-chip clear" onclick="rfBoardClearAll(event)">✕ clear selected (${resFit.boardOn.size})</button>`:""}
       </div>
       <div class="rf-menulist" id="rfBoardList">${rfBoardListHtml()}</div></div>`;
     const boardDrop = `<span class="rf-drop res-pdrop">
-      <button class="tc-chip rf-side${resFit.boardSide?' on':''}" onclick="rfSide('board')">Rest of Board · ${resFit.boardSide?(resFit.boardOn.size||0):"off"}</button>
+      <button class="tc-chip rf-side${resFit.boardSide?' on':''}" onclick="rfSide('board')" title="Auto-populates with the players your filters select (top ${RF_BOARD_CAP} by rank)">Rest of Board · ${resFit.boardSide?rfBoardAuto().length:"off"}</button>
       <button class="tc-chip rf-caret" onclick="rfMenu('board',event)">▾</button>${boardMenu}</span>`;
     const playersRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Columns</span>${clientsDrop}${boardDrop}</div>`;
     // Position: same POS_TREE dropdown as Best Available / Player Research (token-level,
@@ -4565,12 +4586,12 @@
       ${["HS","College","JuCo"].map(v=>chip(resFit.lvl.has(v),v,`rfLvlTok('${v}')`)).join("")}</div>`;
     const rkMax = rfRkMax(), rkHi = resFit.rkHi || rkMax;
     const rkActive = resFit.rkLo > 1 || rkHi < rkMax;
-    const rankMenu = !rfRankMenu ? "" : `<div class="res-posmenu rf-menu" onclick="event.stopPropagation()" style="min-width:260px">
-      <div class="res-slider"><span class="tc-wizlab">Composite</span><span class="res-slab" id="rfRkLab">#${resFit.rkLo} – #${rkHi}</span>
+    const rankMenu = !rfRankMenu ? "" : `<div class="res-posmenu rf-menu rf-rankmenu" onclick="event.stopPropagation()">
+      <div class="res-slider"><span class="tc-wizlab rf-lab-air">Composite</span><span class="res-slab" id="rfRkLab">#${resFit.rkLo} – #${rkHi}</span>
         <div class="dual"><input type="range" id="rfRkLo" min="1" max="${rkMax}" step="1" value="${resFit.rkLo}" oninput="rfRankSlide()">
         <input type="range" id="rfRkHi" min="1" max="${rkMax}" step="1" value="${rkHi}" oninput="rfRankSlide()"></div></div>
       ${rkActive?`<div class="res-posrow"><button class="tc-chip clear" onclick="rfRankClear(event)">✕ full board</button></div>`:""}</div>`;
-    const rankRow = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab">Composite</span>
+    const rankRow = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab rf-lab-air">Composite</span>
       <button class="tc-chip${rkActive?' on':''}" onclick="rfRankOpen(event)">${rkActive?`#${resFit.rkLo}–#${rkHi}`:"Any rank"} ▾</button>${rankMenu}</div>`;
     // Outlooks = the four questions — click to select/deselect (multi-select averages them);
     // none selected (or all four) reads as "Overall".
