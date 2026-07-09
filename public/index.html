@@ -505,9 +505,10 @@
     text-shadow:0 0 2px #fff, 0 0 2px #fff; pointer-events:none; }
   .tc-mixbar .tick::after { content:""; position:absolute; left:50%; top:11px; width:1px; height:14px;
     background:var(--ink); transform:translateX(-50%); }
-  .tc-mixbar .tick .tkd { position:absolute; top:-1px; font-size:9.5px; font-weight:900; color:var(--ink);
-    white-space:nowrap; background:#fff; border-radius:3px; padding:0 4px; line-height:15px;
-    box-shadow:0 0 0 1px rgba(0,0,0,.08); }
+  /* delta rides directly on the bar (no chip) — a tight white halo keeps black legible on red/gray */
+  .tc-mixbar .tick .tkd { position:absolute; top:3px; line-height:14px; font-size:9.5px; font-weight:900;
+    color:var(--ink); white-space:nowrap;
+    text-shadow:0 0 2px #fff, 0 0 2px #fff, 1px 1px 1px #fff, -1px -1px 1px #fff, 1px -1px 1px #fff, -1px 1px 1px #fff; }
   /* 4-way HS/COL × Hitter/Pitcher heat matrix — a compact, right-anchored support graphic */
   .tc-mat { display:grid; grid-template-columns:auto 74px 74px; gap:3px; margin:7px 0 0 auto; width:max-content; }
   .tc-mat .hd { font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.3px;
