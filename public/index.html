@@ -978,6 +978,9 @@
   body.mob .ba-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   body.mob #viewBest table.ba { min-width:680px; }
   body.mob #viewBest table.ba .hide-sm { display:table-cell; }
+  /* sticky top:128px anchors to the scroll wrapper (not the viewport) once we scroll
+     horizontally, floating the header mid-table — pin it static at the top on mobile. */
+  body.mob #viewBest table.ba th { position:static; top:auto; }
   body.mob #viewBest table.ba th, body.mob #viewBest table.ba td { padding:8px 6px; white-space:nowrap; }
   body.mob #viewBest table.ba th:first-child, body.mob #viewBest table.ba td:first-child { padding-left:8px; }
   body.mob #fQuery { min-width:120px; }
