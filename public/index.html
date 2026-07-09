@@ -674,12 +674,7 @@
   .dual input[type=range]::-moz-range-thumb { pointer-events:auto; width:12px; height:12px; border-radius:50%; background:#fff; border:2.5px solid var(--red); cursor:pointer; }
   .tc-wizsum > span:first-child { font-weight:700; font-variant-numeric:tabular-nums; }
   .tc-wizscope { color:var(--muted); font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
-  /* Research sub-tabs */
-  .res-subtabs { display:flex; gap:8px; margin-bottom:14px; border-bottom:2px solid var(--line); }
-  .res-subtab { font:inherit; font-size:12px; font-weight:900; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; padding:7px 4px; cursor:pointer; }
-  .res-subtab:hover { color:var(--ink); }
-  .res-subtab.on { color:var(--red); border-bottom-color:var(--red); }
-  /* Team-fit module — controls + heat grid (players × orgs) */
+  /* Team-fit view — controls + heat grid (players × orgs) */
   /* Whole control stack sticks under the app chrome (mirrors .res-filters; --theadTop is
      measured live) so the grid scrolls under it; page bg keeps the seam clean. */
   #rfControls { position:sticky; top:var(--theadTop, 128px); z-index:10; background:var(--bg); padding-bottom:2px; }
@@ -1216,6 +1211,7 @@
   <button id="tabPools" onclick="setView('pools')">Bonus Pools</button>
   <button id="tabBest" onclick="setView('best')">Best Available</button>
   <button id="tabResearch" onclick="setView('research')">Research</button>
+  <button id="tabFit" onclick="setView('fit')">Team Fit</button>
 </nav>
 
 <div class="bar hidden" id="mockBar">
@@ -1316,15 +1312,9 @@
     </div>
   </section>
 
-  <!-- RESEARCH — two sub-tabs: precedent wizard (default) + team-fit grid -->
+  <!-- RESEARCH — the precedent wizard over the full 2018-25 tracker -->
   <section id="viewResearch" class="view">
-    <div class="res-subtabs">
-      <button id="rstResearch" class="res-subtab on" onclick="setResTab('research')">Player Research</button>
-      <button id="rstFit" class="res-subtab" onclick="setResTab('fit')">Team Fit</button>
-    </div>
-    <!-- Sub-tab 1: the precedent wizard over the full 2018-25 tracker (default landing) -->
-    <div id="resPaneResearch">
-      <div class="res-grid">
+    <div class="res-grid">
         <div class="res-filters" id="resFilters"></div>
         <div class="res-out">
           <!-- Ask the data — static box (outside the re-rendered containers) → /api/ask -->
@@ -1341,12 +1331,12 @@
           <div id="resTable"></div>
         </div>
       </div>
-    </div>
-    <!-- Sub-tab 2: team-fit grid — every player × every org, blended from the fit engine -->
-    <div id="resPaneFit" style="display:none">
-      <div id="rfControls"></div>
-      <div class="rf-gridwrap" id="rfGrid"></div>
-    </div>
+  </section>
+
+  <!-- TEAM FIT — heat grid: every player × every org, blended from the fit engine -->
+  <section id="viewFit" class="view">
+    <div id="rfControls"></div>
+    <div class="rf-gridwrap" id="rfGrid"></div>
   </section>
 </main>
 
@@ -1357,6 +1347,7 @@
   <button data-view="best" onclick="setView('best')"><span class="mi">≡</span>Best</button>
   <button data-view="pools" onclick="setView('pools')"><span class="mi">$</span>Pools</button>
   <button data-view="research" onclick="setView('research')"><span class="mi">⌕</span>Research</button>
+  <button data-view="fit" onclick="setView('fit')"><span class="mi">⊞</span>Team Fit</button>
 </nav>
 
 <!-- War-room notebook: shared free-form notes over /api/intel (kind:"note") — every view -->
@@ -1603,6 +1594,7 @@
       }
       if (cardPick!=null) renderTeamCard(currentState);
       if (VIEW==="research") renderResearch();
+      else if (VIEW==="fit") renderResFit();
     } catch (e) {}
   }
   // Renamed franchises alias forward so 2018-25 tracker rows pool under today's name.
@@ -3352,7 +3344,7 @@
     if (bonusEdit!=null && !(e.target.closest && e.target.closest(".bc-bform"))) { bonusEdit = null; renderBoard(currentState); }
     if (resPosOpen && !(e.target.closest && e.target.closest(".res-pdrop"))) { resPosOpen = false; renderResearch(); }
     if (baOpen && !(e.target.closest && e.target.closest(".ba-drop"))) { baOpen = null; renderBaChips(); }
-    if ((rfClientsMenu||rfBoardMenu||rfPosMenu||rfRankMenu) && !(e.target.closest && e.target.closest(".rf-drop, .res-pdrop"))) { rfClientsMenu = false; rfBoardMenu = false; rfPosMenu = false; rfRankMenu = false; if (resTab==="fit") renderRfControls(); }
+    if ((rfClientsMenu||rfBoardMenu||rfPosMenu||rfRankMenu) && !(e.target.closest && e.target.closest(".rf-drop, .res-pdrop"))) { rfClientsMenu = false; rfBoardMenu = false; rfPosMenu = false; rfRankMenu = false; if (VIEW==="fit") renderRfControls(); }
   });
   window.toggleBoardClient = (key, e) => {
     if (e) e.stopPropagation();
@@ -4540,7 +4532,6 @@
     $("resBnLab").textContent = `${fmtM(research.bnLo)} – ${research.bnHi>=BN_MAX?"$10M+":fmtM(research.bnHi)}`;
     if (resFindQ) resFindInput(resFindQ);   // rebuild the typeahead menu after the innerHTML swap
     renderResearchResults();
-    applyResTab();   // reflect the saved sub-tab (and draw the fit grid if that's where we land)
   }
 
   // ================= TEAM FIT — players × orgs, blended from the fit engine =================
@@ -4604,7 +4595,7 @@
   const RF_DEF = () => ({ clientsSide:true, clientsOff:new Set(), boardSide:false, boardOn:new Set(),
     pos:new Set(), cls:new Set(), lvl:new Set(), rkLo:1, rkHi:0, teamsOff:new Set(), gradeMin:0, sel:new Set(), custom:false, ftOpen:false,
     weights:rfMergeSel(new Set()), tOpen:false, sortCol:null, sortDir:"desc", hidden:false });
-  let resFit = RF_DEF(), resFitDrawn = false, resTab = "research", fitSel = null;
+  let resFit = RF_DEF(), resFitDrawn = false, fitSel = null;
   let rfClientsMenu = false, rfBoardMenu = false, rfBoardQuery = "", rfPosMenu = false, rfRankMenu = false;   // dropdown state (session)
   let _rfRkMax = null;
   const rfRkMax = () => _rfRkMax || (_rfRkMax = DATA.composite.length ? Math.max(...DATA.composite.map(c => c.rank || 0)) : 674);
@@ -4656,7 +4647,8 @@
       resFit.tOpen = !!sv.tOpen;
       resFit.sortCol = typeof sv.sortCol==="string" ? sv.sortCol : null;
       resFit.sortDir = sv.sortDir==="asc" ? "asc" : "desc";
-      if (sv.tab==="fit") resTab = "fit";
+      // (older saves carried a tab:"research"|"fit" sub-tab choice — Team Fit is its own
+      //  top-level view now, so any stored sub-tab is ignored)
     }
   } catch (e) {}
   function rfSave() {
@@ -4665,18 +4657,8 @@
       pos:[...resFit.pos], cls:[...resFit.cls], lvl:[...resFit.lvl], rkLo:resFit.rkLo, rkHi:resFit.rkHi,
       teamsOff:[...resFit.teamsOff], gradeMin:resFit.gradeMin,
       sel:[...resFit.sel], custom:resFit.custom, weights:resFit.weights, hidden:resFit.hidden, tOpen:resFit.tOpen,
-      ftOpen:resFit.ftOpen, sortCol:resFit.sortCol, sortDir:resFit.sortDir, tab:resTab })); } catch (e) {}
+      ftOpen:resFit.ftOpen, sortCol:resFit.sortCol, sortDir:resFit.sortDir })); } catch (e) {}
   }
-  // ---- sub-tab switching (Player Research ↔ Team Fit) ----
-  function applyResTab() {
-    const rr=$("rstResearch"), rf=$("rstFit"), pr=$("resPaneResearch"), pf=$("resPaneFit");
-    if (!rr||!rf||!pr||!pf) return;
-    rr.classList.toggle("on", resTab==="research"); rf.classList.toggle("on", resTab==="fit");
-    pr.style.display = resTab==="research" ? "" : "none";
-    pf.style.display = resTab==="fit" ? "" : "none";
-    if (resTab==="fit") renderResFit();
-  }
-  window.setResTab = (t) => { resTab = t==="fit" ? "fit" : "research"; rfSave(); applyResTab(); };
 
   // ---- data selection ----
   // Columns = (SV clients side, minus any toggled off) ∪ (board side, only those toggled on).
@@ -5815,7 +5797,7 @@
   })();
   const VIEWS = [["tabClients","viewClients","clients"],["tabBoard","viewBoard","board"],
                  ["tabPools","viewPools","pools"],["tabBest","viewBest","best"],
-                 ["tabResearch","viewResearch","research"]];
+                 ["tabResearch","viewResearch","research"],["tabFit","viewFit","fit"]];
   function renderActive() {
     if (!currentState) return;
     renderLeadStrip();   // X-lead chips reconcile against fresh official picks on every repaint
@@ -5839,7 +5821,10 @@
     }
     else if (VIEW==="research") {
       if (!researchDrawn) renderResearch();                         // static data — no tick re-render (sliders!)
-      else if (resTab==="fit") renderRfGrid();                      // fit grid tracks live pools/intel; controls untouched
+    }
+    else if (VIEW==="fit") {
+      if (!resFitDrawn) { loadSlotHistory(); renderResFit(); }      // first entry draws controls + grid
+      else renderRfGrid();                                          // fit grid tracks live pools/intel; controls untouched
     }
     else renderBest();
   }
@@ -6293,11 +6278,11 @@
     pushState.busy = false; renderPushCtl();
   };
 
-  // Shareable deep-links into Research: #teamfit opens the team-fit grid, #research the wizard.
+  // Shareable deep-links: #teamfit opens the Team Fit grid, #research the precedent wizard.
   const applyResHash = () => {
     const hh = (location.hash||"").toLowerCase();
-    if (hh==="#teamfit" || hh==="#team-fit") { setView("research"); setResTab("fit"); }
-    else if (hh==="#research") { setView("research"); setResTab("research"); }
+    if (hh==="#teamfit" || hh==="#team-fit") setView("fit");
+    else if (hh==="#research") setView("research");
   };
   window.addEventListener("hashchange", applyResHash);
 
