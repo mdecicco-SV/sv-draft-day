@@ -490,6 +490,28 @@
   .tc-kv .v { font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; }
   .hg-pct { color:var(--muted); font-weight:700; }
   .pi-ovr { color:var(--muted); font-weight:600; margin-left:2px; }
+  /* split proportion bar (Panel 2 mix metrics) — team share + league-avg tick */
+  .tc-mixbar { padding:5px 0; border-top:1px solid var(--line); }
+  .tc-mixbar .top { display:flex; justify-content:space-between; align-items:baseline; }
+  .tc-mixbar .top .k { font-size:11.5px; color:var(--muted); font-weight:700; }
+  .tc-mixbar .top .v { font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .tc-mixbar .track { position:relative; display:flex; height:14px; margin-top:5px; border-radius:4px;
+    overflow:hidden; background:var(--line); }
+  .tc-mixbar .seg-l, .tc-mixbar .seg-r { display:flex; align-items:center; font-size:8.5px; font-weight:900;
+    letter-spacing:.4px; color:#fff; overflow:hidden; }
+  .tc-mixbar .seg-l { background:var(--red); padding-left:5px; }
+  .tc-mixbar .seg-r { flex:1; justify-content:flex-end; padding-right:5px; background:#b8bcc4; }
+  .tc-mixbar .tick { position:absolute; top:-3px; transform:translateX(-50%); font-size:9px; color:var(--ink);
+    text-shadow:0 0 2px #fff, 0 0 2px #fff; pointer-events:none; }
+  .tc-mixbar .tick::after { content:""; position:absolute; left:50%; top:11px; width:1px; height:14px;
+    background:var(--ink); transform:translateX(-50%); }
+  /* 4-way HS/COL × Hitter/Pitcher heat matrix */
+  .tc-mat { display:grid; grid-template-columns:auto 1fr 1fr; gap:3px; margin-top:8px; }
+  .tc-mat .hd { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.4px;
+    color:var(--muted); display:flex; align-items:center; justify-content:center; }
+  .tc-mat .cell { display:flex; align-items:center; justify-content:center; height:26px; border-radius:5px;
+    border:1px solid var(--line); font-size:11px; font-weight:900; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .tc-mat-cap { margin:6px 0 0; }
   .tc-feed-row { display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-top:1px solid var(--line); }
   .tc-feed-row:first-child { border-top:none; }
   .tc-feed-meta { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); }
@@ -1463,11 +1485,16 @@
     const byTeam = new Map();
     for (const r of DATA.slotHistory) {
       const t = NAME_FWD[r.team] || r.team;
-      const v = byTeam.get(t) || { n:0, p:0, hs:0 };
+      const v = byTeam.get(t) || { n:0, p:0, hs:0, hsHit:0, hsP:0, colHit:0, colP:0 };
       v.n++; if (r.group==="P") v.p++; if (r.level==="HS") v.hs++;
+      // 4-way HS/COL × Hitter/Pitcher (JuCo folds into College, matching hsPct's framing)
+      const isHS = r.level==="HS", isP = r.group==="P";
+      if (isHS && !isP) v.hsHit++; else if (isHS && isP) v.hsP++;
+      else if (!isHS && !isP) v.colHit++; else v.colP++;
       byTeam.set(t, v);
     }
-    const teams = [...byTeam.entries()].map(([t,v]) => ({ t, pPct:100*v.p/v.n, hsPct:100*v.hs/v.n, n:v.n }));
+    const teams = [...byTeam.entries()].map(([t,v]) => ({ t, pPct:100*v.p/v.n, hsPct:100*v.hs/v.n, n:v.n,
+      hsHit:v.hsHit, hsP:v.hsP, colHit:v.colHit, colP:v.colP }));
     const mean = f => teams.length ? teams.reduce((s,x)=>s+f(x),0)/teams.length : null;
     DATA.leagueTend = {
       byTeam: new Map(teams.map(x=>[x.t, x])),
@@ -3434,6 +3461,17 @@
     const rkCls = n => n<=10 ? "rk-hi" : n<=20 ? "rk-mid" : "rk-lo";
     const vsLg = (val, avg, rank) => (val==null || avg==null) ? "—"
       : `${val-avg>=0?"+":"−"}${Math.abs(val-avg).toFixed(1)}%${rank?` <span class="hg-pct ${rkCls(rank)}">· ${ord(rank)}</span>`:""}`;
+    const clamp = (v) => Math.max(0, Math.min(100, v));
+    // Split proportion bar: left segment = the team's actual share (leftShort), right = remainder;
+    // a ▲ tick marks the league average so the lean (and how it beats/trails the league) is obvious.
+    const mixBar = (label, leftShort, rightShort, leftPct, avgLeftPct, rank) => {
+      if (leftPct==null) return `<div class="tc-kv"><span class="k">${label}</span><span class="v">${avgLeftPct==null?"…":"—"}</span></div>`;
+      const lp = clamp(leftPct), tick = clamp(avgLeftPct);
+      return `<div class="tc-mixbar"><div class="top"><span class="k">${label}</span>
+        <span class="v">${Math.round(leftPct)}% ${leftShort}${rank?` <span class="hg-pct ${rkCls(rank)}">· ${ord(rank)}</span>`:""}</span></div>
+        <div class="track"><span class="seg-l" style="width:${lp}%">${leftShort}</span><span class="seg-r">${rightShort}</span>
+        <span class="tick" style="left:${tick}%" title="league avg ${avgLeftPct.toFixed(1)}%">▲</span></div></div>`;
+    };
     h += `<div class="tc-sub">vs league average · rank of 30</div>`;
     // homegrown = drafted by this org & still with them (MLB StatsAPI bake)
     const hg = o.hgLevels, lgHG = DATA.lgHomegrown || {};
@@ -3443,12 +3481,28 @@
     } else {
       h += `<div class="tc-kv"><span class="k">Homegrown</span><span class="v">${o.homegrown!=null?`${o.homegrown} in system`:"—"}</span></div>`;
     }
+    // MLB-debut sits directly above the mix rows; then the two split bars.
+    h += `<div class="tc-kv"><span class="k">MLB-debut rate (dev)</span><span class="v">${vsLg(dev.mlbDebut!=null?100*dev.mlbDebut:null, DATA.lgDebut?DATA.lgDebut.avg:null, o.rankDebut)}</span></div>`;
     // Team-wide 2018-25 draft behavior vs the league (leagueTendencies reducer)
     const myName = pk.teamName || "";
     const lt = DATA.leagueTend, tt = lt ? lt.byTeam.get(myName) : null;
-    h += `<div class="tc-kv"><span class="k">Pitchers vs hitters</span><span class="v">${!lt?"…":tt?vsLg(tt.pPct, lt.avgP, lt.rankP(myName)):"—"}</span></div>`;
-    h += `<div class="tc-kv"><span class="k">HS vs College</span><span class="v">${!lt?"…":tt?vsLg(tt.hsPct, lt.avgHS, lt.rankHS(myName)):"—"}</span></div>`;
-    h += `<div class="tc-kv"><span class="k">MLB-debut rate (dev)</span><span class="v">${vsLg(dev.mlbDebut!=null?100*dev.mlbDebut:null, DATA.lgDebut?DATA.lgDebut.avg:null, o.rankDebut)}</span></div>`;
+    h += mixBar("Pitchers vs hitters", "P", "H", tt?tt.pPct:null, lt?lt.avgP:null, tt?lt.rankP(myName):null);
+    h += mixBar("HS vs College", "HS", "COL", tt?tt.hsPct:null, lt?lt.avgHS:null, tt?lt.rankHS(myName):null);
+    // 4-way distribution: HS/COL × Hitter/Pitcher across 2018-25, shaded by share of the team's picks
+    if (tt) {
+      const total = tt.hsHit + tt.hsP + tt.colHit + tt.colP;
+      if (total >= 10) {
+        const cells = [["hsHit","HS","Hitter"],["colHit","COL","Hitter"],["hsP","HS","Pitcher"],["colP","COL","Pitcher"]]
+          .map(([k]) => ({ k, share: tt[k]/total, n: tt[k] }));
+        const maxShare = Math.max(...cells.map(c=>c.share)) || 1;
+        const cell = (c) => `<span class="cell" style="background:rgba(200,16,46,${(0.10+0.80*(c.share/maxShare)).toFixed(3)})" title="${c.n} of ${total}">${Math.round(100*c.share)}%</span>`;
+        h += `<div class="tc-mat">
+          <span class="hd"></span><span class="hd">HS</span><span class="hd">COL</span>
+          <span class="hd">Hit</span>${cell(cells[0])}${cell(cells[1])}
+          <span class="hd">Pit</span>${cell(cells[2])}${cell(cells[3])}</div>`;
+        h += `<div class="tc-sub tc-mat-cap">bat/arm × level · 2018–25 · n=${total}</div>`;
+      }
+    }
     // The org's actual picks in THIS round (special rounds fold forward), for the
     // precedent list below and the selected player's habit note.
     const rd = numericRound(state, pk);
