@@ -1719,6 +1719,18 @@
       DATA.prospects = pros || {};   // Org Review MLB.com T30 per org (build_prospects.py)
       DATA.drafthist = dh;           // 2018-25 rounds 1-10 picks + outcomes (build_drafthist.py)
       DATA.warhist = wh;             // 2008-25 career-WAR draft lookback + aWAR (build_warhist.py)
+      // Empirical fit layer (ported from sv-draft-fit) — all optional-file degrade:
+      // regime windows, farm-system depth, NCAA projectability, merged 2021-25 draft DB.
+      try {
+        const [rg, fd, pj, db] = await Promise.all([
+          fetch("/data/regime.json").then(r=>r.ok?r.json():null).catch(()=>null),
+          fetch("/data/farmdepth.json").then(r=>r.ok?r.json():null).catch(()=>null),
+          fetch("/data/projection.json").then(r=>r.ok?r.json():null).catch(()=>null),
+          fetch("/data/draftdb.json").then(r=>r.ok?r.json():null).catch(()=>null),
+        ]);
+        DATA.regime = rg || {}; DATA.farmdepth = fd || {}; DATA.projection = pj || {};
+        DATA.draftdb = Array.isArray(db) ? db : [];
+      } catch (e) { DATA.regime = {}; DATA.farmdepth = {}; DATA.projection = {}; DATA.draftdb = []; }
       // homegrown-by-level (baked from MLB StatsAPI, keyed by team id) → org records,
       // with each team's league rank on the two homegrown percentages
       if (hg) {
@@ -2162,6 +2174,259 @@
     }
     return order(W.picks.filter(p=>p.g===g)).slice(0, limit);
   }
+  // ================= EMPIRICAL FIT ENGINE — port of sv-draft-fit/src/lib/algorithm.ts =================
+  // Regime-aware org scoring (Kent Matthes weights, Apr 2026) over the merged 2021-25 draft DB
+  // (draftdb.json: reached_mlb / total_war / bonus_vs_slot_pct per pick), farm-system depth
+  // (farmdepth.json), regime windows (regime.json), live bonus pools, and geography.
+  // Every function degrades to 0.5-neutral when its data file is absent — the classic lenses
+  // keep working untouched. All scores keep the 0-1 contract of the existing fit engine.
+  const DF_WEIGHTS = {   // stakeholder weights: development / bonus_pool / spending / depth / geography
+    HS:      { dev:0.36, pool:0.18, spend:0.18, depth:0.18, geo:0.10 },
+    College: { dev:0.29, pool:0.20, spend:0.20, depth:0.29, geo:0.02 },
+  };
+  // spring-training sites (lat,lng) keyed by OUR feed abbrevs
+  const DF_ST = { ATL:[27.0586,-82.1543], BAL:[27.3364,-82.5307], BOS:[26.5364,-81.8723],
+    DET:[28.0395,-81.9498], HOU:[26.7153,-80.0534], MIA:[26.9342,-80.0942], MIN:[26.5364,-81.8723],
+    NYM:[27.2730,-80.3884], NYY:[27.7706,-82.6873], PHI:[27.9758,-82.7298], PIT:[27.4989,-82.5749],
+    STL:[26.9342,-80.0942], TB:[26.8785,-82.0023], TOR:[28.0332,-82.7543], WSH:[26.7153,-80.0534],
+    ARI:[33.4608,-111.9261], CHC:[33.4384,-111.8318], CHW:[33.5072,-112.1859], CIN:[33.4394,-112.3577],
+    CLE:[33.4394,-112.3577], COL:[33.4608,-111.9261], KC:[33.6292,-112.3679], LAA:[33.4255,-111.9400],
+    LAD:[33.5072,-112.1859], MIL:[33.4484,-112.0740], ATH:[33.4384,-111.8318], SD:[33.6461,-112.2259],
+    SEA:[33.6461,-112.2259], SF:[33.4608,-111.9261], TEX:[33.6292,-112.3679] };
+  const DF_STATE = { AL:[32.8,-86.8],AK:[64,-153],AZ:[34.3,-111.7],AR:[34.8,-92.2],CA:[37.2,-119.7],
+    CO:[39,-105.5],CT:[41.6,-72.7],DE:[39,-75.5],FL:[28.6,-82.4],GA:[32.7,-83.4],HI:[20.5,-157.5],
+    ID:[44.4,-114.6],IL:[40,-89.2],IN:[39.9,-86.3],IA:[42,-93.5],KS:[38.5,-98.3],KY:[37.8,-85.7],
+    LA:[31.1,-92],ME:[45.4,-69.2],MD:[39,-76.8],MA:[42.2,-71.8],MI:[44.3,-84.6],MN:[46.3,-94.3],
+    MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[47.1,-109.6],NE:[41.5,-99.8],NV:[39.9,-116.8],NH:[43.7,-71.6],
+    NJ:[40.1,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.6,-79.8],ND:[47.5,-100.4],OH:[40.2,-82.8],
+    OK:[35.6,-97.5],OR:[44.1,-120.5],PA:[40.9,-77.8],RI:[41.7,-71.5],SC:[33.9,-80.9],SD:[44.4,-100.2],
+    TN:[35.9,-86.4],TX:[31.5,-99.4],UT:[39.3,-111.7],VA:[37.5,-78.9],VT:[44.1,-72.6],WA:[47.4,-120.7],
+    WV:[38.6,-80.6],WI:[44.6,-89.7],WY:[43,-107.5],DC:[38.9,-77] };
+  const dfReady = () => DATA.draftdb && DATA.draftdb.length && DATA.regime && Object.keys(DATA.regime).length;
+  // regime window: a GM's first draft is start_year+1 (July draft, most hires Aug-Dec);
+  // long-tenured GMs floor at 2021 (data floor); brand-new regimes borrow the prior org.
+  function dfRegime(team) {
+    const r = DATA.regime && DATA.regime[team];
+    if (!r) return { source: team, start: 2021, end: 9999, gm: null };
+    let start = r.gm_start_year <= 2019 ? 2021 : r.gm_start_year + 1;
+    // Brand-new regimes (first controlled draft 2024+) borrow the GM's prior org —
+    // but his track record THERE is his tenure through the year he left, not his
+    // new club's start year (fixes a source-algorithm bug where the borrowed
+    // window began after the DB ends and scored on zero picks).
+    if (start >= 2024 && r.prior_org) {
+      return { source: r.prior_org, start: 2021, end: r.gm_start_year, gm: r.gm, borrowed: true };
+    }
+    return { source: team, start: Math.max(start, 2021), end: 9999, gm: r.gm };
+  }
+  let _dfIdx = null;   // team -> regime-window picks (built once per load)
+  function dfPicks(team) {
+    if (!dfReady()) return [];
+    if (!_dfIdx) { _dfIdx = {}; for (const p of DATA.draftdb) (_dfIdx[p.team_abbrev] = _dfIdx[p.team_abbrev] || []).push(p); }
+    const rg = dfRegime(team);
+    return (_dfIdx[rg.source] || []).filter(p => p.year >= rg.start && p.year <= rg.end);
+  }
+  // player shape for slicing: {isP, posN, lvl}
+  function dfPlayerOf(comp) {
+    const isP = isPitcher(comp.pos);
+    let posN = (comp.pos || "").toUpperCase().split(/[\/,-]/)[0].trim();
+    if (isP) posN = "P"; else if (["RF","CF","LF"].includes(posN)) posN = "OF";
+    // draftdb.hs_or_college domain is {"HS","C"} (verified) — NOT "College"
+    return { isP, posN, lvl: comp.level === "HS" ? "HS" : "C" };
+  }
+  const dfPickIsP = (p) => (p.position_normalized || "").toUpperCase() === "P" || (p.position_normalized || "").toUpperCase().includes("P");
+  function dfMatch(p, pl, gran) {
+    const pickP = dfPickIsP(p);
+    if (gran === "broad") return pl.isP === pickP;
+    if (gran === "medium") return pl.isP === pickP && p.hs_or_college === pl.lvl;
+    if (pl.isP) return pickP && p.hs_or_college === pl.lvl;
+    return (p.position_normalized || "").toUpperCase() === pl.posN && p.hs_or_college === pl.lvl;
+  }
+  // development: 10 pts reached MLB (×(1+round/20) for rd 3+), +3 each at 1/2/3+ WAR, per pick avg;
+  // broad/medium/fine blend 25/35/40, slices under 3 picks skipped.
+  function dfDevSlice(picks, pl, gran) {
+    const m = picks.filter(p => dfMatch(p, pl, gran));
+    if (m.length < 3) return null;
+    let tot = 0, mlb = 0, w1 = 0, w2 = 0, w3 = 0; const names = [];
+    for (const p of m) {
+      if (!p.reached_mlb) continue;
+      let s = 10; if (p.round >= 3) s *= 1 + p.round / 20;
+      tot += s; mlb++; names.push(p.name);
+      const w = p.total_war || 0;
+      if (w >= 1) { tot += 3; w1++; } if (w >= 2) { tot += 3; w2++; } if (w >= 3) { tot += 3; w3++; }
+    }
+    return { score: tot / m.length, n: m.length, mlb, rate: mlb / m.length, w1, w2, w3, names };
+  }
+  function dfDevRaw(team, pl) {
+    const picks = dfPicks(team);
+    const broad = dfDevSlice(picks, pl, "broad"), med = dfDevSlice(picks, pl, "medium"), fine = dfDevSlice(picks, pl, "fine");
+    let s = 0, w = 0;
+    if (broad) { s += broad.score * 0.25; w += 0.25; }
+    if (med) { s += med.score * 0.35; w += 0.35; }
+    if (fine) { s += fine.score * 0.40; w += 0.40; }
+    const best = fine || med || broad;
+    // Exposure adjustment: the 2021-25 DB is young, and regime windows differ in age —
+    // a 2023-start regime has had no time to produce debuts. Score per pick per
+    // year-of-exposure so old windows don't win on maturity alone.
+    const yrs = picks.length ? picks.reduce((a, p) => a + (2026 - p.year), 0) / picks.length : 0;
+    const raw = (w > 0 ? s / w : 0) / Math.max(1.5, yrs);
+    return { raw, best, exposureYrs: Math.round(yrs * 10) / 10, rg: dfRegime(team) };
+  }
+  // per-player dev scores across all 30 orgs, min-max normalized to 0-1 (cache per player)
+  const _dfDevCache = new Map();
+  function dfDev(team, comp) {
+    if (!dfReady() || !comp) return { dev01: 0.5, known: false };
+    const key = normName(comp.name);
+    let all = _dfDevCache.get(key);
+    if (!all) {
+      const pl = dfPlayerOf(comp);
+      all = {};
+      for (const t of Object.keys(DATA.orgs)) all[t] = dfDevRaw(t, pl);
+      const raws = Object.values(all).map(x => x.raw);
+      const lo = Math.min(...raws), hi = Math.max(...raws);
+      for (const t in all) all[t].dev01 = hi > lo ? (all[t].raw - lo) / (hi - lo) : 0.5;
+      // league reached-MLB rate for this player type (broad), for the reach lens
+      const rates = Object.values(all).map(x => x.best ? x.rate ?? x.best.rate : null).filter(v => v != null);
+      all._lgRate = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
+      _dfDevCache.set(key, all);
+    }
+    const o = all[team];
+    return o ? { dev01: o.dev01, best: o.best, rg: o.rg, lgRate: all._lgRate, known: !!o.best } : { dev01: 0.5, known: false };
+  }
+  // spending: avg bonus-vs-slot % over the regime window, clamped ±20% → 0-1 (cache)
+  const _dfSpendCache = new Map();
+  function dfSpend(team) {
+    if (!dfReady()) return { spend01: 0.5, known: false };
+    if (_dfSpendCache.has(team)) return _dfSpendCache.get(team);
+    const ps = dfPicks(team).filter(p => p.bonus_vs_slot_pct != null);
+    let out;
+    if (!ps.length) out = { spend01: 0.5, known: false };
+    else {
+      const avg = ps.reduce((s, p) => s + p.bonus_vs_slot_pct, 0) / ps.length;
+      out = { spend01: (Math.max(-20, Math.min(20, avg)) + 20) / 40, avgPct: Math.round(avg * 10) / 10, n: ps.length, known: true };
+    }
+    _dfSpendCache.set(team, out); return out;
+  }
+  // farm depth: fewer prospects at his position = less blocked = higher (1 - n/15)
+  function dfDepth(team, comp) {
+    const farm = DATA.farmdepth && DATA.farmdepth[team];
+    if (!farm || !comp) return { depth01: 0.5, known: false };
+    const pl = dfPlayerOf(comp);
+    let at = [];
+    for (const [k, arr] of Object.entries(farm.positions || {})) {
+      const K = k.toUpperCase();
+      const hit = pl.isP ? (K.includes("SP") || K.includes("RP")) : (K === pl.posN);
+      if (hit) at = at.concat(arr);
+    }
+    const n = at.length;
+    return { depth01: Math.max(0, 1 - n / 15), n, known: true,
+      block: n >= 6 ? "high" : n >= 3 ? "medium" : "low",
+      names: at.slice(0, 4).map(p => p.name) };
+  }
+  // geography: haversine home state ↔ spring-training site (0.10 weight HS, 0.02 College)
+  function dfHomeState(comp) {
+    const m = (comp.school || "").match(/\(([A-Z]{2})\)\s*$/);
+    return m && DF_STATE[m[1]] ? m[1] : null;
+  }
+  function dfGeo(team, comp) {
+    const st = DF_ST[team], hs = comp ? dfHomeState(comp) : null;
+    if (!st || !hs) return { geo01: 0.5, known: false };
+    const [la1, lo1] = DF_STATE[hs], [la2, lo2] = st, R = 3959, rad = Math.PI / 180;
+    const dLat = (la2 - la1) * rad, dLon = (lo2 - lo1) * rad;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(la1 * rad) * Math.cos(la2 * rad) * Math.sin(dLon / 2) ** 2;
+    const mi = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return { geo01: 1 - Math.min(mi / 2800, 1), mi: Math.round(mi), state: hs, known: true };
+  }
+  // bonus pool: LIVE pools (richer than sv-draft-fit's static file) min-max across 30
+  function dfPool(team, state) {
+    const pools = state && state.pools ? state.pools : [];
+    if (!pools.length) return { pool01: 0.5, known: false };
+    const mine = pools.find(p => p.team === team);
+    if (!mine) return { pool01: 0.5, known: false };
+    const vals = pools.map(p => p.pool);
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    return { pool01: hi > lo ? (mine.pool - lo) / (hi - lo) : 0.5, known: true };
+  }
+  // ---- projectability: the per-player caliber term the classic engine lacked ----
+  // Blend: NCAA model FV (college) / fv.json (HS fallback) + consensus-rank percentile +
+  // cross-source agreement (rank dispersion). 0-1; null when nothing known.
+  function projOf(comp) { return comp ? (DATA.projection && DATA.projection[normName(comp.name)]) || null : null; }
+  function calibOf(comp) {
+    if (!comp) return { calib01: null };
+    const pj = projOf(comp);
+    const parts = [];
+    const fvv = pj && Number.isFinite(+pj.final_fv) ? Math.max(0, Math.min(1, (+pj.final_fv - 20) / 40)) : fvNormOf(comp);
+    if (fvv != null) parts.push(fvv);
+    if (comp.rank) parts.push(Math.max(0, 1 - (comp.rank - 1) / 315));
+    const srcs = ["ba", "mlb", "espn", "pbr", "overslot", "ath"].map(k => comp[k]).filter(v => v);
+    if (srcs.length >= 2) {
+      const spread = Math.max(...srcs) - Math.min(...srcs);
+      parts.push(Math.max(0, 1 - spread / (comp.rank ? Math.max(comp.rank * 1.5, 30) : 100)));
+    }
+    return { calib01: parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null,
+      fv: pj ? pj.final_fv : fvRawOf(comp), tier: pj ? pj.tier : null,
+      draftProb: pj ? pj.draftProb : null, tools: pj ? pj.tools : null, src: pj ? "NCAA model" : (fvRawOf(comp) != null ? "FV feed" : null) };
+  }
+  // ---- directional lenses: the four questions, each 0-1 ----
+  function dirReach(team, comp) {   // best shot to REACH MLB
+    const d = dfDev(team, comp), o = DATA.orgs[team] || {};
+    const parts = [];
+    if (d.known && d.best && d.lgRate != null) parts.push(Math.max(0, Math.min(1, 0.5 + 1.6 * (d.best.rate - d.lgRate))));
+    if (o.dev && o.dev.mlbDebut != null && DATA.lgDebut) parts.push(Math.max(0, Math.min(1, 0.5 + 2.0 * (o.dev.mlbDebut - DATA.lgDebut.avg / 100))));
+    return { v: parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0.5, known: !!parts.length, d };
+  }
+  function dirDevelop(team, comp) { // maximize DEVELOPMENT (long-run value extraction)
+    const g = comp ? (comp.posGroup || posGroupOf(comp.pos)) : null;
+    const w = comp ? warSignal(team, g, comp.rank, comp.level) : { warN: 0.5, known: false };
+    const d = dfDev(team, comp);
+    // WAR lookback carries 12 mature draft classes; the regime DB only 5 young ones — 60/40.
+    const v = d.known && w.known ? 0.6 * w.warN + 0.4 * d.dev01 : w.known ? w.warN : d.known ? d.dev01 : 0.5;
+    return { v, known: w.known || d.known, war: w, d };
+  }
+  function dirSpeed(team, comp) {   // FASTEST through the pipeline
+    const W = DATA.warhist && DATA.warhist.orgs && DATA.warhist.orgs[team];
+    const ds = W && W.debutSpeed; if (!ds || !comp) return { v: 0.5, known: false };
+    const lvl = comp.level === "HS" ? "HS" : "College";
+    const cell = ds[lvl] || ds.all; if (!cell || !cell.n) return { v: 0.5, known: false };
+    const lg = lvl === "HS" ? 5 : 4;   // league medians baked/verified in warhist
+    return { v: Math.max(0, Math.min(1, 0.5 + 0.25 * (lg - cell.medianYears))), known: true,
+      med: cell.medianYears, n: cell.n, lg, lvl };
+  }
+  function dirEarn(team, comp) {    // best shot at a HIGH-EARNING career
+    // v1 = spending (over-slot habit) + reach-arbitration rate; the WAR→earnings proxy is
+    // gated on methodology approval and NOT included yet.
+    const s = dfSpend(team), o = DATA.orgs[team] || {};
+    const parts = [];
+    if (s.known) parts.push(s.spend01);
+    if (o.dev && o.dev.arb != null) {
+      const lgArb = (() => { const vs = Object.values(DATA.orgs).map(x => x.dev && x.dev.arb).filter(v => v != null);
+        return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null; })();
+      if (lgArb != null) parts.push(Math.max(0, Math.min(1, 0.5 + 2.0 * (o.dev.arb - lgArb))));
+    }
+    return { v: parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0.5, known: !!parts.length, spend: s };
+  }
+  // empirical composite (Kent weights, HS vs College), ratio-compressed around league avg like the source
+  const _dfCompCache = new Map();
+  function dfComposite(comp, team, state) {
+    if (!dfReady() || !comp) return { v: 0.5, known: false };
+    const key = normName(comp.name);
+    let all = _dfCompCache.get(key);
+    if (!all || all._pools !== (state && state.pools)) {
+      const W = DF_WEIGHTS[comp.level === "HS" ? "HS" : "College"];
+      all = { _pools: state && state.pools };
+      for (const t of Object.keys(DATA.orgs)) {
+        all[t] = dfDev(t, comp).dev01 * W.dev + dfPool(t, state).pool01 * W.pool
+          + dfSpend(t).spend01 * W.spend + dfDepth(t, comp).depth01 * W.depth + dfGeo(t, comp).geo01 * W.geo;
+      }
+      const vals = Object.keys(DATA.orgs).map(t => all[t]);
+      all._avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      _dfCompCache.set(key, all);
+    }
+    if (all[team] == null || !all._avg) return { v: 0.5, known: false };
+    const ratio = all[team] / all._avg;   // 0.5-centered, ±0.5 per 100% ratio delta (source compression)
+    return { v: Math.max(0, Math.min(1, 0.5 + (ratio - 1) * 0.5)), known: true };
+  }
+  function dfResetCaches() { _dfIdx = null; _dfDevCache.clear(); _dfSpendCache.clear(); _dfCompCache.clear(); }
+
   // Pipeline lens: how much of the player's position group the org's Top-30 already carries,
   // vs the league norm for that group (a SS isn't judged against pitcher counts). More than
   // the field = they collect his type.
@@ -2244,8 +2509,14 @@
     // org fit = interest/dev/type only (money excluded), renormalized — lets a strong intel/org
     // fit surface at a slot even when the team's money doesn't work.
     const orgScore = Math.round(100*(0.45*interestN + 0.20*devN + 0.15*typeN)/0.80);
+    // Directional lenses (empirical fit engine) — cached per player, cheap per cell.
+    const dir = comp ? {
+      reach: dirReach(team, comp), develop: dirDevelop(team, comp),
+      speed: dirSpeed(team, comp), earn: dirEarn(team, comp),
+      emp: dfComposite(comp, team, state),
+    } : null;
     return { score, orgScore, interestN, devN, typeN, moneyN, flavorN, fvN, fvKnown,
-      histN, hist, war, pipeN:pipe.pipeN, pipe, bucketEst:pb.est, bucketIdx:pb.idx };
+      histN, hist, war, dir, pipeN:pipe.pipeN, pipe, bucketEst:pb.est, bucketIdx:pb.idx };
   }
 
   // "Is player Y team X's flavor, and why?" — verdict + 2-4 concise reason strings.
@@ -3931,15 +4202,18 @@
   // (Old dev / flavor / FV lenses folded in or dropped: FV is the same for every org so it
   // never re-ranks teams; org-wide dev now lives inside Track record's league-shrunk rates;
   // flavor's HS/college + arm/bat story survives as "why" bullets on the fit card.)
-  // "WAR" is a display-only lens — it surfaces the long-run WAR-over-expected read (warN)
-  // as its own heatmap. It is NOT in the Combined weight blend (that stays interest/hist/
-  // pipe/money; hist already folds WAR in 50/50). Keeps tomorrow's consolidation pass free.
-  const RF_LENSES = [["combined","Combined"],["interest","Interest"],["hist","Track record"],["war","WAR"],["pipe","Pipeline"],["money","Money"]];
-  const RF_LENSLBL = { combined:"Combined fit", interest:"Interest", hist:"Track record", war:"WAR lookback", pipe:"Pipeline", money:"Money" };
+  // Lens groups. Classic lenses (weight-blended into Combined) + display-only lenses:
+  // "WAR" (raw long-run lookback) and the DIRECTIONAL lenses — the four player-side
+  // questions, each an empirical read from the sv-draft-fit port (regime-aware draft DB,
+  // farm depth, live pools) + warhist/orgs. None of the new ones touch the Combined blend.
+  const RF_LENSES = [["combined","Combined"],["interest","Interest"],["hist","Track record"],["war","WAR"],["pipe","Pipeline"],["money","Money"],
+    ["reach","Reach MLB"],["develop","Development"],["speed","Pipeline speed"],["earn","Earnings"],["emp","Org fit (emp)"]];
+  const RF_LENSLBL = { combined:"Combined fit", interest:"Interest", hist:"Track record", war:"WAR lookback", pipe:"Pipeline", money:"Money",
+    reach:"Reach MLB", develop:"Development", speed:"Pipeline speed", earn:"Earnings", emp:"Empirical org fit" };
   const RF_WDEF = { interest:40, hist:25, pipe:10, money:25 };
   const RF_DEF = () => ({ clientsSide:true, clientsOff:new Set(), boardSide:false, boardOn:new Set(),
     pos:new Set(), teamsOff:new Set(), gradeMin:0, lens:"combined", weights:{...RF_WDEF},
-    wOpen:false, tOpen:false, sortCol:null, sortDir:"desc" });
+    wOpen:false, tOpen:false, sortCol:null, sortDir:"desc", hidden:false });
   let resFit = RF_DEF(), resFitDrawn = false, resTab = "research", fitSel = null;
   let rfClientsMenu = false, rfBoardMenu = false, rfBoardQuery = "";   // column-picker dropdown state (session)
   try {
@@ -3953,6 +4227,7 @@
       resFit.teamsOff = new Set(Array.isArray(sv.teamsOff)?sv.teamsOff:[]);
       resFit.gradeMin = +sv.gradeMin || 0;
       resFit.lens = RF_LENSLBL[sv.lens] ? sv.lens : "combined";
+      resFit.hidden = !!sv.hidden;
       // migrate: pre-simplification saves carried dev/flavor/fv weights — a stale mix has no
       // meaning under the 4-lens blend, so any save without a 'hist' weight resets to defaults
       resFit.weights = (sv.weights && sv.weights.hist!=null)
@@ -3968,7 +4243,7 @@
     try { localStorage.setItem("dd:resFit", JSON.stringify({
       clientsSide:resFit.clientsSide, clientsOff:[...resFit.clientsOff], boardSide:resFit.boardSide, boardOn:[...resFit.boardOn],
       pos:[...resFit.pos], teamsOff:[...resFit.teamsOff], gradeMin:resFit.gradeMin,
-      lens:resFit.lens, weights:resFit.weights, wOpen:resFit.wOpen, tOpen:resFit.tOpen,
+      lens:resFit.lens, hidden:resFit.hidden, weights:resFit.weights, wOpen:resFit.wOpen, tOpen:resFit.tOpen,
       sortCol:resFit.sortCol, sortDir:resFit.sortDir, tab:resTab })); } catch (e) {}
   }
   // ---- sub-tab switching (Player Research ↔ Team Fit) ----
@@ -4024,6 +4299,11 @@
       case "war":      return Math.round(100*((f.war && f.war.known) ? f.war.warN : 0.5));
       case "pipe":     return Math.round(100*f.pipeN);
       case "money":    return Math.round(100*f.moneyN);
+      case "reach":    return Math.round(100*(f.dir ? f.dir.reach.v : 0.5));
+      case "develop":  return Math.round(100*(f.dir ? f.dir.develop.v : 0.5));
+      case "speed":    return Math.round(100*(f.dir ? f.dir.speed.v : 0.5));
+      case "earn":     return Math.round(100*(f.dir ? f.dir.earn.v : 0.5));
+      case "emp":      return Math.round(100*(f.dir ? f.dir.emp.v : 0.5));
       default:         return rfCombined(f);
     }
   }
@@ -4075,7 +4355,8 @@
       ${["P","C","IF","OF"].map(p=>chip(resFit.pos.has(p),p,`rfPos('${p}')`)).join("")}
       ${resFit.pos.size?chip(false,"✕ any","rfPosClear()","clear"):""}</div>`;
     const lensRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Lens</span>
-      ${RF_LENSES.map(([k,l])=>chip(resFit.lens===k,l,`rfLens('${k}')`)).join("")}</div>`;
+      ${RF_LENSES.map(([k,l])=>chip(resFit.lens===k,l,`rfLens('${k}')`)).join("")}
+      ${chip(resFit.hidden,"◎ Hidden fits","rfHidden()","match")}</div>`;
     const gradeRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Grade ≥</span>
       <input type="range" class="rf-grade" min="0" max="100" step="1" value="${resFit.gradeMin}" oninput="rfGrade(this.value)">
       <span class="res-slab" id="rfGradeLab">${resFit.gradeMin}</span></div>`;
@@ -4112,6 +4393,7 @@
     let teams = rfTeamList();
     if (!players.length) { wrap.innerHTML = `<div class="placeholder">No player columns — turn on SV Clients or add players from Rest of Board above${resFit.pos.size?" (or clear the position filter)":""}.</div>`; return; }
     if (!teams.length) { wrap.innerHTML = `<div class="placeholder">All teams are filtered out — turn some back on.</div>`; return; }
+    if (resFit.hidden) { wrap.innerHTML = renderHiddenFits(players, teams, state); return; }
     // Column sort: clicking a player header ranks the teams (rows) by his fit, respecting the
     // active lens. Falls back to org rank as the tiebreak (and when no column is pinned).
     const sortComp = resFit.sortCol ? players.find(c => normName(c.name)===resFit.sortCol) : null;
@@ -4140,6 +4422,51 @@
     }
     h += `</tbody></table>`;
     wrap.innerHTML = h;
+  }
+
+  // ---- Hidden fits: the "we're not seeing it" quadrant ----
+  // Org×player pairs where the EMPIRICAL fit is strong but logged SV interest is thin —
+  // teams whose regime/habits/depth/money profile matches a client without having shown
+  // up in our intel yet. Gated to teams holding an undrafted pick in the player's
+  // plausible range with workable pool room. Click-through to the full fit card.
+  function renderHiddenFits(players, teams, state) {
+    if (!dfReady()) return `<div class="placeholder">Hidden fits needs the empirical data files (regime / draftdb) — run scripts/build_regime.py + build_draftdb.py and reload.</div>`;
+    const rows = [];
+    for (const c of players) {
+      const rg = effRangeOf(c);
+      const demand = demandFor(c);
+      for (const t of teams) {
+        const pk = teamPickInRange(state, t, rg);
+        if (!pk) continue;                                          // no live pick where he lands
+        const pool = state.poolsMap[t];
+        if (pool && demand && pool.room < 0.5 * demand) continue;   // money can't plausibly work
+        const f = fit(c, t, normName(c.name), state);
+        const emp = f.dir && f.dir.emp.known ? f.dir.emp.v : null;
+        if (emp == null || emp < 0.55) continue;                    // only strong empirical fits
+        if (f.interestN > 0.25) continue;                           // ...we already know about the rest
+        const best = [["Reach MLB", f.dir.reach], ["Development", f.dir.develop],
+          ["Pipeline speed", f.dir.speed], ["Earnings", f.dir.earn]]
+          .filter(([, d]) => d.known).sort((a, b) => b[1].v - a[1].v)[0];
+        rows.push({ c, t, pk, emp, interest: f.interestN,
+          score: emp * (1 - f.interestN), best, f });
+      }
+    }
+    rows.sort((a, b) => b.score - a.score);
+    const top = rows.slice(0, 15);
+    if (!top.length) return `<div class="placeholder">No hidden fits under the current filters — every strong empirical match already has live intel (or lacks a pick in range).</div>`;
+    let h = `<div class="tc-sub" style="margin:2px 0 8px">Strong <b>empirical</b> org fits with little-to-no logged SV interest — candidates we may not be seeing (or being told about) yet. Empirical = regime-aware development · pool · spending · depth · geography.</div>`;
+    h += `<table class="tc-upc"><thead><tr><th>Player</th><th>Team</th><th>Hidden</th><th>Emp fit</th><th>Intel</th><th>Strongest angle</th><th>Pick in range</th></tr></thead><tbody>`;
+    h += top.map(r => `<tr style="cursor:pointer" onclick="openFitCard('${normName(r.c.name).replace(/'/g, "\\'")}','${r.t}')">
+      <td class="pl">${_esc(tcInitialName(r.c.name))} <span style="color:var(--muted)">#${r.c.rank}</span></td>
+      <td>${teamLogo(r.t, 15)} <b>${r.t}</b></td>
+      <td><span class="vsv over">${Math.round(100 * r.score)}</span></td>
+      <td style="background:${rfHeat(Math.round(100 * r.emp))};font-weight:800;text-align:center">${Math.round(100 * r.emp)}</td>
+      <td style="color:var(--muted)">${r.interest > 0 ? Math.round(100 * r.interest) : "none"}</td>
+      <td style="color:var(--muted)">${r.best ? `${r.best[0]} · ${Math.round(100 * r.best[1].v)}` : "—"}</td>
+      <td style="color:var(--muted)">#${r.pk.overall} · R${r.pk.round}</td></tr>`).join("");
+    h += `</tbody></table>`;
+    h += `<div class="tc-feed-more">${rows.length} qualifying pairs · showing top 15 · Hidden = empirical fit × (1 − interest) · click a row for the full card</div>`;
+    return h;
   }
 
   // ---- control handlers ----
@@ -4171,6 +4498,7 @@
   window.rfPos = (p) => { resFit.pos.has(p) ? resFit.pos.delete(p) : resFit.pos.add(p); rfSave(); renderResFit(); };
   window.rfPosClear = () => { resFit.pos.clear(); rfSave(); renderResFit(); };
   window.rfLens = (k) => { resFit.lens = k; rfSave(); renderResFit(); };
+  window.rfHidden = () => { resFit.hidden = !resFit.hidden; rfSave(); renderResFit(); };
   window.rfGrade = (v) => { resFit.gradeMin = +v; const l=$("rfGradeLab"); if(l) l.textContent=v; rfSave(); renderRfGrid(); };
   window.rfTeam = (t) => { resFit.teamsOff.has(t) ? resFit.teamsOff.delete(t) : resFit.teamsOff.add(t); rfSave(); renderResFit(); };
   window.rfDiv = (n) => { const ts=RF_DIV[n], allOff=ts.every(t=>resFit.teamsOff.has(t));
@@ -4300,6 +4628,27 @@
       <div class="tc-kv"><span class="k">Est. bonus to sign</span><span class="v">${bonus!=null?fmtM(bonus):"—"}${fits==null?"":fits?` <span class="tg lvl-jc">fits</span>`:` <span class="tg under">short</span>`}</span></div>
       <div class="fc-note">Money reads the room the org has left vs. what it would take to sign him at his likeliest landing pick.</div></div>`;
 
+    // Panel 6 — Player outlook: the four questions, empirically (sv-draft-fit port).
+    // Regime-aware: history counts only the current front office's drafts.
+    let p6 = "";
+    if (f.dir) {
+      const D = f.dir, cal = calibOf(comp);
+      const grade = (d) => d.known ? `<b>${Math.round(100*d.v)}</b>` : `<span class="sub">n/a</span>`;
+      const rgNote = D.reach.d && D.reach.d.rg ? (D.reach.d.rg.source !== t
+        ? `${D.reach.d.rg.gm||"new regime"} — history via ${D.reach.d.rg.source} since '${String(D.reach.d.rg.start).slice(2)}`
+        : `${D.reach.d.rg.gm||"current regime"} since '${String(D.reach.d.rg.start).slice(2)}`) : null;
+      const dd = D.reach.d && D.reach.d.best;
+      p6 = `<div class="tc-panel" data-q="outlook"><h4><span class="n">6</span> Player outlook — the four questions</h4>
+        ${cal.calib01!=null?`<div class="tc-kv"><span class="k">His caliber (projectability)</span><span class="v"><b>${Math.round(100*cal.calib01)}</b>${cal.fv!=null?` <span class="sub">FV ${cal.fv}${cal.tier?` · ${_esc(String(cal.tier))}`:""}${cal.src?` · ${cal.src}`:""}</span>`:""}</span></div>`:""}
+        <div class="tc-kv"><span class="k">Reach MLB</span><span class="v">${grade(D.reach)}${dd?` <span class="sub">${dd.mlb} of ${dd.n} like him reached (${Math.round(100*dd.rate)}%)</span>`:""}</span></div>
+        <div class="tc-kv"><span class="k">Development</span><span class="v">${grade(D.develop)}${dd&&(dd.w1||dd.w2||dd.w3)?` <span class="sub">${dd.w1}/${dd.w2}/${dd.w3} at 1/2/3+ WAR</span>`:""}</span></div>
+        <div class="tc-kv"><span class="k">Pipeline speed</span><span class="v">${grade(D.speed)}${D.speed.known?` <span class="sub">median ${D.speed.med} yrs to debut (${D.speed.lvl}) vs ${D.speed.lg} league</span>`:""}</span></div>
+        <div class="tc-kv"><span class="k">Earnings</span><span class="v">${grade(D.earn)}${D.earn.spend&&D.earn.spend.known?` <span class="sub">${D.earn.spend.avgPct>0?"+":""}${D.earn.spend.avgPct}% vs slot habit</span>`:""}</span></div>
+        <div class="tc-kv"><span class="k">Empirical org fit</span><span class="v">${grade(D.emp)} <span class="sub">(dev·pool·spend·depth·geo, ${comp.level==="HS"?"HS":"college"} weights)</span></span></div>
+        ${rgNote?`<div class="fc-note">Regime: ${_esc(rgNote)} — history before that front office doesn't count against (or for) them.</div>`:""}
+        <div class="fc-note">Earnings = spending habit + reach-arbitration rate; the WAR→earnings career model is pending methodology approval.</div></div>`;
+    }
+
     bd.innerHTML = `<div class="tc-card fc-card">
       <div class="tc-top">
         <span class="tc-ttl">${_esc(comp.name)}</span>
@@ -4322,7 +4671,7 @@
         <div class="tc-stat"><div class="k">Pipeline</div><div class="v">${Math.round(100*f.pipeN)}</div></div>
         <div class="tc-stat"><div class="k">Money</div><div class="v">${Math.round(100*f.moneyN)}</div></div>
       </div></div>
-      <div class="fc-panels">${mobPanels(p1+p2+p3+p4+p5, fitPanelOpen)}</div>
+      <div class="fc-panels">${mobPanels(p1+p2+p3+p4+p5+p6, fitPanelOpen)}</div>
     </div>`;
     bd.classList.add("on");
   }
