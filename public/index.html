@@ -533,6 +533,12 @@
   /* badge must survive the name cell's ellipsis: name shrinks, badge doesn't */
   .tc-upc td.pl .plwrap { display:flex; align-items:center; min-width:0; }
   .tc-upc td.pl .plwrap .pln { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Team card: names show in full (never truncate). The card is read from across the room on the
+     big board; "F. Lastname" values fit with room to spare and the auto-layout keeps clean column
+     whitespace. Scoped to #teamCard so the Research results table keeps its compact ellipsis. */
+  #teamCard .tc-upc td.pl { max-width:none; width:auto; overflow:visible; }
+  #teamCard .tc-upc td.pl .plwrap { display:inline-flex; }
+  #teamCard .tc-upc td.pl .plwrap .pln { overflow:visible; text-overflow:clip; }
   .tc-upc td.cur { color:var(--red); }
   .tc-cur-tag { font-size:9px; font-weight:800; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:1px 5px; margin-left:6px; }
   .tc-fit-strip { margin:0 22px 16px; border:1px solid var(--line); border-radius:12px; padding:13px 16px; display:flex; gap:22px; align-items:center; flex-wrap:wrap; background:#fbfbfc; }
