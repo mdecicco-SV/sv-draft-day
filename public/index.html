@@ -675,6 +675,11 @@
   .rf-tgrps { display:flex; flex-direction:column; gap:6px; margin-top:9px; }
   .rf-tgrp { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
   .rf-tgrp .tc-chip.grp { border-style:dashed; font-weight:900; width:78px; text-align:center; }
+  .rf-otiles { display:inline-flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .rf-otile { border:1.5px solid var(--line); border-radius:10px; padding:7px 14px; background:var(--card); cursor:pointer; font-family:inherit; font-size:12px; font-weight:800; color:var(--ink); }
+  .rf-otile.sel { background:#fdeecd; border-color:#e8920e; }
+  .rf-otile:hover { border-color:rgba(0,0,0,.4); }
+  .rf-selcap { font-size:11.5px; color:var(--muted); margin:2px 0 6px; }
   .rf-wgrid { margin-top:9px; }
   /* always-visible weight panel: 3-col mini-slider grid (2-col mobile) */
   .rf-wgrid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:2px 22px; }
@@ -690,6 +695,8 @@
   .rf-wfoot { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:6px; font-size:10px; color:var(--muted); font-weight:600; }
   .rf-note { font-size:10px; font-weight:700; color:var(--muted); margin:8px 2px 2px; text-transform:uppercase; letter-spacing:.3px; }
   .rf-gridwrap { overflow:auto; border:1px solid #c9c9c7; border-radius:12px; max-height:calc(100vh - 260px); }
+  .hf-scroll { max-height:62vh; overflow-y:auto; }
+  .hf-scroll thead th { position:sticky; top:0; background:var(--card); z-index:2; }
   table.rf-grid { border-collapse:separate; border-spacing:0; }
   .rf-grid th, .rf-grid td { border-right:1px solid #eef0f2; border-bottom:1px solid #eef0f2; }
   .rf-grid thead th { position:sticky; top:0; z-index:3; background:var(--card); }
@@ -4322,27 +4329,32 @@
     ["money", "Money (live)", f => f.moneyN],
   ];
   const RF_FKEYS = RF_FACTORS.map(([k]) => k);
-  const RF_PRESETS = {   // intel-neutral throughout; Development mirrors the old 60/40 formula
-    combined: { hist:40, pipe:20, money:40 },
-    reach:    { reach:100 },
-    develop:  { war:60, dev:40 },
-    speed:    { speed:100 },
-    value:    { value:100 },
-    emp:      { dev:30, depth:30, money:20, value:20 },   // basis approx of the Kent composite
-  };
-  const RF_PRESET_LBL = { combined:"Combined", reach:"Reach MLB", develop:"Development",
-    speed:"Speed to MLB", value:"Cost vs value", emp:"Org fit (emp)", custom:"Custom" };
   const rfVec = (w) => { const v = {}; for (const k of RF_FKEYS) v[k] = +w[k] || 0; return v; };
-  const rfMatchPreset = (w) => {
-    for (const [name, p] of Object.entries(RF_PRESETS)) {
-      const pv = rfVec(p);
-      if (RF_FKEYS.every(k => pv[k] === (+w[k] || 0))) return name;
-    }
-    return "custom";
+  // Four questions — the ONLY first-class objects. Each vec totals 100 over the shared basis.
+  const RF_OUTLOOKS = {
+    bigs:    { label:"Get to Bigs",   vec:{reach:100} },
+    develop: { label:"Develop Best",  vec:{war:60, dev:40} },
+    path:    { label:"Fastest Path",  vec:{speed:100} },
+    value:   { label:"MLB Value",     vec:{value:100} },
   };
+  // Merge selected outlooks into one weight vector: average of each selected vec, factor-by-factor.
+  // Empty selection = all four ("Overall").
+  const rfMergeSel = (selSet) => {
+    const keys = selSet.size ? [...selSet] : Object.keys(RF_OUTLOOKS);
+    const out = {};
+    for (const k of RF_FKEYS) {
+      let s = 0;
+      for (const ok of keys) s += (RF_OUTLOOKS[ok].vec[k] || 0);
+      out[k] = s / keys.length;
+    }
+    return rfVec(out);
+  };
+  const rfLabel = () => resFit.custom ? "Custom blend"
+    : (resFit.sel.size===0 || resFit.sel.size===4) ? "Overall"
+    : [...resFit.sel].map(k=>RF_OUTLOOKS[k].label).join(" + ");
   const RF_DEF = () => ({ clientsSide:true, clientsOff:new Set(), boardSide:false, boardOn:new Set(),
-    pos:new Set(), teamsOff:new Set(), gradeMin:0, outlook:"combined", weights:rfVec(RF_PRESETS.combined),
-    custom:null, tOpen:false, sortCol:null, sortDir:"desc", hidden:false });
+    pos:new Set(), teamsOff:new Set(), gradeMin:0, sel:new Set(), custom:false, ftOpen:false,
+    weights:rfMergeSel(new Set()), tOpen:false, sortCol:null, sortDir:"desc", hidden:false });
   let resFit = RF_DEF(), resFitDrawn = false, resTab = "research", fitSel = null;
   let rfClientsMenu = false, rfBoardMenu = false, rfBoardQuery = "", rfPosMenu = false;   // dropdown state (session)
   try {
@@ -4358,25 +4370,33 @@
       resFit.teamsOff = new Set(Array.isArray(sv.teamsOff)?sv.teamsOff:[]);
       resFit.gradeMin = +sv.gradeMin || 0;
       resFit.hidden = !!sv.hidden;
-      // outlook/weights: new saves carry {outlook, weights{9}}. Old saves carried
-      // {lens, weights{hist,pipe,money}} — map single-factor lenses to a 100-weight
-      // custom vector, 'combined' to its preset, unknown to combined.
-      if (sv.outlook && RF_PRESET_LBL[sv.outlook]) {
-        resFit.weights = rfVec(sv.weights || RF_PRESETS.combined);
-        resFit.outlook = rfMatchPreset(resFit.weights);
-        resFit.custom = Array.isArray(sv.custom) ? null : (sv.custom ? rfVec(sv.custom) : null);
-        if (resFit.outlook === "custom") resFit.custom = { ...resFit.weights };
+      // sel/weights: new saves carry {sel:[...], custom:bool, weights{9}}. Prior saves
+      // carried {outlook, weights{9}} (single-preset era) — map to the matching outlook(s).
+      // Ancient saves carried {lens, weights{hist,pipe,money}} — map single-factor lenses
+      // to the matching outlook, everything else to Overall.
+      if (Array.isArray(sv.sel)) {
+        resFit.sel = new Set(sv.sel.filter(k => RF_OUTLOOKS[k]));
+        resFit.custom = !!sv.custom;
+        resFit.weights = resFit.custom ? rfVec(sv.weights || {}) : rfMergeSel(resFit.sel);
+      } else if (sv.outlook) {
+        const O = sv.outlook;
+        if (O === "develop") resFit.sel = new Set(["develop"]);
+        else if (O === "reach") resFit.sel = new Set(["bigs"]);
+        else if (O === "speed") resFit.sel = new Set(["path"]);
+        else if (O === "value") resFit.sel = new Set(["value"]);
+        else if (O === "custom") { resFit.sel = new Set(); resFit.custom = true; resFit.weights = rfVec(sv.weights || {}); }
+        else resFit.sel = new Set();   // combined/emp/other -> Overall
+        if (!resFit.custom) resFit.weights = rfMergeSel(resFit.sel);
       } else if (sv.lens) {
         const L = sv.lens;
-        if (RF_PRESETS[L]) { resFit.outlook = L; resFit.weights = rfVec(RF_PRESETS[L]); }
-        else if (L === "earn") { resFit.outlook = "value"; resFit.weights = rfVec(RF_PRESETS.value); }
-        else if (RF_FKEYS.includes(L)) { resFit.outlook = "custom"; resFit.weights = rfVec({ [L]: 100 }); resFit.custom = { ...resFit.weights }; }
-        else if (sv.weights && sv.weights.hist != null) {
-          resFit.weights = rfVec(sv.weights);
-          resFit.outlook = rfMatchPreset(resFit.weights);
-          if (resFit.outlook === "custom") resFit.custom = { ...resFit.weights };
-        }
+        if (L === "reach") resFit.sel = new Set(["bigs"]);
+        else if (L === "develop") resFit.sel = new Set(["develop"]);
+        else if (L === "speed") resFit.sel = new Set(["path"]);
+        else if (L === "earn") resFit.sel = new Set(["value"]);
+        else resFit.sel = new Set();   // war/hist/pipe/money/combined/anything -> Overall
+        resFit.weights = rfMergeSel(resFit.sel);
       }
+      resFit.ftOpen = !!sv.ftOpen;
       resFit.tOpen = !!sv.tOpen;
       resFit.sortCol = typeof sv.sortCol==="string" ? sv.sortCol : null;
       resFit.sortDir = sv.sortDir==="asc" ? "asc" : "desc";
@@ -4387,8 +4407,8 @@
     try { localStorage.setItem("dd:resFit", JSON.stringify({
       clientsSide:resFit.clientsSide, clientsOff:[...resFit.clientsOff], boardSide:resFit.boardSide, boardOn:[...resFit.boardOn],
       pos:[...resFit.pos], teamsOff:[...resFit.teamsOff], gradeMin:resFit.gradeMin,
-      outlook:resFit.outlook, weights:resFit.weights, custom:resFit.custom, hidden:resFit.hidden, tOpen:resFit.tOpen,
-      sortCol:resFit.sortCol, sortDir:resFit.sortDir, tab:resTab })); } catch (e) {}
+      sel:[...resFit.sel], custom:resFit.custom, weights:resFit.weights, hidden:resFit.hidden, tOpen:resFit.tOpen,
+      ftOpen:resFit.ftOpen, sortCol:resFit.sortCol, sortDir:resFit.sortDir, tab:resTab })); } catch (e) {}
   }
   // ---- sub-tab switching (Player Research ↔ Team Fit) ----
   function applyResTab() {
@@ -4499,11 +4519,12 @@
       ${resFit.pos.size?`<div class="res-posrow"><button class="tc-chip clear" onclick="rfPosClear(event)">✕ any</button></div>`:""}</div>`;
     const posRow = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab">Position</span>
       <button class="tc-chip${resFit.pos.size?' on':''}" onclick="rfPosOpen(event)">${resFit.pos.size?[...resFit.pos].join(" "):"Any"} ▾</button>${posMenu}</div>`;
-    // Outlooks = preset weight vectors; Custom appears once sliders deviate.
-    const outlookRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Outlook</span>
-      ${Object.keys(RF_PRESETS).map(k=>chip(resFit.outlook===k,RF_PRESET_LBL[k],`rfOutlook('${k}')`)).join("")}
-      ${resFit.outlook==="custom"||resFit.custom?chip(resFit.outlook==="custom","Custom","rfOutlook('custom')"):""}
-      ${chip(resFit.hidden,"◎ Hidden fits","rfHidden()","match")}</div>`;
+    // Outlooks = the four questions — click to select/deselect (multi-select averages them);
+    // none selected (or all four) reads as "Overall".
+    const tileStrip = `<div class="tc-wizgrp"><span class="tc-wizlab">Outlook</span><div class="rf-otiles">
+      ${Object.entries(RF_OUTLOOKS).map(([k,o])=>`<button class="rf-otile${resFit.sel.has(k)&&!resFit.custom?' sel':''}" onclick="rfTileToggle('${k}')"><span class="rf-otk">${o.label}</span></button>`).join("")}
+      ${chip(resFit.hidden,"◎ Hidden fits","rfHidden()","match")}</div></div>`;
+    const selCap = `<div class="rf-selcap">Showing: <b>${rfLabel()}</b>${resFit.custom?"":" — select multiple to see the overlap"}</div>`;
     const gradeRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Grade ≥</span>
       <input type="range" class="rf-grade" min="0" max="100" step="1" value="${resFit.gradeMin}" oninput="rfGrade(this.value)">
       <span class="res-slab" id="rfGradeLab">${resFit.gradeMin}</span></div>`;
@@ -4516,15 +4537,16 @@
       <div class="res-chead" onclick="rfToggleT()">Teams${resFit.teamsOff.size?` · ${nOn} of 30 on`:""}<span>${resFit.tOpen?"▾":"▸"}</span></div>
       ${resFit.tOpen?`<div class="rf-tgrps">${Object.entries(RF_DIV).map(([n,ts])=>tGrp(n,ts)).join("")}
         ${resFit.teamsOff.size?`<button class="tc-chip clear" onclick="rfTeamsAll()">✕ show all 30</button>`:""}</div>`:""}</div>`;
-    // weight panel — ALWAYS visible: the active outlook's vector, draggable into Custom
+    // fine-tune disclosure — collapsed by default; the raw 9-factor slider grid for anyone
+    // who wants to hand-build a blend (dragging any slider detaches into Custom).
     const sl = (k,l) => `<div class="rf-wrow"><span class="rf-wlab">${l}</span>
       <input type="range" class="rf-wsl" id="rfS_${k}" min="0" max="100" step="5" value="${+w[k]||0}" oninput="rfWeight('${k}',this.value)" onchange="rfWeightDone()">
       <span class="rf-wval" id="rfW_${k}">${wsum?Math.round(100*(+w[k]||0)/wsum):0}%</span></div>`;
     const weightsBox = `<div class="res-box rf-wbox">
-      <div class="res-chead" style="cursor:default">Weights · <span id="rfWName">${RF_PRESET_LBL[resFit.outlook]||"Custom"}</span></div>
-      <div class="rf-wgrid rf-wgrid3">${RF_FACTORS.map(([k,l])=>sl(k,l)).join("")}</div>
-      <div class="rf-wfoot"><span>Click an outlook to load its preset; drag any slider for a Custom blend. Intel-neutral — SV interest never moves a fit grade. Money reads live pool room and sharpens as slots commit during the draft.</span></div></div>`;
-    el.innerHTML = `<div class="rf-controls">${playersRow}${posRow}${outlookRow}${gradeRow}</div>${weightsBox}${teamsBox}`;
+      <div class="res-chead" onclick="rfToggleFt()">Fine-tune${resFit.custom?" · custom blend":""}<span>${resFit.ftOpen?"▾":"▸"}</span></div>
+      ${resFit.ftOpen?`<div class="rf-wgrid rf-wgrid3">${RF_FACTORS.map(([k,l])=>sl(k,l)).join("")}</div>
+      <div class="rf-wfoot"><span>Drag any slider for a Custom blend. Intel-neutral — SV interest never moves a fit grade. Money reads live pool room and sharpens as slots commit during the draft.</span></div>`:""}</div>`;
+    el.innerHTML = `<div class="rf-controls">${playersRow}${posRow}${tileStrip}${selCap}${gradeRow}</div>${weightsBox}${teamsBox}`;
   }
   function rfWeightLabels() { const w=resFit.weights, s=rfWsum();
     RF_FKEYS.forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=(s?Math.round(100*(+w[k]||0)/s):0)+"%"; }); }
@@ -4548,13 +4570,13 @@
       const val = t => rfCellVal(fit(sortComp, t, resFit.sortCol, state));
       teams = teams.slice().sort((a,b) => dir*(val(a)-val(b)) || ((DATA.orgs[a].orgRank??99)-(DATA.orgs[b].orgRank??99)));
     }
-    let h = `<table class="rf-grid"><thead><tr><th class="rf-corner">${teams.length}×${players.length}<small>${RF_PRESET_LBL[resFit.outlook]||"Custom"}</small></th>`;
+    let h = `<table class="rf-grid"><thead><tr><th class="rf-corner">${teams.length}×${players.length}<small>${rfLabel()}</small></th>`;
     h += players.map(c => { const last = tcInitialName(c.name).split(" ").slice(-1)[0], key = normName(c.name);
       // header text is rotated 180° (vertical-rl), which flips the glyph — emit the inverse so
       // descending reads as a visual down-arrow (biggest fit on top)
       const isSort = resFit.sortCol===key, arrow = isSort ? (resFit.sortDir==="asc"?" ▼":" ▲") : "";
       const rtS = rtSummary(c);
-      return `<th class="rf-ph${isSort?' rf-sorted':''}" title="Sort teams by ${RF_PRESET_LBL[resFit.outlook]||"Custom"} for ${_esc(c.name)}${rtS?" · "+rtS:""}" onclick="rfSortCol('${key}')"><span class="rf-phn">${_esc(last)} #${c.rank}${arrow}</span></th>`; }).join("");
+      return `<th class="rf-ph${isSort?' rf-sorted':''}" title="Sort teams by ${rfLabel()} for ${_esc(c.name)}${rtS?" · "+rtS:""}" onclick="rfSortCol('${key}')"><span class="rf-phn">${_esc(last)} #${c.rank}${arrow}</span></th>`; }).join("");
     h += `</tr></thead><tbody>`;
     for (const t of teams) {
       const o = DATA.orgs[t] || {};
@@ -4575,9 +4597,14 @@
   // teams whose regime/habits/depth/money profile matches a client without having shown
   // up in our intel yet. Gated to teams holding an undrafted pick in the player's
   // plausible range with workable pool room. Click-through to the full fit card.
+  let hfSort = { col: "score", dir: -1 };
+  // first click: ascending for identity columns (rank/team/pick), descending for value columns
+  window.hfSortBy = (col) => { hfSort = hfSort.col===col ? { col, dir: -hfSort.dir }
+    : { col, dir: ["rank","team","pick"].includes(col) ? 1 : -1 }; renderRfGrid(); };
   function renderHiddenFits(players, teams, state) {
     if (!dfReady()) return `<div class="placeholder">Hidden fits needs the empirical data files (regime / draftdb) — run scripts/build_regime.py + build_draftdb.py and reload.</div>`;
     const rows = [];
+    const gradeFloor = Math.max(55, resFit.gradeMin || 0);
     for (const c of players) {
       const rg = effRangeOf(c);
       const demand = demandFor(c);
@@ -4588,7 +4615,7 @@
         if (pool && demand && pool.room < 0.5 * demand) continue;   // money can't plausibly work
         const f = fit(c, t, normName(c.name), state);
         const emp = f.dir && f.dir.emp.known ? f.dir.emp.v : null;
-        if (emp == null || emp < 0.55) continue;                    // only strong empirical fits
+        if (emp == null || emp * 100 < gradeFloor) continue;         // strong empirical fits (floor raised by Grade ≥)
         if (f.interestN > 0.25) continue;                           // ...we already know about the rest
         const best = [["Reach MLB", f.dir.reach], ["Development", f.dir.develop],
           ["Pipeline speed", f.dir.speed], ["Earnings", f.dir.earn]]
@@ -4602,17 +4629,30 @@
       }
     }
     rows.sort((a, b) => b.score - a.score);
-    // max 2 rows per player so one extreme profile can't monopolize the list
-    const perPlayer = {}, top = [];
+    // max 3 rows per player so one extreme profile can't monopolize the list —
+    // applied over the full sorted set; the grid scrolls instead of slicing to a top-N
+    const perPlayer = {}, capped = [];
     for (const r of rows) {
       const k = normName(r.c.name);
-      if ((perPlayer[k] = (perPlayer[k] || 0) + 1) <= 2) top.push(r);
-      if (top.length >= 15) break;
+      if ((perPlayer[k] = (perPlayer[k] || 0) + 1) <= 3) capped.push(r);
     }
-    if (!top.length) return `<div class="placeholder">No hidden fits under the current filters — every strong empirical match already has live intel (or lacks a pick in range).</div>`;
+    if (!capped.length) return `<div class="placeholder">No hidden fits under the current filters — every strong empirical match already has live intel (or lacks a pick in range).</div>`;
+    const { col, dir } = hfSort;
+    const hfVal = r => col==="rank" ? (r.c.rank || 9999)
+      : col==="team" ? r.t
+      : col==="emp" ? r.emp
+      : col==="interest" ? r.interest
+      : col==="pick" ? r.pk.overall
+      : r.score;
+    const shown = [...capped].sort((a, b) => {
+      const va = hfVal(a), vb = hfVal(b);
+      return col==="team" ? dir * String(va).localeCompare(String(vb)) : dir * (va - vb);
+    });
     let h = `<div class="tc-sub" style="margin:2px 0 8px">Strong <b>empirical</b> org fits with little-to-no logged SV interest — candidates we may not be seeing (or being told about) yet. Empirical = regime-aware development · pool · spending · depth · geography.</div>`;
-    h += `<table class="tc-upc"><thead><tr><th>Player</th><th>Team</th><th>Hidden</th><th>Emp fit</th><th>Intel</th><th>Strongest angle</th><th>Pick in range</th></tr></thead><tbody>`;
-    h += top.map(r => `<tr style="cursor:pointer" onclick="openFitCard('${normName(r.c.name).replace(/'/g, "\\'")}','${r.t}')">
+    const hfArrow = c => hfSort.col===c ? (hfSort.dir>0?" ▲":" ▼") : "";
+    const hfTh = (c, lbl) => `<th class="sortable" onclick="hfSortBy('${c}')">${lbl}${hfArrow(c)}</th>`;
+    h += `<div class="hf-scroll"><table class="tc-upc"><thead><tr>${hfTh("rank","Player")}${hfTh("team","Team")}${hfTh("score","Hidden")}${hfTh("emp","Emp fit")}${hfTh("interest","Intel")}<th>Strongest angle</th>${hfTh("pick","Pick in range")}</tr></thead><tbody>`;
+    h += shown.map(r => `<tr style="cursor:pointer" onclick="openFitCard('${normName(r.c.name).replace(/'/g, "\\'")}','${r.t}')">
       <td class="pl">${_esc(tcInitialName(r.c.name))} <span style="color:var(--muted)">#${r.c.rank}</span></td>
       <td>${teamLogo(r.t, 15)} <b>${r.t}</b></td>
       <td><span class="vsv over">${Math.round(100 * r.score)}</span></td>
@@ -4620,8 +4660,8 @@
       <td style="color:var(--muted)">${r.interest > 0 ? Math.round(100 * r.interest) : "none"}</td>
       <td style="color:var(--muted)">${r.best ? `${r.best[0]} · ${Math.round(100 * r.best[1].v)}` : "—"}</td>
       <td style="color:var(--muted)">#${r.pk.overall} · R${r.pk.round}</td></tr>`).join("");
-    h += `</tbody></table>`;
-    h += `<div class="tc-feed-more">${rows.length} qualifying pairs · showing top 15 · Hidden = empirical fit × (1 − interest) · click a row for the full card</div>`;
+    h += `</tbody></table></div>`;
+    h += `<div class="tc-feed-more">${rows.length} qualifying pairs · ${shown.length} shown (max 3 per player) · Hidden = empirical fit × (1 − interest) × caliber · click a row for the full card · Grade ≥ raises the empirical-fit floor (base 55)</div>`;
     return h;
   }
 
@@ -4659,12 +4699,15 @@
     const toks = POS_TREE[g], all = toks.every(t=>resFit.pos.has(t));
     toks.forEach(t => all ? resFit.pos.delete(t) : resFit.pos.add(t)); rfSave(); renderRfControls(); renderRfGrid(); };
   window.rfPosClear = (e) => { if (e) e.stopPropagation(); resFit.pos.clear(); rfSave(); renderRfControls(); renderRfGrid(); };
-  // Outlook chips = presets over the factor basis; Custom recalls the last dragged vector
-  window.rfOutlook = (k) => {
-    if (k === "custom") { if (resFit.custom) { resFit.outlook = "custom"; resFit.weights = { ...resFit.custom }; } }
-    else { resFit.outlook = k; resFit.weights = rfVec(RF_PRESETS[k]); }
+  // Outlook tiles: click toggles that question in/out of the selection; the merged vector
+  // (rfMergeSel) is the average of every selected outlook's vec. Empty/all-four = Overall.
+  window.rfTileToggle = (k) => {
+    resFit.custom = false;
+    resFit.sel.has(k) ? resFit.sel.delete(k) : resFit.sel.add(k);
+    resFit.weights = rfMergeSel(resFit.sel);
     rfSave(); renderRfControls(); renderRfGrid();
   };
+  window.rfToggleFt = () => { resFit.ftOpen = !resFit.ftOpen; rfSave(); renderRfControls(); };
   window.rfHidden = () => { resFit.hidden = !resFit.hidden; rfSave(); renderResFit(); };
   window.rfGrade = (v) => { resFit.gradeMin = +v; const l=$("rfGradeLab"); if(l) l.textContent=v; rfSave(); renderRfGrid(); };
   window.rfTeam = (t) => { resFit.teamsOff.has(t) ? resFit.teamsOff.delete(t) : resFit.teamsOff.add(t); rfSave(); renderResFit(); };
@@ -4672,14 +4715,12 @@
     ts.forEach(t=>{ if(allOff) resFit.teamsOff.delete(t); else resFit.teamsOff.add(t); }); rfSave(); renderResFit(); };
   window.rfTeamsAll = () => { resFit.teamsOff.clear(); rfSave(); renderResFit(); };
   window.rfToggleT = () => { resFit.tOpen = !resFit.tOpen; rfSave(); renderRfControls(); };
-  // Dragging any slider detaches into Custom (unless the vector happens to equal a preset).
+  // Dragging any slider detaches into a Custom blend — no preset re-detection.
   window.rfWeight = (k,v) => {
     resFit.weights[k] = +v;
-    const match = rfMatchPreset(resFit.weights);
-    resFit.outlook = match;
-    if (match === "custom") resFit.custom = { ...resFit.weights };
+    resFit.custom = true;
     rfSave(); rfWeightLabels();
-    const nm = $("rfWName"); if (nm) nm.textContent = RF_PRESET_LBL[resFit.outlook] || "Custom";
+    const nm = $("rfWName"); if (nm) nm.textContent = rfLabel();
     // chips need re-highlight (Custom may appear) without wiping the slider mid-drag —
     // re-render controls only when the outlook name changed class-wise is overkill; the
     // grid re-blends now and chips catch up on the next controls render (pointerup).
@@ -4727,12 +4768,12 @@
 
     // ---- four tiles: grade + one-line evidence ----
     const tiles = [
-      ["reach", "REACH", D.reach, dd ? `${dd.mlb} of ${dd.n} like him made it` : "no regime sample"],
-      ["develop", "DEVELOP", D.develop, f.war && f.war.known && f.war.pos
+      ["reach", "GET TO BIGS", D.reach, dd ? `${dd.mlb} of ${dd.n} like him made it` : "no regime sample"],
+      ["develop", "DEVELOP BEST", D.develop, f.war && f.war.known && f.war.pos
         ? `${f.war.pos.woe>0?"+":""}${f.war.pos.woe.toFixed(2)} WOE/pick (${g})` : "WAR lookback n/a"],
-      ["speed", "SPEED", D.speed, D.speed && D.speed.known
+      ["speed", "FASTEST PATH", D.speed, D.speed && D.speed.known
         ? `${D.speed.med} yr ${D.speed.med===D.speed.lg?"= lg":D.speed.med<D.speed.lg?"< lg "+D.speed.lg:"> lg "+D.speed.lg} (${D.speed.lvl})` : "no debut sample"],
-      ["value", "COST↔VALUE", D.earn, D.earn && D.earn.roi && D.earn.roi.known
+      ["value", "MLB VALUE", D.earn, D.earn && D.earn.roi && D.earn.roi.known
         ? `${D.earn.roi.roi.toFixed(1)}× vs ${D.earn.roi.lg?D.earn.roi.lg.toFixed(1):"—"}× lg` : "no bonus data"],
     ];
     const tileHtml = tiles.map(([k, lbl, d, ev]) => {
@@ -4800,7 +4841,7 @@
         <span class="fc-sub">${comp.pos} · ${comp.level||"—"} · #${comp.rank}${DATA.clients.has(key)?" · SV":""}</span>
         <span class="fc-arrow">→</span>
         ${teamLogo(t,22)}<span class="tc-abbr">${t}</span><span class="fc-sub">${teamName?_esc(teamName)+" · ":""}org #${(DATA.orgs[t]||{}).orgRank!=null?Math.round(DATA.orgs[t].orgRank):"—"}</span>
-        <span class="fc2-badge" style="background:${rfHeat(blended)}" title="${RF_PRESET_LBL[resFit.outlook]||"Custom"} blend">${blended}<small>${RF_PRESET_LBL[resFit.outlook]||"Custom"}</small></span>
+        <span class="fc2-badge" style="background:${rfHeat(blended)}" title="${rfLabel()} blend">${blended}<small>${rfLabel()}</small></span>
         <button class="tc-x" onclick="closeFitCard()">✕</button>
       </div>
       ${calLine?`<div class="fc2-cal">${calLine}</div>`:""}
