@@ -192,6 +192,17 @@
   .ba-filt-toggle { display:none; }
   .ba-filt-toggle .caret { display:inline-block; transition:transform .15s; }
   .ba-filters.collapsed .ba-filt-toggle .caret { transform:rotate(-90deg); }
+  /* dropdown-chip filters (Level / Position / Age / Bats / Throws) */
+  .ba-chips { display:inline-flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .ba-drop { position:relative; }
+  .ba-chips .tc-chip { font-size:12px; padding:5px 11px; border-radius:16px; color:var(--ink); }
+  .ba-chips .tc-chip .cx { opacity:.5; font-size:10px; }
+  .ba-menu { left:0; top:calc(100% + 5px); min-width:180px; }
+  .ba-agemenu { min-width:220px; }
+  .ba-agemenu .res-slab { display:block; margin-bottom:8px; }
+  .ba-agemenu .dual { width:100%; }
+  .ba-agemenu .dual input[type=range] { border:0; padding:0; }
+  .ba-agemenu .tc-chip.clear { margin-top:10px; }
   /* border-collapse:separate + no overflow:hidden — both break position:sticky on the thead */
   table.ba { width:100%; border-collapse:separate; border-spacing:0; background:#fff; border:1px solid var(--line); border-radius:10px; }
   table.ba th { text-align:left; font-size:var(--fs-1); text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line); background:#fafafa;
@@ -1091,8 +1102,7 @@
     <div class="ba-filters">
       <button class="ba-filt-toggle" onclick="toggleBaFilters(event)" aria-expanded="true">Filters <span class="caret">▾</span></button>
       <div class="ba-filt-controls">
-        <label>Level <select id="fLevel" onchange="renderBest()"><option>All</option><option>HS</option><option>College</option><option>JUCO</option></select></label>
-        <label>Pos <select id="fPos" onchange="renderBest()"><option>All</option><option>P</option><option>C</option><option>IF</option><option>OF</option></select></label>
+        <div id="baChips" class="ba-chips"></div>
         <label><input type="checkbox" id="fSv" onchange="renderBest()"> SV clients only</label>
         <label><input type="checkbox" id="fDrafted" onchange="renderBest()"> Show drafted</label>
         <input id="fQuery" placeholder="search name / school / agency" oninput="renderBest()" style="min-width:180px" />
@@ -2217,17 +2227,80 @@
     const collapsed = bar.classList.toggle("collapsed");
     bar.querySelector(".ba-filt-toggle")?.setAttribute("aria-expanded", String(!collapsed));
   };
+  // Best Available dropdown-chip filters: Level / Position (POS_TREE, same as Player Research) /
+  // Age (dual slider) / Bats / Throws. Multi-select toggles held in Sets; age as a lo/hi range.
+  const baFilt = { pos:new Set(), lvl:new Set(), bats:new Set(), throws:new Set(), ageLo:null, ageHi:null };
+  let baOpen = null;   // which chip's dropdown is open
+  let _baAgeBounds = null;
+  const baAgeBounds = () => {
+    if (!_baAgeBounds) {
+      const a = DATA.composite.map(p=>+p.age).filter(Number.isFinite);
+      _baAgeBounds = a.length ? { min:Math.floor(Math.min(...a)), max:Math.ceil(Math.max(...a)) } : { min:16, max:24 };
+    }
+    return _baAgeBounds;
+  };
+  const baAgeActive = () => { const b=baAgeBounds(); return baFilt.ageLo!=null && (baFilt.ageLo>b.min || baFilt.ageHi<b.max); };
+  const baBatNorm = (v) => { const s=(v||"").toUpperCase(); return s==="B"?"S":s; };   // switch = B or S
+  const baPosTokens = (p) => isPitcher(p.pos) ? [p.throws==="L"?"LHP":"RHP"]
+    : String(p.pos||"").toUpperCase().split(/[-\/,\s]+/).filter(Boolean);
+  window.baToggleMenu = (which, e) => { if (e) e.stopPropagation(); baOpen = baOpen===which?null:which; renderBaChips(); };
+  window.baTok = (grp, v, e) => { if (e) e.stopPropagation(); setTog(baFilt[grp], v); renderBaChips(); renderBest(); };
+  window.baPosGrp = (g, e) => { if (e) e.stopPropagation();
+    const toks = POS_TREE[g], all = toks.every(t=>baFilt.pos.has(t));
+    toks.forEach(t => all ? baFilt.pos.delete(t) : baFilt.pos.add(t));
+    renderBaChips(); renderBest(); };
+  window.baAgeSlide = () => {
+    let lo = parseFloat($("baAgeLo").value), hi = parseFloat($("baAgeHi").value);
+    if (lo > hi) { const t=lo; lo=hi; hi=t; }
+    baFilt.ageLo = lo; baFilt.ageHi = hi;
+    const lab = $("baAgeLab"); if (lab) lab.textContent = `${lo.toFixed(1)} – ${hi.toFixed(1)}`;
+    renderBest(); };
+  window.baAgeClear = (e) => { if (e) e.stopPropagation(); baFilt.ageLo = baFilt.ageHi = null; renderBaChips(); renderBest(); };
+  function renderBaChips() {
+    const el = $("baChips"); if (!el) return;
+    const b = baAgeBounds(), ageOn = baAgeActive();
+    const drop = (which, label, active, menu) =>
+      `<div class="ba-drop">
+        <button class="tc-chip${active?' on':''}" onclick="baToggleMenu('${which}',event)">${label} <span class="cx">▾</span></button>
+        ${baOpen===which?`<div class="res-posmenu ba-menu" onclick="event.stopPropagation()">${menu}</div>`:""}
+      </div>`;
+    const row = (grp, opts) => `<div class="res-posrow">${opts.map(v=>
+      `<button class="tc-chip${baFilt[grp].has(v)?' on':''}" onclick="baTok('${grp}','${v}',event)">${v}</button>`).join("")}</div>`;
+    const lvlMenu = row("lvl", ["HS","College","JUCO"]);
+    const posMenu = Object.entries(POS_TREE).map(([g,toks])=>{
+      const all = toks.every(t=>baFilt.pos.has(t));
+      const grpBtn = toks.length>1 ? `<button class="tc-chip grp${all?' on':''}" onclick="baPosGrp('${g}',event)">${g} · all</button>` : "";
+      return `<div class="res-posrow">${grpBtn}${toks.map(t=>
+        `<button class="tc-chip${baFilt.pos.has(t)?' on':''}" onclick="baTok('pos','${t}',event)">${t}</button>`).join("")}</div>`;}).join("");
+    const batsMenu = row("bats", ["L","R","S"]);
+    const throwsMenu = row("throws", ["L","R"]);
+    const ageMenu = `<div class="ba-agemenu"><div class="res-slab" id="baAgeLab">${
+        ageOn ? `${baFilt.ageLo.toFixed(1)} – ${baFilt.ageHi.toFixed(1)}` : `${b.min.toFixed(1)} – ${b.max.toFixed(1)}`}</div>
+      <div class="dual"><input type="range" id="baAgeLo" min="${b.min}" max="${b.max}" step="0.1" value="${baFilt.ageLo??b.min}" oninput="baAgeSlide()">
+      <input type="range" id="baAgeHi" min="${b.min}" max="${b.max}" step="0.1" value="${baFilt.ageHi??b.max}" oninput="baAgeSlide()"></div>
+      ${ageOn?`<button class="tc-chip clear" onclick="baAgeClear(event)">✕ clear age</button>`:""}</div>`;
+    el.innerHTML =
+        drop("lvl",    baFilt.lvl.size?[...baFilt.lvl].join(", "):"Level", baFilt.lvl.size, lvlMenu)
+      + drop("pos",    baFilt.pos.size?[...baFilt.pos].join(" "):"Position", baFilt.pos.size, posMenu)
+      + drop("age",    ageOn?`Age ${baFilt.ageLo.toFixed(1)}–${baFilt.ageHi.toFixed(1)}`:"Age", ageOn, ageMenu)
+      + drop("bats",   baFilt.bats.size?`Bats ${[...baFilt.bats].join("/")}`:"Bats", baFilt.bats.size, batsMenu)
+      + drop("throws", baFilt.throws.size?`Throws ${[...baFilt.throws].join("/")}`:"Throws", baFilt.throws.size, throwsMenu);
+  }
   function renderBest() {
     if (!currentState) return;
     hideRanks(); // rows re-render in place — don't strand an open hover card
+    if ($("baChips") && !$("baChips").firstChild) renderBaChips();   // first paint of the chip bar
     const draftedBy = new Map(currentState.picks.filter(p=>p.isDrafted&&p.player).map(p=>[normName(p.player), p]));
-    const lvl = $("fLevel").value, pos = $("fPos").value, svOnly = $("fSv").checked, q = normName($("fQuery").value);
-    const showDrafted = $("fDrafted")?.checked;
+    const svOnly = $("fSv").checked, q = normName($("fQuery").value);
+    const showDrafted = $("fDrafted")?.checked, ageOn = baAgeActive();
     const clickable = MODE==="mock" && !mock.running && currentState.onClock;
     const rows = DATA.composite.filter(p => {
       if (draftedBy.has(normName(p.name)) && !showDrafted) return false;
-      if (lvl!=="All" && p.level!==lvl) return false;
-      if (pos!=="All" && p.posGroup!==pos) return false;
+      if (baFilt.lvl.size && !baFilt.lvl.has(p.level)) return false;
+      if (baFilt.pos.size && !baPosTokens(p).some(t=>baFilt.pos.has(t))) return false;
+      if (baFilt.bats.size && !baFilt.bats.has(baBatNorm(p.bats))) return false;
+      if (baFilt.throws.size && !baFilt.throws.has((p.throws||"").toUpperCase())) return false;
+      if (ageOn) { const a=+p.age; if (!Number.isFinite(a) || a<baFilt.ageLo || a>baFilt.ageHi) return false; }
       if (svOnly && !DATA.clients.has(normName(p.name))) return false;
       if (q && !(normName(p.name).includes(q) || normName(p.school).includes(q) || normName(agentOf(p)).includes(q))) return false;
       return true;
@@ -2577,6 +2650,7 @@
     if (playerMenuOpen && !(e.target.closest && e.target.closest(".pdrop"))) { playerMenuOpen = false; renderBoardPlayers(currentState); }
     if (bonusEdit!=null && !(e.target.closest && e.target.closest(".bc-bform"))) { bonusEdit = null; renderBoard(currentState); }
     if (resPosOpen && !(e.target.closest && e.target.closest(".res-pdrop"))) { resPosOpen = false; renderResearch(); }
+    if (baOpen && !(e.target.closest && e.target.closest(".ba-drop"))) { baOpen = null; renderBaChips(); }
     if ((rfClientsMenu||rfBoardMenu) && !(e.target.closest && e.target.closest(".rf-drop"))) { rfClientsMenu = false; rfBoardMenu = false; if (resTab==="fit") renderRfControls(); }
   });
   window.toggleBoardClient = (key, e) => {
