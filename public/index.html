@@ -671,7 +671,8 @@
   .rf-menu .res-findin { width:100%; box-sizing:border-box; }
   .rf-mrk { color:var(--muted); font-weight:600; font-size:9px; margin-left:2px; }
   .rf-empty { color:var(--muted); font-size:11px; padding:8px 2px; }
-  .rf-tbox, .rf-wbox { margin-top:9px; max-width:560px; }
+  .rf-tbox { margin-top:9px; max-width:560px; }
+  .rf-wbox { margin-top:9px; }   /* Fine-tune runs full width — don't be shy with the white box */
   .rf-tgrps { display:flex; flex-direction:column; gap:6px; margin-top:9px; }
   .rf-tgrp { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
   .rf-tgrp .tc-chip.grp { border-style:dashed; font-weight:900; width:78px; text-align:center; }
@@ -681,15 +682,17 @@
   .rf-otile:hover { border-color:rgba(0,0,0,.4); }
   .rf-selcap { font-size:11.5px; color:var(--muted); margin:2px 0 6px; }
   .rf-wgrid { margin-top:9px; }
-  /* Fine-tune slider grid — columns must SHRINK inside the box (minmax(0,1fr)), never
-     overflow it: range inputs get width:100% and rows min-width:0 so nothing escapes. */
-  .rf-wgrid3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:2px 22px; min-width:0; }
-  .rf-wgrid3 .rf-wrow { min-width:0; }
-  .rf-wgrid3 .rf-wsl { width:100%; min-width:40px; }
-  .rf-wgrid3 .rf-wlab { width:84px; flex:0 0 84px; }
-  .rf-wgrid3 .rf-wval { flex:0 0 38px; text-align:right; }
-  @media (max-width:900px){ .rf-wgrid3 { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-  body.mob .rf-wgrid3 { grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 12px; }
+  /* Fine-tune slider grid — contained (minmax(0,1fr)) but generous: the box is wide,
+     use it. Full-width tracks, roomy gutters, labels that never collide with values. */
+  .rf-wbox { padding:14px 22px 12px; }
+  .rf-wgrid3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 48px; min-width:0; margin-top:12px; }
+  .rf-wgrid3 .rf-wrow { min-width:0; margin-bottom:0; gap:12px; }
+  .rf-wgrid3 .rf-wsl { width:100%; min-width:70px; }
+  .rf-wgrid3 .rf-wlab { width:auto; flex:0 0 112px; line-height:1.25; }
+  .rf-wgrid3 .rf-wval { flex:0 0 46px; text-align:right; }
+  .rf-wbox .rf-wfoot { margin-top:14px; }
+  @media (max-width:900px){ .rf-wgrid3 { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 32px; } }
+  body.mob .rf-wgrid3 { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; }
   .rf-wrow { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
   .rf-wlab { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); width:66px; flex:0 0 auto; }
   .rf-wsl { flex:1 1 auto; min-width:0; -webkit-appearance:none; appearance:none; height:4px; border-radius:2px; background:var(--line); }
@@ -3215,7 +3218,7 @@
     if (bonusEdit!=null && !(e.target.closest && e.target.closest(".bc-bform"))) { bonusEdit = null; renderBoard(currentState); }
     if (resPosOpen && !(e.target.closest && e.target.closest(".res-pdrop"))) { resPosOpen = false; renderResearch(); }
     if (baOpen && !(e.target.closest && e.target.closest(".ba-drop"))) { baOpen = null; renderBaChips(); }
-    if ((rfClientsMenu||rfBoardMenu||rfPosMenu) && !(e.target.closest && e.target.closest(".rf-drop, .res-pdrop"))) { rfClientsMenu = false; rfBoardMenu = false; rfPosMenu = false; if (resTab==="fit") renderRfControls(); }
+    if ((rfClientsMenu||rfBoardMenu||rfPosMenu||rfRankMenu) && !(e.target.closest && e.target.closest(".rf-drop, .res-pdrop"))) { rfClientsMenu = false; rfBoardMenu = false; rfPosMenu = false; rfRankMenu = false; if (resTab==="fit") renderRfControls(); }
   });
   window.toggleBoardClient = (key, e) => {
     if (e) e.stopPropagation();
@@ -4355,11 +4358,14 @@
     : (resFit.sel.size===0 || resFit.sel.size===4) ? "Overall"
     : [...resFit.sel].map(k=>RF_OUTLOOKS[k].label).join(" + ");
   const RF_DEF = () => ({ clientsSide:true, clientsOff:new Set(), boardSide:false, boardOn:new Set(),
-    pos:new Set(), teamsOff:new Set(), gradeMin:0, sel:new Set(), custom:false, ftOpen:false,
+    pos:new Set(), cls:new Set(), lvl:new Set(), rkLo:1, rkHi:0, teamsOff:new Set(), gradeMin:0, sel:new Set(), custom:false, ftOpen:false,
     weights:rfMergeSel(new Set()), tOpen:false, sortCol:null, sortDir:"desc", hidden:false });
   let resFit = RF_DEF(), resFitDrawn = false, resTab = "research", fitSel = null;
-  let rfClientsMenu = false, rfBoardMenu = false, rfBoardQuery = "", rfPosMenu = false;   // dropdown state (session)
-  let rfBoardCls = new Set(), rfBoardLvl = new Set();   // Rest-of-Board Class/Level filters (session-only, not persisted)
+  let rfClientsMenu = false, rfBoardMenu = false, rfBoardQuery = "", rfPosMenu = false, rfRankMenu = false;   // dropdown state (session)
+  let _rfRkMax = null;
+  const rfRkMax = () => _rfRkMax || (_rfRkMax = DATA.composite.length ? Math.max(...DATA.composite.map(c => c.rank || 0)) : 674);
+  // Class/Level are POPULATION filters (resFit.cls / resFit.lvl, persisted) — they trim
+  // the whole tab's player columns (SV clients and/or Rest of Board), same as Position.
   try {
     const sv = JSON.parse(localStorage.getItem("dd:resFit") || "null");
     if (sv) {
@@ -4370,6 +4376,9 @@
       // pos: token set. Old saves held groups (P/C/IF/OF) — expand through POS_TREE.
       const savedPos = Array.isArray(sv.pos) ? sv.pos : [];
       resFit.pos = new Set(savedPos.flatMap(v => POS_TREE[v] ? POS_TREE[v] : [v]));
+      resFit.cls = new Set(Array.isArray(sv.cls)?sv.cls:[]);
+      resFit.lvl = new Set(Array.isArray(sv.lvl)?sv.lvl:[]);
+      resFit.rkLo = Math.max(1, +sv.rkLo || 1); resFit.rkHi = +sv.rkHi || 0;
       resFit.teamsOff = new Set(Array.isArray(sv.teamsOff)?sv.teamsOff:[]);
       resFit.gradeMin = +sv.gradeMin || 0;
       resFit.hidden = !!sv.hidden;
@@ -4409,7 +4418,8 @@
   function rfSave() {
     try { localStorage.setItem("dd:resFit", JSON.stringify({
       clientsSide:resFit.clientsSide, clientsOff:[...resFit.clientsOff], boardSide:resFit.boardSide, boardOn:[...resFit.boardOn],
-      pos:[...resFit.pos], teamsOff:[...resFit.teamsOff], gradeMin:resFit.gradeMin,
+      pos:[...resFit.pos], cls:[...resFit.cls], lvl:[...resFit.lvl], rkLo:resFit.rkLo, rkHi:resFit.rkHi,
+      teamsOff:[...resFit.teamsOff], gradeMin:resFit.gradeMin,
       sel:[...resFit.sel], custom:resFit.custom, weights:resFit.weights, hidden:resFit.hidden, tOpen:resFit.tOpen,
       ftOpen:resFit.ftOpen, sortCol:resFit.sortCol, sortDir:resFit.sortDir, tab:resTab })); } catch (e) {}
   }
@@ -4435,6 +4445,9 @@
     if (resFit.boardSide) for (const key of resFit.boardOn) {
       if (clientKeys.has(key)) continue; const comp = DATA.compByName.get(key); if (comp) list.push(comp); }
     if (resFit.pos.size) list = list.filter(c => baPosTokens(c).some(t => resFit.pos.has(t)));
+    if (resFit.cls.size) list = list.filter(c => resFit.cls.has(rfCompCls(c)));
+    if (resFit.lvl.size) list = list.filter(c => resFit.lvl.has(rfCompLvl(c)));
+    if (resFit.rkLo > 1 || resFit.rkHi) list = list.filter(c => c.rank >= resFit.rkLo && (!resFit.rkHi || c.rank <= resFit.rkHi));
     const seen = new Set();
     list = list.filter(c => { const k=normName(c.name); if (seen.has(k)) return false; seen.add(k); return true; });
     list.sort((a,b) => (a.rank||9999)-(b.rank||9999));
@@ -4453,8 +4466,11 @@
     const q = rfBoardQuery.trim().toLowerCase();
     let list = DATA.composite.filter(c => !clientKeys.has(normName(c.name)));
     if (q) list = list.filter(c => (c.name||"").toLowerCase().includes(q));
-    if (rfBoardCls.size) list = list.filter(c => rfBoardCls.has(rfCompCls(c)));
-    if (rfBoardLvl.size) list = list.filter(c => rfBoardLvl.has(rfCompLvl(c)));
+    // population filters apply here too — "add all shown" honors the tab's chips
+    if (resFit.pos.size) list = list.filter(c => baPosTokens(c).some(t => resFit.pos.has(t)));
+    if (resFit.cls.size) list = list.filter(c => resFit.cls.has(rfCompCls(c)));
+    if (resFit.lvl.size) list = list.filter(c => resFit.lvl.has(rfCompLvl(c)));
+    if (resFit.rkLo > 1 || resFit.rkHi) list = list.filter(c => c.rank >= resFit.rkLo && (!resFit.rkHi || c.rank <= resFit.rkHi));
     return list;
   }
   // Board dropdown list HTML (non-client composite, filtered by the search box + chips) —
@@ -4521,10 +4537,6 @@
     const boardFilteredN = !rfBoardMenu ? 0 : rfBoardFiltered().length;
     const boardMenu = !rfBoardMenu ? "" : `<div class="res-posmenu rf-menu rf-menu-wide" onclick="event.stopPropagation()">
       <input id="rfBoardSearch" class="res-findin" type="search" placeholder="Search the board…" autocomplete="off" value="${rfBoardQuery.replace(/"/g,"&quot;")}" oninput="rfBoardSearch(this.value)">
-      <div class="res-posrow"><span class="tc-wizlab">Class</span>${["Prep","Early col","JR","SR+"].map(v=>
-        `<button class="tc-chip${rfBoardCls.has(v)?' on':''}" onclick="rfBoardClsTok('${v}',event)">${v}</button>`).join("")}</div>
-      <div class="res-posrow"><span class="tc-wizlab">Level</span>${["HS","College","JuCo"].map(v=>
-        `<button class="tc-chip${rfBoardLvl.has(v)?' on':''}" onclick="rfBoardLvlTok('${v}',event)">${v}</button>`).join("")}</div>
       <div class="res-posrow">
         <button class="tc-chip grp" onclick="rfBoardAddAll(event)">+ add all shown (${boardFilteredN>100?"top 100":boardFilteredN})</button>
         ${resFit.boardOn.size?`<button class="tc-chip clear" onclick="rfBoardClearAll(event)">✕ clear selected (${resFit.boardOn.size})</button>`:""}
@@ -4544,6 +4556,22 @@
       ${resFit.pos.size?`<div class="res-posrow"><button class="tc-chip clear" onclick="rfPosClear(event)">✕ any</button></div>`:""}</div>`;
     const posRow = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab">Position</span>
       <button class="tc-chip${resFit.pos.size?' on':''}" onclick="rfPosOpen(event)">${resFit.pos.size?[...resFit.pos].join(" "):"Any"} ▾</button>${posMenu}</div>`;
+    // Class / Level: population filters over whichever column sides are on (same
+    // classifiers Player Research uses); Composite: rank-band dual slider over the
+    // whole board (clients + rest) — Best Available's composite rankings.
+    const clsRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Class</span>
+      ${["Prep","Early col","JR","SR+"].map(v=>chip(resFit.cls.has(v),v,`rfClsTok('${v.replace(/'/g,"\\'")}')`)).join("")}</div>`;
+    const lvlRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Level</span>
+      ${["HS","College","JuCo"].map(v=>chip(resFit.lvl.has(v),v,`rfLvlTok('${v}')`)).join("")}</div>`;
+    const rkMax = rfRkMax(), rkHi = resFit.rkHi || rkMax;
+    const rkActive = resFit.rkLo > 1 || rkHi < rkMax;
+    const rankMenu = !rfRankMenu ? "" : `<div class="res-posmenu rf-menu" onclick="event.stopPropagation()" style="min-width:260px">
+      <div class="res-slider"><span class="tc-wizlab">Composite</span><span class="res-slab" id="rfRkLab">#${resFit.rkLo} – #${rkHi}</span>
+        <div class="dual"><input type="range" id="rfRkLo" min="1" max="${rkMax}" step="1" value="${resFit.rkLo}" oninput="rfRankSlide()">
+        <input type="range" id="rfRkHi" min="1" max="${rkMax}" step="1" value="${rkHi}" oninput="rfRankSlide()"></div></div>
+      ${rkActive?`<div class="res-posrow"><button class="tc-chip clear" onclick="rfRankClear(event)">✕ full board</button></div>`:""}</div>`;
+    const rankRow = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab">Composite</span>
+      <button class="tc-chip${rkActive?' on':''}" onclick="rfRankOpen(event)">${rkActive?`#${resFit.rkLo}–#${rkHi}`:"Any rank"} ▾</button>${rankMenu}</div>`;
     // Outlooks = the four questions — click to select/deselect (multi-select averages them);
     // none selected (or all four) reads as "Overall".
     const tileStrip = `<div class="tc-wizgrp"><span class="tc-wizlab">Outlook</span><div class="rf-otiles">
@@ -4571,7 +4599,8 @@
       <div class="res-chead" onclick="rfToggleFt()">Fine-tune${resFit.custom?" · custom blend":""}<span>${resFit.ftOpen?"▾":"▸"}</span></div>
       ${resFit.ftOpen?`<div class="rf-wgrid rf-wgrid3">${RF_FACTORS.map(([k,l])=>sl(k,l)).join("")}</div>
       <div class="rf-wfoot"><span>Drag any slider for a Custom blend. Intel-neutral — SV interest never moves a fit grade. Money reads live pool room and sharpens as slots commit during the draft.</span></div>`:""}</div>`;
-    el.innerHTML = `<div class="rf-controls">${playersRow}${posRow}${tileStrip}${selCap}${gradeRow}</div>${weightsBox}${teamsBox}`;
+    // Row order (per Mike): Columns → filters (Position/Class/Level/Composite) → Outlook → Grade → sliders
+    el.innerHTML = `<div class="rf-controls">${playersRow}${posRow}${clsRow}${lvlRow}${rankRow}${tileStrip}${selCap}${gradeRow}</div>${weightsBox}${teamsBox}`;
   }
   function rfWeightLabels() { const w=resFit.weights, s=rfWsum();
     RF_FKEYS.forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=(s?Math.round(100*(+w[k]||0)/s):0)+"%"; }); }
@@ -4716,10 +4745,18 @@
     rfSave(); renderRfControls(); renderRfGrid();
   };
   window.rfBoardSearch = (v) => { rfBoardQuery = v; const el = $("rfBoardList"); if (el) el.innerHTML = rfBoardListHtml(); };
-  window.rfBoardClsTok = (v, e) => { if (e) e.stopPropagation();
-    rfBoardCls.has(v) ? rfBoardCls.delete(v) : rfBoardCls.add(v); renderRfControls(); };
-  window.rfBoardLvlTok = (v, e) => { if (e) e.stopPropagation();
-    rfBoardLvl.has(v) ? rfBoardLvl.delete(v) : rfBoardLvl.add(v); renderRfControls(); };
+  // population filters: Class / Level chips + Composite rank band (whole tab, both sides)
+  window.rfClsTok = (v) => { resFit.cls.has(v) ? resFit.cls.delete(v) : resFit.cls.add(v); rfSave(); renderResFit(); };
+  window.rfLvlTok = (v) => { resFit.lvl.has(v) ? resFit.lvl.delete(v) : resFit.lvl.add(v); rfSave(); renderResFit(); };
+  window.rfRankOpen = (e) => { if (e) e.stopPropagation(); rfRankMenu = !rfRankMenu; renderRfControls(); };
+  window.rfRankSlide = () => {
+    let lo = +$("rfRkLo").value, hi = +$("rfRkHi").value;
+    if (lo > hi) [lo, hi] = [hi, lo];
+    resFit.rkLo = lo; resFit.rkHi = hi >= rfRkMax() ? 0 : hi;   // 0 = open-ended top
+    const lab = $("rfRkLab"); if (lab) lab.textContent = `#${lo} – #${hi}`;
+    rfSave(); renderRfGrid();
+  };
+  window.rfRankClear = (e) => { if (e) e.stopPropagation(); resFit.rkLo = 1; resFit.rkHi = 0; rfSave(); renderRfControls(); renderRfGrid(); };
   window.rfBoardAddAll = (e) => { if (e) e.stopPropagation();
     const list = rfBoardFiltered().slice().sort((a,b)=>(a.rank||9999)-(b.rank||9999)).slice(0, 100);
     list.forEach(c => resFit.boardOn.add(normName(c.name)));
