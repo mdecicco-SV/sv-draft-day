@@ -521,6 +521,22 @@
   .tc-vgrid .mv .ms { font-size:10px; color:var(--muted); margin-left:1px; }
   .tc-vgrid .mr { font-size:12.5px; color:var(--ink); }
   .tc-vgrid .mr .rk-hi { color:#1a7f37; } .tc-vgrid .mr .rk-lo { color:#c8102e; }
+  /* mix-metric spectrums: dot on a fixed pole-to-pole axis, gray tick = league avg */
+  .spec-row { display:flex; align-items:center; gap:10px; padding:6px 0 8px; border-top:1px solid var(--line); }
+  .spec-k { font-size:12px; color:var(--muted); font-weight:700; flex:0 0 122px; }
+  .spec-track { flex:1; display:flex; align-items:center; gap:7px; min-width:0; }
+  .spec-end { font-size:8px; font-weight:800; color:var(--muted); letter-spacing:.4px; }
+  .spec-line { position:relative; flex:1; height:28px; }
+  .spec-line::before { content:""; position:absolute; left:0; right:0; top:19px; height:2px; background:var(--line); border-radius:1px; }
+  .spec-avg { position:absolute; top:13px; width:2px; height:14px; background:#9aa2ab; transform:translateX(-50%); border-radius:1px; }
+  .spec-dot { position:absolute; top:15px; width:10px; height:10px; border-radius:50%; background:var(--ink); transform:translateX(-50%); box-shadow:0 0 0 2px #fff; }
+  .spec-dot.rk-hi { background:#1a7f37; } .spec-dot.rk-lo { background:#c8102e; }
+  .spec-val { position:absolute; top:0; transform:translateX(-50%); font-size:11.5px; font-weight:800; color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .spec-val .ms { font-size:9px; color:var(--muted); margin-left:1px; }
+  .spec-rank { flex:0 0 auto; font-size:12.5px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .spec-rank .rk-hi { color:#1a7f37; } .spec-rank .rk-lo { color:#c8102e; }
+  .spec-cap { font-size:9px; color:var(--muted); padding:4px 0 0; }
+  .spec-avg-demo { display:inline-block; width:2px; height:9px; background:#9aa2ab; vertical-align:-1px; margin-right:3px; }
   /* 4-way HS/COL × Hitter/Pitcher heat matrix — a compact, right-anchored support graphic */
   .tc-mat { display:grid; grid-template-columns:auto 74px 74px; gap:3px; margin:7px 0 0 auto; width:max-content; }
   .tc-mat .hd { font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.3px;
@@ -4149,9 +4165,9 @@
     const myName = pk.teamName || "";
     const lt = DATA.leagueTend, tt = lt ? lt.byTeam.get(myName) : null;
     const rankTot = lt ? lt.byTeam.size : 30;
-    // Clean 2-column read: Pct% · Rank ("14th of 30"). For the two mix metrics the Pct% shows the
-    // side that matches the player under evaluation (his pitcher/hitter + HS/college), and the
-    // rank flips to that same side; homegrown & debut are raw team rates.
+    // Clean 2-column read: Pct% · Rank ("14th of 30"); homegrown & debut are raw team rates.
+    // The two mix metrics render as spectrums below the grid (fixed pole-to-pole axis) — their
+    // value label + rank still flip to the side of the player under evaluation.
     const selC = sel && sel.c ? sel.c.comp : null;
     const hitSel = selC ? (selC.posGroup || posGroupOf(selC.pos)) !== "P" : false;
     const colSel = selC ? !!(selC.level && selC.level !== "HS") : false;
@@ -4179,15 +4195,30 @@
           + `<div class="mr">${rk?`<span class="${rkCls(rk)}">${ord(rk)} of 30</span>`:""}</div>`;
       }
     }
-    rows += tt
-      ? (hitSel ? mrow("Pitchers vs hitters", 100-tt.pPct, 100-lt.avgP, (rankTot+1)-lt.rankP(myName), "H")
-                : mrow("Pitchers vs hitters", tt.pPct, lt.avgP, lt.rankP(myName), "P"))
-      : mrow("Pitchers vs hitters", null, null, null);
-    rows += tt
-      ? (colSel ? mrow("HS vs College", 100-tt.hsPct, 100-lt.avgHS, (rankTot+1)-lt.rankHS(myName), "COL")
-                : mrow("HS vs College", tt.hsPct, lt.avgHS, lt.rankHS(myName), "HS"))
-      : mrow("HS vs College", null, null, null);
     h += `<div class="tc-vgrid"><div class="mh"></div><div class="mh">Pct%</div><div class="mh">Rank</div>${rows}</div>`;
+    // Mix metrics as spectrums: fixed axis (hitters↔pitchers, College↔HS), team dot at its share,
+    // gray tick = league avg. Value label + rank keep the flip convention (side of the player under eval).
+    const spec = (label, endL, endR, pos, avg, valTxt, rank) => {
+      const cl = x => Math.max(4, Math.min(96, x));
+      const inner = pos==null ? "" :
+        `<span class="spec-avg" style="left:${cl(avg)}%"></span>
+         <span class="spec-dot ${rank?rkCls(rank):""}" style="left:${cl(pos)}%"></span>
+         <span class="spec-val" style="left:${cl(pos)}%">${valTxt||""}</span>`;
+      return `<div class="spec-row"><div class="spec-k">${label}</div>
+        <div class="spec-track"><span class="spec-end">${endL}</span><div class="spec-line">${inner}</div><span class="spec-end">${endR}</span></div>
+        <div class="spec-rank">${rank?`<span class="${rkCls(rank)}">${ord(rank)} of 30</span>`:pos==null?(lt?"—":"…"):""}</div></div>`;
+    };
+    if (tt) {
+      h += spec("Pitchers vs hitters", "HIT", "P", tt.pPct, lt.avgP,
+        hitSel ? `${Math.round(100-tt.pPct)}%<span class="ms">H</span>` : `${Math.round(tt.pPct)}%<span class="ms">P</span>`,
+        hitSel ? (rankTot+1)-lt.rankP(myName) : lt.rankP(myName));
+      h += spec("HS vs College", "COL", "HS", tt.hsPct, lt.avgHS,
+        colSel ? `${Math.round(100-tt.hsPct)}%<span class="ms">COL</span>` : `${Math.round(tt.hsPct)}%<span class="ms">HS</span>`,
+        colSel ? (rankTot+1)-lt.rankHS(myName) : lt.rankHS(myName));
+      h += `<div class="spec-cap"><span class="spec-avg-demo"></span> league avg · dot = this team's share, 2018–25</div>`;
+    } else {
+      h += spec("Pitchers vs hitters","HIT","P",null) + spec("HS vs College","COL","HS",null);
+    }
     // 4-way distribution: HS/COL × Hitter/Pitcher across 2018-25, shaded by share of the team's picks
     if (tt) {
       const total = tt.hsHit + tt.hsP + tt.colHit + tt.colP;
@@ -5035,7 +5066,9 @@
   };
 
   // ---- fit card: player × team deep dive across every lens ----
-  window.openFitCard = (key, team) => { fitSel = { key, team }; fitTile = null; renderFitCard(); };
+  let fitPicksOpen = false;  // "Name the picks" <details> survives the 3s re-render ticks
+  window.fitPicksTgl = (el) => { fitPicksOpen = el.open; };
+  window.openFitCard = (key, team) => { fitSel = { key, team }; fitTile = null; fitPicksOpen = false; renderFitCard(); };
   window.closeFitCard = () => { fitSel = null; const bd=$("fitCard"); if(bd){ bd.classList.remove("on"); bd.innerHTML=""; } };
   // ================= FIT CARD — "four questions first" (redesigned 7/10) =================
   // The four directional grades ARE the card: heat tiles up top with one-line evidence,
@@ -5094,7 +5127,7 @@
     let drawer = "";
     if (fitTile === "reach") {
       const pickLine = (p) => `${_esc(p.name)} '${dfYY(p.year)} #${p.overall} — ${p.reached_mlb?"reached MLB":"not yet"}`;
-      const picksBlock = ddPicks.length ? `<details class="fc2-picks"><summary>Name the ${dd.n} picks ▾</summary>${ddPicks.slice(0,12).map(pickLine).join("<br>")}${dd.n>12?`<br>+${dd.n-12} more`:""}</details>` : "";
+      const picksBlock = ddPicks.length ? `<details class="fc2-picks"${fitPicksOpen?" open":""} ontoggle="fitPicksTgl(this)"><summary>Name the ${dd.n} picks ▾</summary>${ddPicks.slice(0,12).map(pickLine).join("<br>")}${dd.n>12?`<br>+${dd.n-12} more`:""}</details>` : "";
       drawer = (dd ? kv(`${dd.n} like him — ${ddCrit}`, `${dd.mlb} reached MLB (${pct(dd.rate)})${D.reach.d.lgRate!=null?` vs ${pct(D.reach.d.lgRate)} league`:""}`) : "")
         + ((DATA.orgs[t]||{}).dev && DATA.orgs[t].dev.mlbDebut!=null ? kv("Org MLB-debut rate (all-time)", `${pct(DATA.orgs[t].dev.mlbDebut)}${DATA.lgDebut?` vs ${Math.round(DATA.lgDebut.avg)}% lg`:""}`) : "")
         + picksBlock

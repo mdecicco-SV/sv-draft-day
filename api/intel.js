@@ -53,7 +53,8 @@ module.exports = async (req, res) => {
       if (body.kind === "note" && !String(body.note || "").trim()) return res.status(400).json({ error: "note text required" });
       const row = {
         player_id: body.player_id ?? null,
-        player_name: body.player_name ?? null,
+        // player_name column is NOT NULL in Supabase — untagged notes store "" (read side treats falsy as team/general)
+        player_name: body.player_name ?? (body.kind === "note" ? "" : null),
         team: body.team ?? null,
         kind: body.kind,
         strength: body.strength ?? null,
