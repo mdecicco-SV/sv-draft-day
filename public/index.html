@@ -4272,15 +4272,17 @@
   // (Old dev / flavor / FV lenses folded in or dropped: FV is the same for every org so it
   // never re-ranks teams; org-wide dev now lives inside Track record's league-shrunk rates;
   // flavor's HS/college + arm/bat story survives as "why" bullets on the fit card.)
-  // Lens groups. Classic lenses (weight-blended into Combined) + display-only lenses:
-  // "WAR" (raw long-run lookback) and the DIRECTIONAL lenses — the four player-side
-  // questions, each an empirical read from the sv-draft-fit port (regime-aware draft DB,
-  // farm depth, live pools) + warhist/orgs. None of the new ones touch the Combined blend.
-  const RF_LENSES = [["combined","Combined"],["interest","Interest"],["hist","Track record"],["war","WAR"],["pipe","Pipeline"],["money","Money"],
-    ["reach","Reach MLB"],["develop","Development"],["speed","Pipeline speed"],["earn","Cost vs value"],["emp","Org fit (emp)"]];
-  const RF_LENSLBL = { combined:"Combined fit", interest:"Interest", hist:"Track record", war:"WAR lookback", pipe:"Pipeline", money:"Money",
-    reach:"Reach MLB", develop:"Development", speed:"Pipeline speed", earn:"Cost vs value", emp:"Empirical org fit" };
-  const RF_WDEF = { interest:40, hist:25, pipe:10, money:25 };
+  // Lens groups, two labeled rows. INTEREST IS NOT A FIT FACTOR here by design (Mike,
+  // 7/9): SV intel is our collected intelligence — this tab evaluates the class on equal
+  // footing, so interest stays informational (card panel 2, hidden-fits contrast, board
+  // dots) but never moves a fit number. Row 1 = the Combined blend's inputs; row 2 =
+  // display-only outlook reads (WAR lookback + the four questions + empirical composite).
+  const RF_LENSES_MAIN = [["combined","Combined"],["hist","Track record"],["pipe","Pipeline"],["money","Money"]];
+  const RF_LENSES_OUT = [["war","WAR"],["reach","Reach MLB"],["develop","Development"],["speed","Speed to MLB"],["earn","Cost vs value"],["emp","Org fit (emp)"]];
+  const RF_LENSES = [...RF_LENSES_MAIN, ...RF_LENSES_OUT];
+  const RF_LENSLBL = { combined:"Combined fit", hist:"Track record", war:"WAR lookback", pipe:"Pipeline", money:"Money",
+    reach:"Reach MLB", develop:"Development", speed:"Speed to MLB", earn:"Cost vs value", emp:"Empirical org fit" };
+  const RF_WDEF = { hist:40, pipe:20, money:40 };
   const RF_DEF = () => ({ clientsSide:true, clientsOff:new Set(), boardSide:false, boardOn:new Set(),
     pos:new Set(), teamsOff:new Set(), gradeMin:0, lens:"combined", weights:{...RF_WDEF},
     wOpen:false, tOpen:false, sortCol:null, sortDir:"desc", hidden:false });
@@ -4359,12 +4361,11 @@
     return Object.keys(DATA.orgs).filter(t=>!resFit.teamsOff.has(t))
       .sort((a,b) => ((DATA.orgs[a].orgRank??99)-(DATA.orgs[b].orgRank??99)));
   }
-  const rfWsum = () => { const w=resFit.weights; return (w.interest+w.hist+w.pipe+w.money)||1; };
-  const rfCombined = (f) => { const w=resFit.weights;
-    return Math.round(100*(w.interest*f.interestN+w.hist*f.histN+w.pipe*f.pipeN+w.money*f.moneyN)/rfWsum()); };
+  const rfWsum = () => { const w=resFit.weights; return (w.hist+w.pipe+w.money)||1; };
+  const rfCombined = (f) => { const w=resFit.weights;   // intel-neutral: no interest term
+    return Math.round(100*(w.hist*f.histN+w.pipe*f.pipeN+w.money*f.moneyN)/rfWsum()); };
   function rfCellVal(f) {
     switch (resFit.lens) {
-      case "interest": return Math.round(100*f.interestN);
       case "hist":     return Math.round(100*f.histN);
       case "war":      return Math.round(100*((f.war && f.war.known) ? f.war.warN : 0.5));
       case "pipe":     return Math.round(100*f.pipeN);
@@ -4380,7 +4381,6 @@
   // one short clause per lens that moved — the cell tooltip's "why"
   function rfWhyShort(f) {
     const parts = [];
-    if (f.interestN>=0.4) parts.push("live interest"); else if (f.interestN>0) parts.push("some intel");
     if (f.histN>=0.58) parts.push("proven at his position/price"); else if (f.histN<=0.42) parts.push("thin track record here");
     if (f.war && f.war.known) { if (f.war.warN>=0.6) parts.push("develops his kind (WAR)"); else if (f.war.warN<=0.4) parts.push("underdelivers his kind (WAR)"); }
     if (f.pipeN>=0.62) parts.push("collects his type"); else if (f.pipeN<=0.38) parts.push("light on his group");
@@ -4425,7 +4425,9 @@
       ${["P","C","IF","OF"].map(p=>chip(resFit.pos.has(p),p,`rfPos('${p}')`)).join("")}
       ${resFit.pos.size?chip(false,"✕ any","rfPosClear()","clear"):""}</div>`;
     const lensRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Lens</span>
-      ${RF_LENSES.map(([k,l])=>chip(resFit.lens===k,l,`rfLens('${k}')`)).join("")}
+      ${RF_LENSES_MAIN.map(([k,l])=>chip(resFit.lens===k,l,`rfLens('${k}')`)).join("")}</div>
+    <div class="tc-wizgrp"><span class="tc-wizlab">Outlook</span>
+      ${RF_LENSES_OUT.map(([k,l])=>chip(resFit.lens===k,l,`rfLens('${k}')`)).join("")}
       ${chip(resFit.hidden,"◎ Hidden fits","rfHidden()","match")}</div>`;
     const gradeRow = `<div class="tc-wizgrp"><span class="tc-wizlab">Grade ≥</span>
       <input type="range" class="rf-grade" min="0" max="100" step="1" value="${resFit.gradeMin}" oninput="rfGrade(this.value)">
@@ -4445,13 +4447,13 @@
       <span class="rf-wval" id="rfW_${k}">${Math.round(100*w[k]/wsum)}%</span></div>`;
     const weightsBox = `<div class="res-box rf-wbox">
       <div class="res-chead" onclick="rfToggleW()">Blend weights<span>${resFit.wOpen?"▾":"▸"}</span></div>
-      ${resFit.wOpen?`<div class="rf-wgrid">${sl("interest","Interest")}${sl("hist","Track record")}${sl("pipe","Pipeline")}${sl("money","Money")}
-        <div class="rf-wfoot"><span>Combined = weighted blend of the four lenses. Selecting a single lens shows it raw.</span>
-        <button class="tc-chip clear" onclick="rfWeightReset()">Reset 40·25·10·25</button></div></div>`:""}</div>`;
+      ${resFit.wOpen?`<div class="rf-wgrid">${sl("hist","Track record")}${sl("pipe","Pipeline")}${sl("money","Money")}
+        <div class="rf-wfoot"><span>Combined = weighted blend of Track record · Pipeline · Money. Intel-neutral by design — SV interest never moves a fit grade here. Selecting a single lens shows it raw.</span>
+        <button class="tc-chip clear" onclick="rfWeightReset()">Reset 40·20·40</button></div></div>`:""}</div>`;
     el.innerHTML = `<div class="rf-controls">${playersRow}${posRow}${lensRow}${gradeRow}</div>${teamsBox}${weightsBox}`;
   }
   function rfWeightLabels() { const w=resFit.weights, s=rfWsum();
-    ["interest","hist","pipe","money"].forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=Math.round(100*w[k]/s)+"%"; }); }
+    ["hist","pipe","money"].forEach(k=>{ const e=$("rfW_"+k); if(e) e.textContent=Math.round(100*w[k]/s)+"%"; }); }
 
   function renderRfGrid() {
     const wrap = $("rfGrid"); if (!wrap) return;
@@ -4640,7 +4642,7 @@
       whyBullets.push(`The comp: ${p.name} '${String(p.y).slice(2)} (${p.pos} ${p.lvl==="HS"?"HS":"COL"}, ${p.bon?fmtM(p.bon):"—"}) — ${(OUT_LBL[p.out]||["",""])[1]}.`); }
     const p1 = `<div class="tc-panel" data-q="why"><h4><span class="n">1</span> Why ${t}?</h4>
       <ul class="fc-reasons">${whyBullets.map(r=>`<li>${_esc(r)}</li>`).join("")}</ul>
-      <div class="fc-note">Combined <b>${combined}</b> = Interest ${Math.round(100*w.interest/wsum)}% · Track record ${Math.round(100*w.hist/wsum)}% · Pipeline ${Math.round(100*w.pipe/wsum)}% · Money ${Math.round(100*w.money/wsum)}%.</div></div>`;
+      <div class="fc-note">Combined <b>${combined}</b> = Track record ${Math.round(100*w.hist/wsum)}% · Pipeline ${Math.round(100*w.pipe/wsum)}% · Money ${Math.round(100*w.money/wsum)}% — intel-neutral: interest shown for context, never blended.</div></div>`;
 
     // Panel 2 — Interest (SV intel)
     let p2i;
