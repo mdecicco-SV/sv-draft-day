@@ -4,6 +4,7 @@
   "private": true,
   "description": "Stadium Ventures draft-day hub: live picks, clock, teamintel, bonus pools.",
   "dependencies": {
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "web-push": "^3.6.7"
   }
 }

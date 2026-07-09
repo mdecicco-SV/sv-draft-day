@@ -1067,6 +1067,9 @@
     <button id="mLive" class="on" onclick="setMode('live')">● Live</button>
     <button id="mMock" onclick="setMode('mock')">⚙ Mock</button>
   </span>
+  <!-- push bell: rendered only when /api/push says the server is configured AND the
+       browser can push (on iOS that means the installed home-screen PWA) -->
+  <span id="pushCtl"></span>
   <span class="hdr-clock" id="hdrClock" style="display:none"></span>
   <!-- hidden pill: kept only as the load-error surface (pollLive unhides it) -->
   <span class="badge" id="yearBadge" style="display:none">2026 MLB DRAFT</span>
@@ -5104,6 +5107,60 @@
   // Companion PWA: SW only caches static art/fonts — live data always hits the network.
   if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("/sw.js"); } catch (e) {} }
 
+  // ---------- push notifications: "SV client drafted" on this device ----------
+  // Server side lives in lib/push.js (detection piggybacks on /api/draft's cache-miss
+  // path). The bell renders only when the server has VAPID keys AND this context can
+  // push — on iOS that's the installed home-screen PWA (16.4+), never a Safari tab.
+  let pushState = {
+    supported: "serviceWorker" in navigator && "PushManager" in window && "Notification" in window,
+    enabled: false, key: null, busy: false,
+  };
+  function renderPushCtl() {
+    const el = $("pushCtl"); if (!el) return;
+    el.innerHTML = `<button class="ctl ${pushState.enabled ? 'primary' : ''}" onclick="togglePush()"
+      title="${pushState.enabled ? "Client-drafted alerts ON for this device" : "Notify this device when an SV client is drafted"}">${pushState.busy ? "…" : "🔔"}</button>`;
+  }
+  const _b64ToU8 = (s) => { const p = "=".repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from([...b].map(c => c.charCodeAt(0))); };
+  async function initPush() {
+    if (!pushState.supported) return;
+    try {
+      const cfg = await fetch("/api/push").then(r => r.json());
+      if (!cfg.enabled) return;   // server unconfigured — no bell, keep the header clean
+      pushState.key = cfg.publicKey;
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      pushState.enabled = !!sub && Notification.permission === "granted";
+      renderPushCtl();
+    } catch (e) {}
+  }
+  window.togglePush = async () => {
+    if (pushState.busy || !pushState.key) return;
+    pushState.busy = true; renderPushCtl();
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (pushState.enabled) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/push", { method: "DELETE", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }) });
+          await sub.unsubscribe();
+        }
+        pushState.enabled = false;
+      } else {
+        // permission prompt must ride the tap gesture (iOS hard requirement)
+        const perm = await Notification.requestPermission();
+        if (perm === "granted") {
+          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: _b64ToU8(pushState.key) });
+          await fetch("/api/push", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subscription: sub.toJSON(), test: true }) });   // test:true → instant confirmation push
+          pushState.enabled = true;
+        }
+      }
+    } catch (e) {}
+    pushState.busy = false; renderPushCtl();
+  };
+
   // Shareable deep-links into Research: #teamfit opens the team-fit grid, #research the wizard.
   const applyResHash = () => {
     const hh = (location.hash||"").toLowerCase();
@@ -5114,6 +5171,7 @@
 
   (async () => {
     initOrgTooltip();
+    initPush();   // async — renders the header bell if server + device both support push
     applyTv();
     applyViewVis();   // sync tab/section classes (Board is the default view everywhere)
     applyResHash();   // honor a #teamfit / #research deep-link on first load

@@ -12,6 +12,7 @@
 
 const Redis = require("ioredis");
 const { abbr, classBucket } = require("../lib/teams");
+const { notifyDraftedClients } = require("../lib/push");
 
 const FEED = (year) => `https://statsapi.mlb.com/api/v1/draft/${year}`;
 const CACHE_TTL_MS = 2000; // coalesce upstream fetches across clients
@@ -123,6 +124,10 @@ module.exports = async (req, res) => {
     const state = await fetchLive(year);
     if (r) await r.set(key, JSON.stringify(state), "PX", CACHE_TTL_MS);
     res.setHeader("X-Cache", "miss");
+    // Cache-miss = we just saw fresh upstream truth (~once per TTL across the war
+    // room) — the one place to detect newly-drafted SV clients and push phones.
+    // Default year only: a ?year=2025 replay must never notify. Fail-soft inside.
+    if (r && Number(year) === DEFAULT_YEAR) await notifyDraftedClients(r, state);
     return res.status(200).json(state);
   } catch (err) {
     // On upstream failure, serve last-known cache (ignore TTL) if we have it.
