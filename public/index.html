@@ -505,13 +505,13 @@
     text-shadow:0 0 2px #fff, 0 0 2px #fff; pointer-events:none; }
   .tc-mixbar .tick::after { content:""; position:absolute; left:50%; top:11px; width:1px; height:14px;
     background:var(--ink); transform:translateX(-50%); }
-  /* 4-way HS/COL × Hitter/Pitcher heat matrix */
-  .tc-mat { display:grid; grid-template-columns:auto 1fr 1fr; gap:3px; margin-top:8px; }
-  .tc-mat .hd { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.4px;
+  /* 4-way HS/COL × Hitter/Pitcher heat matrix — kept subtle so it reads as a support graphic */
+  .tc-mat { display:grid; grid-template-columns:auto 1fr 1fr; gap:2px; margin-top:7px; max-width:230px; }
+  .tc-mat .hd { font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.3px;
     color:var(--muted); display:flex; align-items:center; justify-content:center; }
-  .tc-mat .cell { display:flex; align-items:center; justify-content:center; height:26px; border-radius:5px;
-    border:1px solid var(--line); font-size:11px; font-weight:900; font-variant-numeric:tabular-nums; color:var(--ink); }
-  .tc-mat-cap { margin:6px 0 0; }
+  .tc-mat .cell { display:flex; align-items:center; justify-content:center; height:19px; border-radius:4px;
+    border:1px solid var(--line); font-size:10px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .tc-mat-cap { margin:5px 0 0; font-size:8px; }
   .tc-feed-row { display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-top:1px solid var(--line); }
   .tc-feed-row:first-child { border-top:none; }
   .tc-feed-meta { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); }
@@ -3495,7 +3495,7 @@
         const cells = [["hsHit","HS","Hitter"],["colHit","COL","Hitter"],["hsP","HS","Pitcher"],["colP","COL","Pitcher"]]
           .map(([k]) => ({ k, share: tt[k]/total, n: tt[k] }));
         const maxShare = Math.max(...cells.map(c=>c.share)) || 1;
-        const cell = (c) => `<span class="cell" style="background:rgba(200,16,46,${(0.10+0.80*(c.share/maxShare)).toFixed(3)})" title="${c.n} of ${total}">${Math.round(100*c.share)}%</span>`;
+        const cell = (c) => `<span class="cell" style="background:rgba(200,16,46,${(0.07+0.45*(c.share/maxShare)).toFixed(3)})" title="${c.n} of ${total}">${Math.round(100*c.share)}%</span>`;
         h += `<div class="tc-mat">
           <span class="hd"></span><span class="hd">HS</span><span class="hd">COL</span>
           <span class="hd">Hit</span>${cell(cells[0])}${cell(cells[1])}
