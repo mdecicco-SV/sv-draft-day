@@ -1,6 +1,6 @@
 {
   "name": "SV Draft Day",
-  "short_name": "Draft Day",
+  "short_name": "SV Draft Day",
   "description": "Stadium Ventures draft-day companion — live board, team cards, client intel.",
   "start_url": "/?pwa=1",
   "display": "standalone",
