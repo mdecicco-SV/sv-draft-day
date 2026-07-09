@@ -5109,7 +5109,8 @@
     announcedPicks = null; tickerQueue = [];   // don't replay the board when switching modes
     if (m==="mock") {
       await seedFromLive(); pushMock();
-    } else { pollLive(); }
+      seedMockLeads(); renderLeadStrip();   // rehearse the leading-intel alert in mock
+    } else { MOCKLEADS = []; pollLive(); }
   }
 
   // ---------- org-review hover tooltip (on team names in the org-interest lists) ----------
@@ -5227,7 +5228,27 @@
   // parses tweets; here we match names to the board, render amber UNOFFICIAL chips, and
   // auto-clear once the official feed confirms. Silent unless the server is configured.
   let XLEADS = { enabled: null, leads: [] };
+  let MOCKLEADS = [];   // synthetic leads seeded in mock mode so the alert strip can be rehearsed
   const LEAD_TTL_MS = 45 * 60 * 1000, LEAD_MIN_CONF = 0.55, LEAD_SHOW = 3;
+  // Seed a couple of demo leads off the current mock board: upcoming picks × undrafted
+  // SV clients (falling back to the top board). They reconcile/auto-clear exactly like
+  // real ones — as the sim drafts a named player, his chip drops.
+  function seedMockLeads() {
+    MOCKLEADS = [];
+    if (!currentState) return;
+    const drafted = new Set(currentState.picks.filter(p => p.isDrafted && p.player).map(p => normName(p.player)));
+    let cands = DATA.clientList.filter(c => c.comp && !drafted.has(c.key)).map(c => c.comp);
+    if (cands.length < 2) cands = cands.concat(DATA.composite.filter(c => !drafted.has(normName(c.name))));
+    const upcoming = currentState.picks.filter(p => !p.isDrafted && p.team && p.overall);
+    const srcs = ["JeffPassan", "kileymcd", "CarlosACollazo"];
+    const n = Math.min(2, cands.length, upcoming.length);
+    for (let i = 0; i < n; i++) {
+      const c = cands[i], pk = upcoming[Math.min(i * 2, upcoming.length - 1)];
+      MOCKLEADS.push({ id: "mock-" + normName(c.name), player: c.name, team: pk.teamName || pk.team,
+        pick: pk.overall, confidence: 0.9, src: srcs[i % srcs.length], mock: true,
+        at: new Date().toISOString(), text: `(MOCK) Hearing ${c.name} to ${pk.team} at #${pk.overall}.` });
+    }
+  }
   function leadTeamAbbr(t) {
     if (!t) return null;
     const up = teamAlias(t.trim().toUpperCase());
@@ -5238,18 +5259,20 @@
       return n && (n.includes(low) || low.includes(n.split(" ").pop())); });
     return hit ? hit.team : null;
   }
-  function activeLeads() {
+  function activeLeads(base) {
     const now = Date.now();
     const drafted = currentState
       ? new Set(currentState.picks.filter(p => p.isDrafted && p.player).map(p => normName(p.player)))
       : new Set();
-    return XLEADS.leads.filter(l => l.confidence >= LEAD_MIN_CONF
+    return (base || []).filter(l => l.confidence >= LEAD_MIN_CONF
       && (!l.at || isNaN(new Date(l.at)) || now - new Date(l.at).getTime() < LEAD_TTL_MS)
       && !drafted.has(normName(l.player))).slice(0, LEAD_SHOW);
   }
   function renderLeadStrip() {
     const el = $("leadStrip"); if (!el) return;
-    const leads = MODE === "live" ? activeLeads() : [];
+    // live → server leads; mock → seeded demo leads (rehearsal); pre-draft/other → none
+    const leads = MODE === "mock" ? activeLeads(MOCKLEADS)
+                : MODE === "live" ? activeLeads(XLEADS.leads) : [];
     if (!leads.length) { el.style.display = "none"; el.innerHTML = ""; return; }
     el.style.display = "";
     el.innerHTML = leads.map(l => {
@@ -5262,7 +5285,7 @@
         <b>${comp ? playerLink(comp.name) : _esc(l.player)}</b>${comp ? `<span class="lc-rk">#${comp.rank}</span>` : ""}
         <span class="lc-arrow">→</span> ${ab ? teamLogo(ab, 15) : ""}<b>${ab || _esc(l.team)}</b>
         ${l.pick ? `<span class="lc-pick">at #${l.pick}</span>` : ""}
-        <span class="lc-src">per @${_esc(l.src)}${ago} · unofficial</span>
+        <span class="lc-src">per @${_esc(l.src)}${ago} · ${l.mock ? "mock" : "unofficial"}</span>
         <button class="lc-x" onclick="dismissLead('${String(l.id).replace(/'/g,"\\'")}')" title="dismiss this report">✕</button>
       </div>`;
     }).join("");
