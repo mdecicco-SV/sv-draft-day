@@ -1832,7 +1832,7 @@
   const teamLink = (t) => t ? `<span class="tlink" onclick="openTeam('${t}')">${t}</span>` : "";
   const playerLink = (name) => `<span class="tlink" onclick="openPlayer('${normName(name).replace(/'/g,"\\'")}')">${name}</span>`;
   let currentState = null, lastLive = null, ORDER = null;
-  let mock = { picks:null, running:false, speed:"fast", nextAt:0, seeding:false };
+  let mock = { picks:null, running:false, speed:"fast", nextAt:0, seeding:false, sid:null };
 
   async function loadStatic() {
     try {
@@ -5854,6 +5854,8 @@
         // Pre-draft or no live data: blank skeleton
         mock.picks = o.picks.map(p => ({ ...p, isDrafted:false, isPass:false, player:null, playerId:null, school:null, schoolClass:null, bucket:"UNK", bonus:null, bonusUser:false, bonusV:false, rank:null }));
       }
+      // fresh session id: re-arms the server-side mock-push dedupe (a reset mints a new one)
+      mock.sid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     } catch (e) { $("mockNote").textContent = "Couldn't load board — serve via a web server (vercel dev / python3 -m http.server)"; }
     mock.seeding = false;
   }
@@ -5942,6 +5944,20 @@
       pk.bucket = comp.level==="HS" ? "HS" : comp.level==="College" ? "4YR" : comp.level==="JUCO" ? "JUCO" : "UNK";
       pk.bonus = choice.bonus;
     } else { pk.player=`Pick ${pk.overall}`; pk.bucket="UNK"; pk.bonus=null; }
+    notifyMockPick(pk);
+  }
+  // Real web-push for mock/manual picks of SV clients (manual Draft button and the
+  // auto-engine both land in applyPick). Client-set prefilter keeps a full-board
+  // mock from invoking the endpoint ~600 times; the server re-validates + dedupes
+  // per mock session (see api/notify.js).
+  function notifyMockPick(pk) {
+    if (!pk.player || !mock.sid || !DATA.clients.has(normName(pk.player))) return;
+    try {
+      fetch("/api/notify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pick: { player:pk.player, overall:pk.overall, slot:pk.slot, team:pk.team, teamName:pk.teamName, round:pk.round }, mode:"mock", sid: mock.sid }),
+      }).catch(() => {});
+    } catch (e) {}
   }
   function autoPickOne() {
     const st = derive(mock.picks, mock.picks[0]?.year || 2026);
