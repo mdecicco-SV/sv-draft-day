@@ -5248,8 +5248,10 @@
     } else {
       const ps = orgPosSystem(t), B = leagueBaselines();
       const sysLine = ps && ps[g]!=null ? `System: ${Math.round(ps[g]*ps.n)} ${g} in their Top-30 (lg ~${(B.sys[g]*ps.n).toFixed(1)})` : null;
-      const spotN = t30AtSpot(t, g, 3);
-      const depthLine = D.depthInfo && D.depthInfo.known ? `farm ${D.depthInfo.block} blocked at his spot (${D.depthInfo.n})${spotN.length?": "+spotN.map(p=>`${_esc(p.name)} #${p.rank}`).join(", "):""}` : null;
+      // count + names both from the CURRENT T30 — farmdepth.json (April snapshot) only scores
+      // the Fine-tune Farm-depth factor, which no outlook preset uses
+      const spotAll = t30AtSpot(t, g, 30), spotN = spotAll.slice(0, 3);
+      const depthLine = spotAll.length ? `${spotAll.length} in their current T30 at his spot${spotN.length?": "+spotN.map(p=>`${_esc(p.name)} #${p.rank}`).join(", "):""}${spotAll.length>3?" +"+(spotAll.length-3):""}` : `no one in their current T30 at his spot`;
       drawer = (compsLine ? `<div class="fc-note">${compsLine}</div>` : "")
         + (rgLine ? `<div class="fc-note">${rgLine} (${dfPicks(t).length} picks counted)</div>` : "")
         + ((sysLine||depthLine) ? `<div class="fc-note">${[sysLine,depthLine].filter(Boolean).join(" · ")}</div>` : "")

@@ -26,6 +26,13 @@ SRC_PATH = "public/data/regime_data.json"
 
 ABBR_FIX = {"KCR": "KC", "SDP": "SD", "SFG": "SF", "TBR": "TB", "WSN": "WSH", "OAK": "ATH"}
 
+# Post-snapshot front-office changes the sv-draft-fit source (dormant since Apr '26)
+# doesn't know about — merged on top of the fetched data so a rebake keeps them.
+OVERRIDES = {
+    "LAA": {"gm": "John Mozeliak", "gm_title": "Interim GM", "gm_start_year": 2026, "prior_org": "STL",
+            "notes": "Minasian fired 2026-06-27; Mozeliak (STL 2007-25) interim while GM search runs. McIlvaine from Brewers."},
+}
+
 
 def fetch_source():
     out = subprocess.run(
@@ -49,6 +56,10 @@ def main():
         if rec.get("sd_prior_org"):
             rec["sd_prior_org"] = norm_abbr(rec["sd_prior_org"])
         out[norm_abbr(team)] = rec
+
+    for team, patch in OVERRIDES.items():
+        if team in out:
+            out[team].update(patch)
 
     assert len(out) == 30, f"expected 30 teams, got {len(out)}"
 
