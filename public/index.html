@@ -47,6 +47,17 @@
   .prebanner .sched .sep { color:var(--line); padding:0 4px; }
   .pulse { width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 0 0 rgba(255,42,34,.5); animation:pulse 1.6s infinite; }
   @keyframes pulse { 70% { box-shadow:0 0 0 7px rgba(255,42,34,0); } 100% { box-shadow:0 0 0 0 rgba(255,42,34,0); } }
+  /* X leading-intel strip: amber = unofficial, never the red/green of the official ticker */
+  #leadStrip { display:flex; flex-direction:column; gap:5px; padding:7px 16px; background:#fffaf0; border-bottom:1px solid #ecd9ac; position:sticky; top:90px; z-index:4; }
+  .lead-chip { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; font-size:13px; color:var(--ink); }
+  .lead-chip .lc-flag { background:#e8920e; color:#fff; font-weight:900; font-size:10.5px; letter-spacing:.5px; padding:2.5px 7px; border-radius:5px; }
+  .lead-chip .lc-rk, .lead-chip .lc-pick { color:var(--muted); font-weight:700; font-size:12px; }
+  .lead-chip .lc-arrow { color:#c8871c; font-weight:900; }
+  .lead-chip .lc-src { color:var(--muted); font-size:11.5px; font-weight:600; margin-left:auto; }
+  .lead-chip .lc-x { border:0; background:none; color:var(--muted); font-size:13px; cursor:pointer; padding:1px 5px; }
+  .lead-chip .lc-x:hover { color:var(--red); }
+  body.mob #leadStrip { top:0; padding:6px 10px; }
+  body.mob .lead-chip .lc-src { flex-basis:100%; margin-left:0; }
   .ctl { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 11px; font:inherit; font-weight:700; cursor:pointer; }
   .ctl.primary { background:var(--red); color:#fff; border-color:var(--red); }
   .bar select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:8px; }
@@ -1099,6 +1110,9 @@
 </div>
 
 <div id="preBanner" class="prebanner" style="display:none"></div>
+<!-- Leading intel from the DraftDay_Feed sheet (/api/xlead) — UNOFFICIAL reports, amber-styled,
+     auto-clear when the MLB feed confirms. Hidden entirely unless the server is configured. -->
+<div id="leadStrip" style="display:none"></div>
 
 <main>
   <!-- OUR CLIENTS (hero) -->
@@ -4866,6 +4880,7 @@
                  ["tabResearch","viewResearch","research"]];
   function renderActive() {
     if (!currentState) return;
+    renderLeadStrip();   // X-lead chips reconcile against fresh official picks on every repaint
     // refresh the open team card on live data ticks, but don't wipe an in-progress capture form
     if (cardPick!=null) {
       const ae = document.activeElement;
@@ -5202,6 +5217,64 @@
   // Companion PWA: SW only caches static art/fonts — live data always hits the network.
   if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("/sw.js"); } catch (e) {} }
 
+  // ---------- X leading intel: insider-account pick reports ahead of the MLB feed ----------
+  // Server (/api/xlead) reads the DraftDay_Feed sheet the capture Apps Script fills and
+  // parses tweets; here we match names to the board, render amber UNOFFICIAL chips, and
+  // auto-clear once the official feed confirms. Silent unless the server is configured.
+  let XLEADS = { enabled: null, leads: [] };
+  const LEAD_TTL_MS = 45 * 60 * 1000, LEAD_MIN_CONF = 0.55, LEAD_SHOW = 3;
+  function leadTeamAbbr(t) {
+    if (!t) return null;
+    const up = teamAlias(t.trim().toUpperCase());
+    if (ABBR_TO_ID[up]) return up;
+    const low = t.trim().toLowerCase();
+    const pools = currentState ? currentState.pools : [];
+    const hit = pools.find(p => { const n = (p.teamName || "").toLowerCase();
+      return n && (n.includes(low) || low.includes(n.split(" ").pop())); });
+    return hit ? hit.team : null;
+  }
+  function activeLeads() {
+    const now = Date.now();
+    const drafted = currentState
+      ? new Set(currentState.picks.filter(p => p.isDrafted && p.player).map(p => normName(p.player)))
+      : new Set();
+    return XLEADS.leads.filter(l => l.confidence >= LEAD_MIN_CONF
+      && (!l.at || isNaN(new Date(l.at)) || now - new Date(l.at).getTime() < LEAD_TTL_MS)
+      && !drafted.has(normName(l.player))).slice(0, LEAD_SHOW);
+  }
+  function renderLeadStrip() {
+    const el = $("leadStrip"); if (!el) return;
+    const leads = MODE === "live" ? activeLeads() : [];
+    if (!leads.length) { el.style.display = "none"; el.innerHTML = ""; return; }
+    el.style.display = "";
+    el.innerHTML = leads.map(l => {
+      const ab = leadTeamAbbr(l.team);
+      const comp = DATA.compByName.get(normName(l.player));
+      const t = l.at ? new Date(l.at).getTime() : NaN;
+      const ago = isNaN(t) ? "" : ` · ${Math.max(0, Math.round((Date.now() - t) / 60000))}m ago`;
+      return `<div class="lead-chip" title="${_esc(l.text || "")}">
+        <span class="lc-flag">⚡ REPORTED</span>
+        <b>${comp ? playerLink(comp.name) : _esc(l.player)}</b>${comp ? `<span class="lc-rk">#${comp.rank}</span>` : ""}
+        <span class="lc-arrow">→</span> ${ab ? teamLogo(ab, 15) : ""}<b>${ab || _esc(l.team)}</b>
+        ${l.pick ? `<span class="lc-pick">at #${l.pick}</span>` : ""}
+        <span class="lc-src">per @${_esc(l.src)}${ago} · unofficial</span>
+        <button class="lc-x" onclick="dismissLead('${String(l.id).replace(/'/g,"\\'")}')" title="dismiss this report">✕</button>
+      </div>`;
+    }).join("");
+  }
+  window.dismissLead = async (id) => {
+    XLEADS.leads = XLEADS.leads.filter(l => l.id !== id); renderLeadStrip();
+    try { await fetch(`/api/xlead?id=${encodeURIComponent(id)}`, { method: "DELETE" }); } catch (e) {}
+  };
+  async function pollXLeads() {
+    if (MODE !== "live" || XLEADS.enabled === false) return;   // server said disabled — stop asking
+    try {
+      const d = await fetch("/api/xlead", { cache: "no-store" }).then(r => r.json());
+      XLEADS.enabled = !!d.enabled;
+      if (d.enabled) { XLEADS.leads = d.leads || []; renderLeadStrip(); }
+    } catch (e) {}
+  }
+
   // ---------- push notifications: "SV client drafted" on this device ----------
   // Server side lives in lib/push.js (detection piggybacks on /api/draft's cache-miss
   // path). The bell renders only when the server has VAPID keys AND this context can
@@ -5277,6 +5350,8 @@
     await loadPickInPlay();                           // sv-teamintel per-pick "in play" checkboxes
     pollLive();
     setInterval(pollLive, 3000);
+    pollXLeads();
+    setInterval(pollXLeads, 20000);           // X insider leads from DraftDay_Feed (no-op unless configured)
     setInterval(loadIntel, 12000);            // refresh shared intel so the war room stays in sync
     setInterval(() => loadTeamIntel(true), 15000);   // re-pull teamintel colors/scores live
     setInterval(() => loadPickInPlay(true), 15000);  // re-pull per-pick in-play checkboxes
