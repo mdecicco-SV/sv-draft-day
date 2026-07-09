@@ -33,6 +33,7 @@
   .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
   .seg button { border:0; background:#fff; padding:6px 12px; font:inherit; font-weight:700; cursor:pointer; color:var(--muted); }
   .seg button.on { background:var(--red); color:#fff; }
+  .ico { width:15px; height:15px; vertical-align:-3px; }   /* inline SVG chrome glyphs (gear, bell) — stroke follows currentColor */
 
   .tabs { display:flex; gap:4px; padding:8px 16px 0; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:49px; z-index:5; }
   .tabs button { border:0; border-bottom:3px solid transparent; background:none; padding:8px 14px; font:inherit; font-weight:700; color:var(--muted); cursor:pointer; }
@@ -40,11 +41,22 @@
 
   .bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 16px; background:#fff7f8; border-bottom:1px solid var(--line); position:sticky; top:90px; z-index:5; }
   .bar.hidden { display:none; }
-  .prebanner { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:2px 8px; padding:9px 16px; background:#fff; border-bottom:1px solid var(--line); font-size:13px; font-weight:700; color:var(--ink); position:sticky; top:90px; z-index:4; }
+  .prebanner { display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 16px; background:#fff; border-bottom:1px solid var(--line); font-size:13px; font-weight:700; color:var(--ink); position:sticky; top:90px; z-index:4; }
   .prebanner b { color:var(--red); font-variant-numeric:tabular-nums; }
-  .prebanner .sched { flex-basis:100%; text-align:center; font-size:11.5px; font-weight:600; color:var(--muted); }
-  .prebanner .sched b { color:var(--ink); }
-  .prebanner .sched .sep { color:var(--line); padding:0 4px; }
+  .prebanner .pb-main { display:flex; align-items:center; gap:7px; white-space:nowrap; }
+  .prebanner .sched { text-align:center; font-size:11px; font-weight:600; color:var(--muted); line-height:1.5; }
+  .prebanner .sched b { color:var(--ink); white-space:nowrap; }
+  .prebanner .sched .sep { color:var(--line); padding:0 3px; }
+  .prebanner .sched .s-short { display:none; }
+  body.mob .prebanner { padding:8px 10px; }
+  body.mob .prebanner .sched { cursor:pointer; padding:1px 0; -webkit-tap-highlight-color:transparent; }
+  body.mob .prebanner .sched .s-short { font-size:9.5px; letter-spacing:-.2px; white-space:nowrap; }
+  body.mob .prebanner .sched .s-full { display:none; }
+  body.mob .prebanner .sched .s-short { display:inline; }
+  body.mob .prebanner .sched.open .s-full { display:inline; }
+  body.mob .prebanner .sched.open .s-short { display:none; }
+  body.mob .prebanner .sched::after { content:" ▾"; color:var(--muted); font-size:9px; }
+  body.mob .prebanner .sched.open::after { content:" ▴"; }
   .pulse { width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 0 0 rgba(255,42,34,.5); animation:pulse 1.6s infinite; }
   @keyframes pulse { 70% { box-shadow:0 0 0 7px rgba(255,42,34,0); } 100% { box-shadow:0 0 0 0 rgba(255,42,34,0); } }
   /* X leading-intel strip: amber = unofficial, never the red/green of the official ticker */
@@ -976,7 +988,10 @@
   body.mob .tabs { display:none; }
   body.mob .bar, body.mob .prebanner { position:static; }
   body.mob main, body.mob main.wide { padding:12px 10px calc(74px + env(safe-area-inset-bottom)); }
-  body.mob #mtabs { display:flex; position:fixed; left:0; right:0; bottom:0; z-index:70;
+  /* keep rubber-band bounce from dragging the fixed bottom bar with it */
+  body.mob { overscroll-behavior-y:none; }
+  /* own compositing layer — iOS repaints fixed bars late during scroll without it */
+  body.mob #mtabs { display:flex; position:fixed; left:0; right:0; bottom:0; z-index:70; transform:translateZ(0);
     background:#fff; border-top:1px solid var(--line); padding:5px 4px calc(5px + env(safe-area-inset-bottom)); }
   #mtabs button { flex:1; border:0; background:none; font:inherit; font-weight:800; font-size:10px;
     text-transform:uppercase; letter-spacing:.3px; color:var(--muted);
@@ -1202,7 +1217,7 @@
   <span id="conn" class="dot"></span>
   <span class="seg" style="margin-left:8px">
     <button id="mLive" class="on" onclick="setMode('live')">● Live</button>
-    <button id="mMock" onclick="setMode('mock')">⚙ Mock</button>
+    <button id="mMock" onclick="setMode('mock')"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.08a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Mock</button>
   </span>
   <!-- push bell: rendered only when /api/push says the server is configured AND the
        browser can push (on iOS that means the installed home-screen PWA) -->
@@ -1917,7 +1932,9 @@
   let _tiRaw = "";
   async function loadTeamIntel(rerender) {
     try {
-      const txt = await fetch(TEAMINTEL_URL, { cache:"no-store" }).then(r=>r.text());
+      // 30s cache-bust bucket: no-store only skips the BROWSER cache — Vercel's edge serves this
+      // file with swr up to an hour stale; a fresh query string forces a new CDN cache key.
+      const txt = await fetch(`${TEAMINTEL_URL}?v=${Math.floor(Date.now()/30000)}`, { cache:"no-store" }).then(r=>r.text());
       if (txt === _tiRaw) return false;                 // unchanged — skip rebuild + re-render
       _tiRaw = txt;
       const ti = JSON.parse(txt);
@@ -5061,6 +5078,9 @@
   // ---- fit card: player × team deep dive across every lens ----
   let fitPicksOpen = false;  // "Name the picks" <details> survives the 3s re-render ticks
   window.fitPicksTgl = (el) => { fitPicksOpen = el.open; };
+  // Current org Top-30 at the player's position group (prospects.json is rank-ordered)
+  const t30AtSpot = (team, g, lim=4) =>
+    ((DATA.prospects && DATA.prospects[team]) || []).filter(p => posGroupOf(p.pos) === g).slice(0, lim);
   window.openFitCard = (key, team) => { fitSel = { key, team }; fitTile = null; fitPicksOpen = false; renderFitCard(); };
   window.closeFitCard = () => { fitSel = null; const bd=$("fitCard"); if(bd){ bd.classList.remove("on"); bd.innerHTML=""; } };
   // ================= FIT CARD — "four questions first" (redesigned 7/10) =================
@@ -5132,8 +5152,10 @@
         + (compsLine ? `<div class="fc-note">${compsLine}</div>` : "")
         + (f.war && f.war.known && D.develop && D.develop.d && D.develop.d.known ? `<div class="fc-note">Grade blends '18+ WAR history (60%) with regime-window development (40%).</div>` : "");
     } else if (fitTile === "speed") {
-      const dep = D.depthInfo && D.depthInfo.known ? D.depthInfo : null;
-      const farmLine = dep && dep.items && dep.items.length ? `<div class="fc-note"><b>In their system at his spot (farm):</b> ${dep.items.map(p=>`${_esc(p.name)}${p.fv!=null?` FV${p.fv}`:""}${p.eta?` · ETA ${p.eta}`:""}`).join(" · ")}</div>` : "";
+      // names come from the CURRENT org Top-30 (prospects.json, curated weekly) — farmdepth.json
+      // is an April snapshot and still lists traded/graduated players; it only scores the factor.
+      const spot = t30AtSpot(t, g);
+      const farmLine = spot.length ? `<div class="fc-note"><b>In their system at his spot (current T30):</b> ${spot.map(p=>`${_esc(p.name)} <span class="sub">T30 #${p.rank} · ${_esc(p.pos)}${p.level?` · ${_esc(p.level)}`:""}</span>`).join(" · ")}</div>` : "";
       // warhist picks carry no debut year — list debuted picks at his level (nonzero bWAR or an aWAR record), newest first
       const Wo = DATA.warhist && DATA.warhist.orgs && DATA.warhist.orgs[t];
       const lvlW = comp.level === "HS" ? "HS" : "College";
@@ -5151,7 +5173,8 @@
     } else {
       const ps = orgPosSystem(t), B = leagueBaselines();
       const sysLine = ps && ps[g]!=null ? `System: ${Math.round(ps[g]*ps.n)} ${g} in their Top-30 (lg ~${(B.sys[g]*ps.n).toFixed(1)})` : null;
-      const depthLine = D.depthInfo && D.depthInfo.known ? `farm ${D.depthInfo.block} blocked at his spot (${D.depthInfo.n})${D.depthInfo.names && D.depthInfo.names.length?": "+D.depthInfo.names.slice(0,3).map(_esc).join(", "):""}` : null;
+      const spotN = t30AtSpot(t, g, 3);
+      const depthLine = D.depthInfo && D.depthInfo.known ? `farm ${D.depthInfo.block} blocked at his spot (${D.depthInfo.n})${spotN.length?": "+spotN.map(p=>`${_esc(p.name)} #${p.rank}`).join(", "):""}` : null;
       drawer = (compsLine ? `<div class="fc-note">${compsLine}</div>` : "")
         + (rgLine ? `<div class="fc-note">${rgLine} (${dfPicks(t).length} picks counted)</div>` : "")
         + ((sysLine||depthLine) ? `<div class="fc-note">${[sysLine,depthLine].filter(Boolean).join(" · ")}</div>` : "")
@@ -6005,11 +6028,19 @@
   function updatePreDraft() {
     const pre = isPreDraft(), b = $("preBanner");
     if (b) {
-      if (pre) { b.style.display = ""; b.innerHTML = `<span class="pulse"></span> 2026 MLB Draft begins in <b>${fmtCountdown(DRAFT_START-Date.now())}</b> &middot; Sat July 11 &middot; 1:00 PM ET
-        <span class="sched"><b>Day 1</b> Sat 7/11 · R1–4 — 1:00 picks 1–10 (NBC/Peacock) · 2:30 picks 11–40 (MLB Network, MLB.com) · 4:30 picks 41–135 (MLB.com) <span class="sep">|</span> <b>Day 2</b> Sun 7/12 · R5–20 — 11:30 AM–7:30 PM (MLB.com)</span>`; }
+      if (pre) {
+        b.style.display = "";
+        // build once — only the countdown span ticks, so the mobile tap-expanded schedule survives re-renders
+        if (!b.dataset.built) {
+          b.dataset.built = "1";
+          b.innerHTML = `<div class="pb-main"><span class="pulse"></span><span>2026 MLB Draft &middot; <b id="draftCountdown"></b> &middot; Sat 7/11 1:00 PM ET</span></div>
+            <div class="sched" onclick="this.classList.toggle('open')"><span class="s-short"><b>Day 1</b> Sat 1:00 ET (NBC/Peacock, MLB Net) · <b>Day 2</b> Sun 11:30 ET (MLB.com)</span><span class="s-full"><b>Day 1</b> Sat 7/11 · R1–4 — 1:00 picks 1–10 (NBC/Peacock) · 2:30 picks 11–40 (MLB Network, MLB.com) · 4:30 picks 41–135 (MLB.com) <span class="sep">|</span> <b>Day 2</b> Sun 7/12 · R5–20 — 11:30 AM–7:30 PM (MLB.com)</span></div>`;
+        }
+        const sp = document.getElementById("draftCountdown");
+        if (sp) sp.textContent = fmtCountdown(DRAFT_START-Date.now());
+      }
       else b.style.display = "none";
     }
-    if (pre) { const sp = document.getElementById("draftCountdown"); if (sp) sp.textContent = fmtCountdown(DRAFT_START-Date.now()); }
   }
   function tick() {
     renderCountdown();
@@ -6261,7 +6292,8 @@
   function renderPushCtl() {
     const el = $("pushCtl"); if (!el) return;
     el.innerHTML = `<button class="ctl ${pushState.enabled ? 'primary' : ''}" onclick="togglePush()"
-      title="${pushState.enabled ? "Client-drafted alerts ON for this device" : "Notify this device when an SV client is drafted"}">${pushState.busy ? "…" : "🔔"}</button>`;
+      title="${pushState.enabled ? "Client-drafted alerts ON for this device" : "Notify this device when an SV client is drafted"}">${pushState.busy ? "…"
+        : `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`}</button>`;
   }
   const _b64ToU8 = (s) => { const p = "=".repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/"));
     return Uint8Array.from([...b].map(c => c.charCodeAt(0))); };
