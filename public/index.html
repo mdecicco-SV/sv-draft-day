@@ -526,13 +526,14 @@
   .spec-k { font-size:12px; color:var(--muted); font-weight:700; flex:0 0 122px; }
   .spec-track { flex:1; display:flex; align-items:center; gap:7px; min-width:0; }
   .spec-end { font-size:8px; font-weight:800; color:var(--muted); letter-spacing:.4px; }
-  .spec-line { position:relative; flex:1; height:28px; }
-  .spec-line::before { content:""; position:absolute; left:0; right:0; top:19px; height:2px; background:var(--line); border-radius:1px; }
-  .spec-avg { position:absolute; top:13px; width:2px; height:14px; background:#9aa2ab; transform:translateX(-50%); border-radius:1px; }
-  .spec-dot { position:absolute; top:15px; width:10px; height:10px; border-radius:50%; background:var(--ink); transform:translateX(-50%); box-shadow:0 0 0 2px #fff; }
+  .spec-line { position:relative; flex:1; height:22px; }
+  .spec-line::before { content:""; position:absolute; left:0; right:0; top:11px; height:2px; background:var(--line); border-radius:1px; }
+  .spec-avg { position:absolute; top:4px; width:2px; height:15px; background:#9aa2ab; transform:translateX(-50%); border-radius:1px; }
+  .spec-avg-lb { position:absolute; top:-6px; transform:translateX(-50%); font-size:7px; font-weight:800; color:#9aa2ab; letter-spacing:.3px; }
+  .spec-dot { position:absolute; top:7px; width:10px; height:10px; border-radius:50%; background:var(--ink); transform:translateX(-50%); box-shadow:0 0 0 2px #fff; }
   .spec-dot.rk-hi { background:#1a7f37; } .spec-dot.rk-lo { background:#c8102e; }
-  .spec-val { position:absolute; top:0; transform:translateX(-50%); font-size:11.5px; font-weight:800; color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
-  .spec-val .ms { font-size:9px; color:var(--muted); margin-left:1px; }
+  .spec-pv { font-size:11.5px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; margin:0 2px; }
+  .spec-pv.dim { color:var(--muted); font-weight:700; }
   .spec-rank { flex:0 0 auto; font-size:12.5px; font-weight:800; font-variant-numeric:tabular-nums; }
   .spec-rank .rk-hi { color:#1a7f37; } .spec-rank .rk-lo { color:#c8102e; }
   .spec-cap { font-size:9px; color:var(--muted); padding:4px 0 0; }
@@ -4198,24 +4199,24 @@
     h += `<div class="tc-vgrid"><div class="mh"></div><div class="mh">Pct%</div><div class="mh">Rank</div>${rows}</div>`;
     // Mix metrics as spectrums: fixed axis (hitters↔pitchers, College↔HS), team dot at its share,
     // gray tick = league avg. Value label + rank keep the flip convention (side of the player under eval).
-    const spec = (label, endL, endR, pos, avg, valTxt, rank) => {
-      const cl = x => Math.max(4, Math.min(96, x));
+    // Both poles carry their own %, so the dot needs no floating label; bold pole = the side
+    // being ranked (flips to the evaluated player's side), the other pole dims.
+    const spec = (label, nmL, nmR, pos, avg, rank, boldR) => {
+      const cl = x => Math.max(3, Math.min(97, x));
+      const vL = pos==null?null:`${Math.round(100-pos)}%`, vR = pos==null?null:`${Math.round(pos)}%`;
       const inner = pos==null ? "" :
-        `<span class="spec-avg" style="left:${cl(avg)}%"></span>
-         <span class="spec-dot ${rank?rkCls(rank):""}" style="left:${cl(pos)}%"></span>
-         <span class="spec-val" style="left:${cl(pos)}%">${valTxt||""}</span>`;
+        `<span class="spec-avg" style="left:${cl(avg)}%"></span><span class="spec-avg-lb" style="left:${cl(avg)}%">lg</span>
+         <span class="spec-dot ${rank?rkCls(rank):""}" style="left:${cl(pos)}%"></span>`;
       return `<div class="spec-row"><div class="spec-k">${label}</div>
-        <div class="spec-track"><span class="spec-end">${endL}</span><div class="spec-line">${inner}</div><span class="spec-end">${endR}</span></div>
+        <div class="spec-track"><span class="spec-end">${nmL}</span>${vL?`<span class="spec-pv${boldR?" dim":""}">${vL}</span>`:""}<div class="spec-line">${inner}</div>${vR?`<span class="spec-pv${boldR?"":" dim"}">${vR}</span>`:""}<span class="spec-end">${nmR}</span></div>
         <div class="spec-rank">${rank?`<span class="${rkCls(rank)}">${ord(rank)} of 30</span>`:pos==null?(lt?"—":"…"):""}</div></div>`;
     };
     if (tt) {
       h += spec("Pitchers vs hitters", "HIT", "P", tt.pPct, lt.avgP,
-        hitSel ? `${Math.round(100-tt.pPct)}%<span class="ms">H</span>` : `${Math.round(tt.pPct)}%<span class="ms">P</span>`,
-        hitSel ? (rankTot+1)-lt.rankP(myName) : lt.rankP(myName));
+        hitSel ? (rankTot+1)-lt.rankP(myName) : lt.rankP(myName), !hitSel);
       h += spec("HS vs College", "COL", "HS", tt.hsPct, lt.avgHS,
-        colSel ? `${Math.round(100-tt.hsPct)}%<span class="ms">COL</span>` : `${Math.round(tt.hsPct)}%<span class="ms">HS</span>`,
-        colSel ? (rankTot+1)-lt.rankHS(myName) : lt.rankHS(myName));
-      h += `<div class="spec-cap"><span class="spec-avg-demo"></span> league avg · dot = this team's share, 2018–25</div>`;
+        colSel ? (rankTot+1)-lt.rankHS(myName) : lt.rankHS(myName), !colSel);
+      h += `<div class="spec-cap"><span class="spec-avg-demo"></span> lg = league average · dot = this team, 2018–25 · rank follows the bold side</div>`;
     } else {
       h += spec("Pitchers vs hitters","HIT","P",null) + spec("HS vs College","COL","HS",null);
     }
