@@ -859,8 +859,16 @@
   .fc2-strip { padding:8px 22px; border-top:1px solid var(--line); font-size:12.5px; color:var(--ink); display:flex; flex-wrap:wrap; align-items:center; gap:4px 7px; }
   .fc2-sk { font-size:9.5px; font-weight:900; letter-spacing:.5px; color:var(--muted); margin-right:4px; }
   .fc2-dim { color:var(--muted); font-weight:600; font-size:11px; }
-  .fc2-picks { margin-top:6px; font-size:10.5px; color:var(--muted); font-weight:600; line-height:1.55; }
-  .fc2-picks summary { cursor:pointer; font-weight:800; color:var(--ink); user-select:none; }
+  /* evidence tables: the actual picks inside each question's lens, plainly */
+  .fc2-evwrap { max-height:200px; overflow-y:auto; margin-top:7px; border:1px solid var(--line); border-radius:8px; }
+  .fc2-ev { width:100%; border-collapse:collapse; }
+  .fc2-ev th { position:sticky; top:0; background:#fafafa; font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); text-align:left; padding:4px 10px; border-bottom:1px solid var(--line); }
+  .fc2-ev td { font-size:11.5px; font-weight:700; padding:4px 10px; border-bottom:1px solid #f0f0ee; font-variant-numeric:tabular-nums; }
+  .fc2-ev tr:last-child td { border-bottom:0; }
+  .fc2-hero { display:flex; flex-direction:column; gap:5px; margin:3px 0 9px; }
+  .fc2-hero-row b { font-size:20px; font-weight:900; font-variant-numeric:tabular-nums; margin-right:8px; }
+  .fc2-hero-row { font-size:12px; font-weight:700; }
+  .fc2-raw { font-weight:600; }
   .fc2-legend { padding:6px 22px 10px; border-top:1px solid var(--line); font-size:10px; color:var(--muted); font-weight:600; }
   @media (max-width:640px){ .fc2-tiles { grid-template-columns:repeat(2,1fr); } .fc2-badge { font-size:16px; } }
   body.mob .fc2-tiles { grid-template-columns:repeat(2,1fr); }
@@ -5569,12 +5577,10 @@
   };
 
   // ---- fit card: player × team deep dive across every lens ----
-  let fitPicksOpen = false;  // "Name the picks" <details> survives the 3s re-render ticks
-  window.fitPicksTgl = (el) => { fitPicksOpen = el.open; };
   // Current org Top-30 at the player's position group (prospects.json is rank-ordered)
   const t30AtSpot = (team, g, lim=4) =>
     ((DATA.prospects && DATA.prospects[team]) || []).filter(p => posGroupsOf(p.pos).has(g)).slice(0, lim);
-  window.openFitCard = (key, team) => { fitSel = { key, team }; fitTile = null; fitPicksOpen = false; renderFitCard(); };
+  window.openFitCard = (key, team) => { fitSel = { key, team }; fitTile = "reach"; renderFitCard(); };   // open on Q1's evidence
   window.closeFitCard = () => { fitSel = null; const bd=$("fitCard"); if(bd){ bd.classList.remove("on"); bd.innerHTML=""; } };
   // ================= FIT CARD — "four questions first" (redesigned 7/10) =================
   // The four directional grades ARE the card: heat tiles up top with one-line evidence,
@@ -5593,7 +5599,6 @@
     const f = fit(comp, t, key, state);
     const blended = rfCellVal(f);
     const D = f.dir || {};
-    const ti = teamInterest(key, t), li = latestIntel(key, t);
     const land = tcNextLanding(state, t, comp) || teamNextPick(state, t);
     const pool = state.poolsMap[t];
     const bonus = land ? negBonus(comp, land.slot, land.overall) : null;
@@ -5623,27 +5628,29 @@
         <span class="fc2-tk">${lbl}</span><span class="fc2-tv">${v!=null?v:"—"}</span><span class="fc2-tev">${ev}</span></button>`;
     }).join("");
 
-    // ---- receipts drawer per question (or default: comps · regime · system) ----
+    // ---- evidence drawer per question: the actual picks in the lens, plainly — the
+    // room draws its own inference. Names click through to the draft-history card.
     const kv = (k, v) => `<div class="tc-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
     const woeFmt = (c) => `<span class="vsv ${c.woe>=0.12?'over':c.woe<=-0.12?'under':'even'}">${c.woe>0?"+":""}${c.woe.toFixed(2)}</span>`;
     const warRow = (lbl, c) => c ? kv(lbl, `${c.warSum} WAR vs ${c.expSum} exp over ${c.n} · ${woeFmt(c)}/pick`) : "";
     const rgLine = rg ? `Regime: ${_esc(rg.gm||"current FO")}${rg.borrowed?` — history via ${rg.source} '${String(rg.start).slice(2)}–'${String(rg.end).slice(2)}`:` since '${String(rg.start).slice(2)}`}` : null;
-    const wComps = warComps(t, comp);
-    const compsLine = wComps.length ? `<b>Their picks like him ('18+):</b> ${wComps.map(p=>`${_esc(p.n)} '${String(p.y).slice(2)} #${p.ov} — ${p.aw!=null?p.aw+" aWAR":p.w+" WAR"}`).join(" · ")}` : null;
+    const evTable = (heads, rows) => rows.length ? `<div class="fc2-evwrap"><table class="fc2-ev"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>` : "";
+    const evName = (name, year, overall) => `<span${histAttr({year, overall})}>${_esc(name)}</span>`;
     let drawer = "";
     if (fitTile === "reach") {
-      const pickLine = (p) => `${_esc(p.name)} '${dfYY(p.year)} #${p.overall} — ${p.reached_mlb?"reached MLB":"not yet"}`;
-      const picksBlock = ddPicks.length ? `<details class="fc2-picks"${fitPicksOpen?" open":""} ontoggle="fitPicksTgl(this)"><summary>Name the ${dd.n} picks ▾</summary>${ddPicks.slice(0,12).map(pickLine).join("<br>")}${dd.n>12?`<br>+${dd.n-12} more`:""}</details>` : "";
       drawer = (dd ? kv(`${dd.n} like him — ${ddCrit}`, `${dd.mlb} reached MLB (${pct(dd.rate)})${D.reach.d.lgRate!=null?` vs ${pct(D.reach.d.lgRate)} league`:""}`) : "")
         + ((DATA.orgs[t]||{}).dev && DATA.orgs[t].dev.mlbDebut!=null ? kv("Org MLB-debut rate (all-time)", `${pct(DATA.orgs[t].dev.mlbDebut)}${DATA.lgDebut?` vs ${Math.round(DATA.lgDebut.avg)}% lg`:""}`) : "")
-        + picksBlock
-        + (rgLine ? `<div class="fc-note">${rgLine} — earlier front offices don't count.</div>` : "");
+        + evTable(["Yr","Pick","Player","MLB"], ddPicks.map(p=>`<tr>
+            <td>'${dfYY(p.year)}</td><td>#${p.overall}</td><td>${evName(p.name, p.year, p.overall)}</td>
+            <td>${p.reached_mlb?'<span class="vsv over">✓ MLB</span>':'<span class="fc2-dim">—</span>'}</td></tr>`))
+        + (rgLine ? `<div class="fc-note">${rgLine}</div>` : "");
     } else if (fitTile === "develop") {
+      const wc = warComps(t, comp, 8);
       drawer = (f.war && f.war.known ? warRow(`${g} picks ('18+)`, f.war.pos) + (f.war.band?warRow(`Picks ${f.war.band.key} ('18+)`, f.war.band):"") + (f.war.lvl?warRow(`${f.war.lvl.key} picks ('18+)`, f.war.lvl):"") : "")
         + (f.war && f.war.expAt!=null ? kv(`Expected at ≈#${comp.rank}`, `${f.war.expAt} career WAR <span class="sub">(league mean, his band, '18+)</span>`) : "")
-        + (f.war && f.war.awRecent ? kv("Recent aWAR/pick ('18–24)", `${f.war.awRecent.perPick} <span class="sub">(${f.war.awRecent.n} picks · SV metric)</span>`) : "")
-        + (compsLine ? `<div class="fc-note">${compsLine}</div>` : "")
-        + (f.war && f.war.known && D.develop && D.develop.d && D.develop.d.known ? `<div class="fc-note">Grade blends '18+ WAR history (60%) with regime-window development (40%).</div>` : "");
+        + evTable(["Yr","Pick","Player","WAR"], wc.map(p=>`<tr>
+            <td>'${String(p.y).slice(2)}</td><td>#${p.ov}</td><td>${evName(p.n, p.y, p.ov)}</td>
+            <td>${p.aw!=null?`${p.aw} <span class="fc2-dim">aWAR</span>`:p.w!=null?`${p.w} <span class="fc2-dim">WAR</span>`:'<span class="fc2-dim">—</span>'}</td></tr>`));
     } else if (fitTile === "speed") {
       // names come from the CURRENT org Top-30 (prospects.json, curated weekly) — farmdepth.json
       // is an April snapshot and still lists traded/graduated players; it only scores the factor.
@@ -5652,17 +5659,21 @@
       // warhist picks carry no debut year — list debuted picks at his level (nonzero bWAR or an aWAR record), newest first
       const Wo = DATA.warhist && DATA.warhist.orgs && DATA.warhist.orgs[t];
       const lvlW = comp.level === "HS" ? "HS" : "College";
-      const deb = Wo ? Wo.picks.filter(p=>p.lvl===lvlW && (p.aw!=null || (p.w!=null && p.w!==0))).sort((a,b)=>b.y-a.y).slice(0,3) : [];
-      const debLine = deb.length ? `<div class="fc-note"><b>Debuted picks behind the median (his level, '18+):</b> ${deb.map(p=>`${_esc(p.n)} '${dfYY(p.y)} #${p.ov} — reached MLB`).join(" · ")}</div>` : "";
+      const deb = Wo ? Wo.picks.filter(p=>p.lvl===lvlW && (p.aw!=null || (p.w!=null && p.w!==0))).sort((a,b)=>b.y-a.y).slice(0,8) : [];
       drawer = (D.speed && D.speed.known ? kv(`Median yrs to debut (${D.speed.lvl})`, `${D.speed.med} vs ${D.speed.lg} league <span class="sub">(n=${D.speed.n}, '18+ classes)</span>`) : `<div class="fc-note">No mature debut sample for his level.</div>`)
-        + farmLine + debLine
-        + `<div class="fc-note">Speed = how fast this org moves ${comp.level==="HS"?"prep":"college"} picks to the majors, not roster opportunism — pair with Farm depth for the open-lane read.</div>`;
+        + evTable(["Yr","Pick","Player","WAR"], deb.map(p=>`<tr>
+            <td>'${dfYY(p.y)}</td><td>#${p.ov}</td><td>${evName(p.n, p.y, p.ov)}</td>
+            <td>${p.aw!=null?`${p.aw} <span class="fc2-dim">aWAR</span>`:`${p.w} <span class="fc2-dim">WAR</span>`}</td></tr>`))
+        + farmLine;
     } else if (fitTile === "value") {
-      drawer = (D.earn && D.earn.roi && D.earn.roi.known ? kv("Bonuses → value ('18+)", `${fmtM(D.earn.roi.cost)} in → ${fmtM(D.earn.roi.val)} out · ${D.earn.roi.roi.toFixed(1)}× <span class="sub">(lg ${D.earn.roi.lg.toFixed(1)}×)</span>`) : "")
+      const hero = [];
+      if (pv) hero.push(`<div class="fc2-hero-row"><b>${pv.surplus!=null?fmtM(pv.surplus):"—"} surplus</b>
+        <span class="fc2-dim">FV${pv.fv} ${pv.kind==="pit"?"arm":"bat"} valuation vs ~${pv.cost?fmtM(pv.cost):"—"} to sign${pv.ratio?` · ${Math.round(pv.ratio)}× his price`:""}</span></div>`);
+      if (D.earn && D.earn.roi && D.earn.roi.known) hero.push(`<div class="fc2-hero-row"><b>${D.earn.roi.roi.toFixed(1)}× draft ROI</b>
+        <span class="fc2-dim">${fmtM(D.earn.roi.cost)} in → ${fmtM(D.earn.roi.val)} out ('18+) · lg ${D.earn.roi.lg.toFixed(1)}×</span></div>`);
+      drawer = (hero.length ? `<div class="fc2-hero">${hero.join("")}</div>` : "")
         + (D.earn && D.earn.spend && D.earn.spend.known ? kv("Over-slot habit", `${D.earn.spend.avgPct>0?"+":""}${D.earn.spend.avgPct}% vs slot <span class="sub">(${D.earn.spend.n} picks, regime)</span>`) : "")
-        + (pv ? kv("His value at his price", `<b>${pv.ratio?Math.round(pv.ratio)+"×":"—"}</b> <span class="sub">FV${pv.fv} ${pv.kind==="pit"?"arm":"bat"} ≈ ${fmtM(pv.surplus)} surplus vs ~${pv.cost?fmtM(pv.cost):"—"} to sign (FG Jul-'26 valuation)</span>`) : "")
-        + `<div class="fc-note">ROI = '18+ draft bonuses in vs career WAR × $8.5M (FG $/WAR) out. Surplus = FG Jul-'26 valuation for his FV bucket vs our est. bonus to sign.</div>`
-        + `<div class="fc-note">Value credited to the drafting org — the draft-day question is whether THEY turn picks into careers.</div>`;
+        + `<div class="fc-note">Surplus = FG Jul-'26 valuation for his FV bucket vs our est. bonus. ROI = '18+ bonuses in vs career WAR × $8.5M out, credited to the drafting org.</div>`;
     } else {
       const ps = orgPosSystem(t), B = leagueBaselines();
       const sysLine = ps && ps[g]!=null ? `System: ${Math.round(ps[g]*ps.n)} ${g} in their Top-30 (lg ~${(B.sys[g]*ps.n).toFixed(1)})` : null;
@@ -5670,21 +5681,30 @@
       // the Fine-tune Farm-depth factor, which no outlook preset uses
       const spotAll = t30AtSpot(t, g, 30), spotN = spotAll.slice(0, 3);
       const depthLine = spotAll.length ? `${spotAll.length} in their current T30 at his spot${spotN.length?": "+spotN.map(p=>`${_esc(p.name)} #${p.rank}`).join(", "):""}${spotAll.length>3?" +"+(spotAll.length-3):""}` : `no one in their current T30 at his spot`;
-      drawer = (compsLine ? `<div class="fc-note">${compsLine}</div>` : "")
-        + (rgLine ? `<div class="fc-note">${rgLine} (${dfPicks(t).length} picks counted)</div>` : "")
+      drawer = (rgLine ? `<div class="fc-note">${rgLine} (${dfPicks(t).length} picks counted)</div>` : "")
         + ((sysLine||depthLine) ? `<div class="fc-note">${[sysLine,depthLine].filter(Boolean).join(" · ")}</div>` : "")
-        + `<div class="fc-note fc2-hint">▸ tap a tile for that question's receipts</div>`;
+        + `<div class="fc-note fc2-hint">▸ tap a tile for that question's evidence</div>`;
     }
 
-    // ---- strips: logistics + context-only intel ----
+    // ---- strips: pick economics + context-only intel (dot + latest raw note) ----
     const fits = pool && bonus!=null ? pool.room >= bonus : null;
-    const logistics = `<div class="fc2-strip"><span class="fc2-sk">LOGISTICS</span>
+    const logistics = `<div class="fc2-strip"><span class="fc2-sk">PICK ECONOMICS</span>
       ${land?`pick <b>#${land.overall}</b> · slot <b>${land.slot?fmtM(land.slot):"—"}</b>`:"no pick left in range"}
       · room <b>${pool?fmtM(pool.room):"—"}</b> · est to sign <b>${bonus!=null?fmtM(bonus):"—"}</b>
       ${fits==null?"":fits?`<span class="tg lvl-jc">fits</span>`:`<span class="tg under">short</span>`}
       <span class="fc2-dim">— sharpens as slots commit</span></div>`;
+    const tiRecs = DATA.intel.filter(r => teamAlias(r.team)===t && normName(r.player)===key)
+                             .sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+    const msgRec = tiRecs.find(r => (r.note || r.full_text));
+    const rawMsg = msgRec ? (msgRec.note || msgRec.full_text || "").trim() : "";
+    const msgShort = rawMsg.length > 220 ? rawMsg.slice(0,220) + "…" : rawMsg;
+    const msgSrc = msgRec ? (msgRec.is_manual ? "manual" : msgRec.channel ? "#"+msgRec.channel : "Slack") : "";
     const intel = `<div class="fc2-strip"><span class="fc2-sk">INTEL <span class="fc2-dim">(context only — never graded)</span></span>
-      ${ti.n?`<span class="fc-dot" style="background:${intelColorHex(key,t)}"></span> ${ti.n} note${ti.n>1?"s":""} · strength ${Math.round(ti.strength*100)}${li&&li.date?` · ${li.date}`:""}`:"none logged for this org"}</div>`;
+      ${tiRecs.length
+        ? `<span class="fc-dot" style="background:${intelColorHex(key,t)}"></span>${msgShort
+            ? `<span class="fc2-raw">“${_esc(msgShort)}”</span><span class="fc2-dim">— ${msgRec.date||""}${msgSrc?` · ${msgSrc}`:""}</span>`
+            : `<span class="fc2-dim">color logged, no note text${tiRecs[0].date?` · ${tiRecs[0].date}`:""}</span>`}`
+        : "none logged for this org"}</div>`;
 
     // ---- header ----
     const rt = rankTrendOf(comp), rc = rt ? rtConsensus(rt) : null, ra = rt ? rtArrow(rt) : null;
