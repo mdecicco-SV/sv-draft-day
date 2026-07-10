@@ -751,6 +751,11 @@
   .dual input[type=range]::-moz-range-track { height:4px; background:var(--line); border-radius:2px; }
   .dual input[type=range]::-moz-range-thumb { pointer-events:auto; width:12px; height:12px; border-radius:50%; background:#fff; border:2.5px solid var(--red); cursor:pointer; }
   .tc-wizsum > span:first-child { font-weight:700; font-variant-numeric:tabular-nums; }
+  /* Research results toolbar (vs-slot $/% toggle + PDF export) — right of the count on
+     desktop, its own clean row on phones so nothing stacks over the summary text */
+  .res-sumtools { display:inline-flex; align-items:center; gap:5px; margin-left:auto; white-space:nowrap; }
+  body.mob .res-sumtools { flex-basis:100%; margin-left:0; margin-top:2px; }
+  .res-sumtools .tc-wizlab, body.mob .res-sumtools .tc-wizlab { width:auto; }   /* the filter panes' full-width label rule doesn't apply here */
   .tc-wizscope { color:var(--muted); font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
   /* Team-fit view — controls + heat grid (players × orgs) */
   /* Whole control stack sticks under the app chrome (mirrors .res-filters; --theadTop is
@@ -5036,10 +5041,10 @@
     const avgB = signed.length ? signed.reduce((s,r)=>s+r.bonus,0)/signed.length : null;
     const overN = signed.filter(r=>r.diff>0).length;
     sum.innerHTML = `<span><b>${rows.length} matches</b>${signed.length?` · avg ${fmtM(avgB)} · ${Math.round(100*overN/signed.length)}% over slot`:""}</span>
-      <span style="margin-left:auto;display:inline-flex;align-items:center;gap:4px"><span class="tc-wizlab">vs slot</span>
+      <span class="res-sumtools"><span class="tc-wizlab">vs slot</span>
         <button class="tc-chip${resPctMode?'':' on'}" onclick="resPctSet(false)" title="dollars over/under slot">$</button>
-        <button class="tc-chip${resPctMode?' on':''}" onclick="resPctSet(true)" title="over/under as a % of slot value">%</button></span>
-      <button class="tc-chip" onclick="resExportPdf()" title="print-ready export of the full current result set (save as PDF)">⎙ PDF</button>`;
+        <button class="tc-chip${resPctMode?' on':''}" onclick="resPctSet(true)" title="over/under as a % of slot value">%</button>
+        <button class="tc-chip" style="margin-left:8px" onclick="resExportPdf()" title="print-ready export of the full current result set (save as PDF)">⎙ PDF</button></span>`;
     if (!rows.length) { out.innerHTML = `<div class="placeholder">No signings match those lenses.</div>`; return; }
     const arrow = k => research.sortKey===k ? (research.sortDir>0?" ▲":" ▼") : "";
     const th = (k, lbl) => `<th class="sortable" onclick="resSort('${k}')">${lbl}${arrow(k)}</th>`;
