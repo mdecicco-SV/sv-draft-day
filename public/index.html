@@ -5638,11 +5638,18 @@
     const evName = (name, year, overall) => `<span${histAttr({year, overall})}>${_esc(name)}</span>`;
     let drawer = "";
     if (fitTile === "reach") {
+      // high level via the tracker row (year|overall → mlbid → hilevel.json); draftdb's
+      // own reached_mlb backstops picks the tracker doesn't carry. Sorted MLB down.
+      const histBy = new Map(DATA.slotHistory.map(r => [r.year + "|" + r.overall, r]));
+      const hiOf = (p) => { const r = histBy.get(p.year + "|" + p.overall);
+        return (r && hiLvlOf(r)) || (p.reached_mlb ? "MLB" : null); };
+      const byHi = (dd ? dd.picks.map(p => ({ p, hi: hiOf(p) })) : [])
+        .sort((a, b) => (HI_RANK[b.hi] || 0) - (HI_RANK[a.hi] || 0) || b.p.year - a.p.year);
       drawer = (dd ? kv(`${dd.n} like him — ${ddCrit}`, `${dd.mlb} reached MLB (${pct(dd.rate)})${D.reach.d.lgRate!=null?` vs ${pct(D.reach.d.lgRate)} league`:""}`) : "")
         + ((DATA.orgs[t]||{}).dev && DATA.orgs[t].dev.mlbDebut!=null ? kv("Org MLB-debut rate (all-time)", `${pct(DATA.orgs[t].dev.mlbDebut)}${DATA.lgDebut?` vs ${Math.round(DATA.lgDebut.avg)}% lg`:""}`) : "")
-        + evTable(["Yr","Pick","Player","MLB"], ddPicks.map(p=>`<tr>
+        + evTable(["Yr","Pick","Player","Hi Level"], byHi.map(({p, hi})=>`<tr>
             <td>'${dfYY(p.year)}</td><td>#${p.overall}</td><td>${evName(p.name, p.year, p.overall)}</td>
-            <td>${p.reached_mlb?'<span class="vsv over">✓ MLB</span>':'<span class="fc2-dim">—</span>'}</td></tr>`))
+            <td>${hi==="MLB"?'<span class="vsv over">MLB</span>':hi?hi:'<span class="fc2-dim">—</span>'}</td></tr>`))
         + (rgLine ? `<div class="fc-note">${rgLine}</div>` : "");
     } else if (fitTile === "develop") {
       const wc = warComps(t, comp, 8);
