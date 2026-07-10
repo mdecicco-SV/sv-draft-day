@@ -4987,6 +4987,30 @@
       if (lo > s.min || hi < s.max) parts.push(`${s.lab} ${s.fmt(lo)}–${s.fmt(hi)}`); }
     return parts.length ? parts.join(" · ") : "All 2018–25 signings (no lenses)";
   }
+  // CSV of the FULL current result set — raw numbers (no $ formatting) so it lands
+  // spreadsheet-ready. Base columns + both vs-Slot readings + any optional columns on.
+  window.resExportCsv = () => {
+    const rows = researchRows();
+    if (!rows.length) { alert("No signings match the current lenses — nothing to export."); return; }
+    const xcols = RES_XCOLS.filter(([k]) => resCols.has(k) && k !== "slot");   // Slot is a base column
+    const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const head = ["Year","Player","Level","Pos","Round","Pick","Team","Bonus","Slot","VsSlot","VsSlotPct", ...xcols.map(([,lbl])=>lbl)];
+    const lines = [head.map(esc).join(",")];
+    for (const r of rows) {
+      const d = slotPct(r);
+      lines.push([r.year, wizName(r), r.level, posDisp(r), r.round, r.overall, teamAbbrevOf(r.team),
+        r.bonus!=null?Math.round(r.bonus):"", r.slot!=null?Math.round(r.slot):"",
+        r.diff!=null?Math.round(r.diff):"", d!=null?Math.round(1000*d)/10:"",
+        ...xcols.map(([,,cell])=>cell(r))].map(esc).join(","));
+    }
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const d = new Date(), p2 = (n)=>String(n).padStart(2,"0");
+    a.download = `sv-research-${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}.csv`;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  };
   // Print-ready export of the FULL current result set (not the on-screen cap) — opens a
   // clean print window; the browser's Save-as-PDF does the rest. Always carries both
   // vs-Slot readings: $ over/under AND bonus as % of slot.
@@ -5044,7 +5068,8 @@
       <span class="res-sumtools"><span class="tc-wizlab">vs slot</span>
         <button class="tc-chip${resPctMode?'':' on'}" onclick="resPctSet(false)" title="dollars over/under slot">$</button>
         <button class="tc-chip${resPctMode?' on':''}" onclick="resPctSet(true)" title="over/under as a % of slot value">%</button>
-        <button class="tc-chip" style="margin-left:8px" onclick="resExportPdf()" title="print-ready export of the full current result set (save as PDF)">⎙ PDF</button></span>`;
+        <button class="tc-chip" style="margin-left:8px" onclick="resExportPdf()" title="print-ready export of the full current result set (save as PDF)">⎙ PDF</button>
+        <button class="tc-chip" onclick="resExportCsv()" title="download the full current result set as CSV (raw numbers, spreadsheet-ready)">⤓ CSV</button></span>`;
     if (!rows.length) { out.innerHTML = `<div class="placeholder">No signings match those lenses.</div>`; return; }
     const arrow = k => research.sortKey===k ? (research.sortDir>0?" ▲":" ▼") : "";
     const th = (k, lbl) => `<th class="sortable" onclick="resSort('${k}')">${lbl}${arrow(k)}</th>`;
