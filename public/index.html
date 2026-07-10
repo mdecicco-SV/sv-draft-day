@@ -69,20 +69,13 @@
   body.mob .prebanner.liveoc .oc-meta { flex-basis:100%; text-align:center; margin-top:-2px; }
   .pulse { width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 0 0 rgba(255,42,34,.5); animation:pulse 1.6s infinite; }
   @keyframes pulse { 70% { box-shadow:0 0 0 7px rgba(255,42,34,0); } 100% { box-shadow:0 0 0 0 rgba(255,42,34,0); } }
-  /* X leading-intel strip: amber = unofficial, never the red/green of the official ticker */
-  #leadStrip { display:flex; flex-direction:column; gap:5px; padding:7px 16px; background:#fffaf0; border-bottom:1px solid #ecd9ac; position:sticky; top:90px; z-index:4; }
-  .lead-chip { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; font-size:13px; color:var(--ink); }
-  .lead-chip .lc-flag { background:#e8920e; color:#fff; font-weight:900; font-size:10.5px; letter-spacing:.5px; padding:2.5px 7px; border-radius:5px; }
-  .lead-chip .lc-rk, .lead-chip .lc-pick { color:var(--muted); font-weight:700; font-size:12px; }
-  .lead-chip .lc-arrow { color:#c8871c; font-weight:900; }
-  .lead-chip .lc-src { color:var(--muted); font-size:11.5px; font-weight:600; margin-left:auto; }
-  .lead-chip .lc-x { border:0; background:none; color:var(--muted); font-size:13px; cursor:pointer; padding:1px 5px; }
-  .lead-chip .lc-x:hover { color:var(--red); }
-  .lead-chip .lc-val { border:1px solid #e3b505; background:#fff7e0; color:#8a6d00; font-weight:800; font-size:11.5px;
-    border-radius:6px; padding:2px 8px; cursor:pointer; white-space:nowrap; }
-  .lead-chip .lc-val:hover { background:#ffedb8; }
-  body.mob #leadStrip { top:0; padding:6px 10px; }
-  body.mob .lead-chip .lc-src { flex-basis:100%; margin-left:0; }
+  /* X leading-intel: amber lead chip ON the target pick tile (no banner) — same amber
+     family as the reported ladder, flashing until the pick card is opened once */
+  .bcard.lead { border-color:#e3b505; background:#fffdf4; }
+  .bc-lead { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:800; letter-spacing:.3px;
+    color:#8a6d00; background:#fff3cd; border:1px solid #e3b505; border-radius:5px; padding:1px 6px; white-space:nowrap; }
+  .bc-lead.flash { animation:leadpulse 1.5s ease-in-out infinite; }
+  @keyframes leadpulse { 0%,100% { box-shadow:0 0 0 0 rgba(227,181,5,.5); } 50% { box-shadow:0 0 0 5px rgba(227,181,5,0); } }
   .ctl { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 11px; font:inherit; font-weight:700; cursor:pointer; }
   .ctl.primary { background:var(--red); color:#fff; border-color:var(--red); }
   .bar select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:8px; }
@@ -1305,9 +1298,6 @@
 </div>
 
 <div id="preBanner" class="prebanner" style="display:none"></div>
-<!-- Leading intel from the DraftDay_Feed sheet (/api/xlead) — UNOFFICIAL reports, amber-styled,
-     auto-clear when the MLB feed confirms. Hidden entirely unless the server is configured. -->
-<div id="leadStrip" style="display:none"></div>
 
 <main>
   <!-- OUR CLIENTS (hero) -->
@@ -3615,6 +3605,7 @@
   window.toggleRound = (r) => { openRounds.has(r) ? openRounds.delete(r) : openRounds.add(r); renderActive(); };
   function renderBoardGrid(state) {
     const svOnly = $("bSv").checked, focus = boardSelClients.size>0, CAP = 6;
+    const leadMap = leadsByPick();   // active X leads resolved onto their target pick tiles
     // Exactly one player selected → full intel-color "heat" board around that player.
     const single = boardSelClients.size===1 ? [...boardSelClients][0] : null;
     const singleC = single ? DATA.clientList.find(c=>c.key===single) : null;
@@ -3691,6 +3682,16 @@
         const comp = DATA.compByName.get(normName(p.reported.player));
         const meta = comp ? [comp.pos, schoolShort(comp.school)].filter(Boolean).join(" · ") : "";
         if (meta) dotsHtml = `<div class="bc-meta">${meta}</div>`;
+      } else if (leadMap.has(p.overall)) {
+        // active X lead resolved to this pick: amber chip, flashing until the card is opened
+        const l = leadMap.get(p.overall);
+        cardCls += " lead";
+        const flash = leadEngaged.has(String(l.id)) ? "" : " flash";
+        const ttl = l.text || `${l.player} → ${l.team} per @${l.src}`;
+        body = `<span class="bc-lead${flash}" title="${_esc(ttl)}">⚡ ${_esc(l.player)}</span>`;
+        const comp = DATA.compByName.get(normName(l.player));
+        const meta = comp ? [comp.pos, schoolShort(comp.school)].filter(Boolean).join(" · ") : "";
+        dotsHtml = `<div class="bc-meta">${meta ? meta + " · " : ""}per @${_esc(l.src)}</div>`;
       } else if (single) {
         // Full-color heat card for the one selected player — mirrors the sv-teamintel Draft Card:
         // a pick unchecked there (not in play) paints RED regardless of the team's intel color.
@@ -4359,6 +4360,15 @@
     if (pk.reported) h += `<div class="tc-reprow">🟡 <b>${_esc(pk.reported.player)}</b> reported here${(pk.reported.srcs||[]).length?` per ${(pk.reported.srcs||[]).map(s=>"@"+_esc(s)).join(" ")}`:""} — single source, unvalidated
       <button class="tc-rep-btn" onclick="tcRepValidate(${pk.overall},event)">✓ Validate</button>
       <button class="tc-rep-btn" onclick="tcRepUndo(${pk.overall},event)">✕ Dismiss</button></div>`;
+    // X-lead row: an active insider lead resolved to this pick — engage from here
+    const tcLead = pk.reported ? null : leadsByPick().get(pk.overall);
+    if (tcLead) {
+      leadEngaged.add(String(tcLead.id));   // card opened once → the tile chip stops flashing
+      const qid = String(tcLead.id).replace(/'/g,"\\'");
+      h += `<div class="tc-reprow" title="${_esc(tcLead.text||"")}">⚡ <b>${_esc(tcLead.player)}</b> lead here per @${_esc(tcLead.src)}${tcLead.mock?" (mock)":""} — unofficial X report
+        <button class="tc-rep-btn" onclick="validateLead('${qid}',event)">✓ Validate</button>
+        <button class="tc-rep-btn" onclick="dismissLead('${qid}',event)">✕ Dismiss</button></div>`;
+    }
 
     // this team's own next pick after the one being viewed — the draft-wide next pick
     // is obvious from the board and doesn't belong in the lead stat slot
@@ -6275,7 +6285,6 @@
                  ["tabResearch","viewResearch","research"],["tabFit","viewFit","fit"]];
   function renderActive() {
     if (!currentState) return;
-    renderLeadStrip();   // X-lead chips reconcile against fresh official picks on every repaint
     // refresh the open team card on live data ticks, but don't wipe an in-progress capture form
     if (cardPick!=null) {
       const ae = document.activeElement;
@@ -6562,7 +6571,7 @@
       await seedFromLive(); pushMock();
       // Demo X-lead chips in mock are DISABLED for now (per Mike, 7/10) — flip this
       // gate back on when the live capture wiring conversation resumes.
-      if (MOCK_LEADS_DEMO) { seedMockLeads(); renderLeadStrip(); }
+      if (MOCK_LEADS_DEMO) { seedMockLeads(); noteNewLeads(MOCKLEADS); }   // tile chips paint on the next board render
     } else { MOCKLEADS = []; pollLive(); }
   }
 
@@ -6678,11 +6687,13 @@
 
   // ---------- X leading intel: insider-account pick reports ahead of the MLB feed ----------
   // Server (/api/xlead) reads the DraftDay_Feed sheet the capture Apps Script fills and
-  // parses tweets; here we match names to the board, render amber UNOFFICIAL chips, and
-  // auto-clear once the official feed confirms. Silent unless the server is configured.
+  // parses tweets; here we resolve each lead to its target pick and paint an amber chip ON
+  // that board tile (no banner), auto-clearing once the official feed confirms. Every new
+  // lead also lands in the war-room notebook. Silent unless the server is configured.
   let XLEADS = { enabled: null, leads: [] };
+  const leadEngaged = new Set();   // lead ids whose pick card was opened — chip stops flashing
   const MOCK_LEADS_DEMO = false;   // demo tweets in mock mode — off until the live capture wiring resumes
-  let MOCKLEADS = [];   // synthetic leads seeded in mock mode so the alert strip can be rehearsed
+  let MOCKLEADS = [];   // synthetic leads seeded in mock mode so the tile chips can be rehearsed
   const LEAD_TTL_MS = 45 * 60 * 1000, LEAD_MIN_CONF = 0.55, LEAD_SHOW = 3;
   // Seed a couple of demo leads off the current mock board: upcoming picks × undrafted
   // SV clients (falling back to the top board). They reconcile/auto-clear exactly like
@@ -6724,57 +6735,71 @@
       && (!l.at || isNaN(new Date(l.at)) || now - new Date(l.at).getTime() < LEAD_TTL_MS)
       && !drafted.has(normName(l.player))).slice(0, LEAD_SHOW);
   }
-  function renderLeadStrip() {
-    const el = $("leadStrip"); if (!el) return;
-    // live → server leads; mock → seeded demo leads (rehearsal); pre-draft/other → none
-    const leads = MODE === "mock" ? activeLeads(MOCKLEADS)
-                : MODE === "live" ? activeLeads(XLEADS.leads) : [];
-    if (!leads.length) { el.style.display = "none"; el.innerHTML = ""; return; }
-    el.style.display = "";
-    el.innerHTML = leads.map(l => {
-      const ab = leadTeamAbbr(l.team);
-      const comp = DATA.compByName.get(normName(l.player));
-      const t = l.at ? new Date(l.at).getTime() : NaN;
-      const ago = isNaN(t) ? "" : ` · ${Math.max(0, Math.round((Date.now() - t) / 60000))}m ago`;
-      return `<div class="lead-chip" title="${_esc(l.text || "")}">
-        <span class="lc-flag">⚡ REPORTED</span>
-        <b>${comp ? playerLink(comp.name) : _esc(l.player)}</b>${comp ? `<span class="lc-rk">#${comp.rank}</span>` : ""}
-        <span class="lc-arrow">→</span> ${ab ? teamLogo(ab, 15) : ""}<b>${ab || _esc(l.team)}</b>
-        ${l.pick ? `<span class="lc-pick">at #${l.pick}</span>` : ""}
-        <span class="lc-src">per @${_esc(l.src)}${ago} · ${l.mock ? "mock" : "unofficial"}</span>
-        <button class="lc-val" onclick="validateLead('${String(l.id).replace(/'/g,"\\'")}')" title="validate — file as the reported pick (board chip, tracker, clock hold)">✓ Validate</button>
-        <button class="lc-x" onclick="dismissLead('${String(l.id).replace(/'/g,"\\'")}')" title="dismiss this report">✕</button>
-      </div>`;
-    }).join("");
-  }
-  // Promote a lead into the reported-pick flow: resolve the target pick (the lead's
-  // pick# if that slot is open and the team's, else the team's next open pick), then
-  // reportPick does the rest (board chip, tracker flip, clock hold, POST + notebook).
-  window.validateLead = (id) => {
-    const src = MODE === "mock" ? MOCKLEADS : XLEADS.leads;
-    const l = (src || []).find(x => String(x.id) === String(id));
-    if (!l || !currentState) return;
+  // live → server leads; mock → seeded demo leads (rehearsal); pre-draft/other → none
+  const modeLeads = () => MODE === "mock" ? activeLeads(MOCKLEADS)
+                        : MODE === "live" ? activeLeads(XLEADS.leads) : [];
+  // Resolve a lead to its target pick: the lead's pick# if that slot is open and the
+  // team's, else the team's next open pick. Shared by the tile chips and validateLead.
+  function leadTargetPick(l) {
+    if (!currentState) return null;
     const ab = leadTeamAbbr(l.team);
     const reported = new Set(currentState.picks.filter(p => p.reported).map(p => p.overall));
     const open = p => !p.isDrafted && !p.isPass && !reported.has(p.overall);
-    let overall = null;
-    if (l.pick != null) { const p = currentState.picks.find(x => x.overall === +l.pick); if (p && open(p) && (!ab || p.team === ab)) overall = p.overall; }
-    if (overall == null && ab) { const p = currentState.picks.find(x => x.team === ab && open(x)); if (p) overall = p.overall; }
+    if (l.pick != null) { const p = currentState.picks.find(x => x.overall === +l.pick); if (p && open(p) && (!ab || p.team === ab)) return p.overall; }
+    if (ab) { const p = currentState.picks.find(x => x.team === ab && open(x)); if (p) return p.overall; }
+    return null;   // no open pick — the lead lives only in the notebook
+  }
+  function leadsByPick() {
+    const m = new Map();
+    for (const l of modeLeads()) { const ov = leadTargetPick(l); if (ov != null && !m.has(ov)) m.set(ov, l); }
+    return m;
+  }
+  // Promote a lead into the reported-pick flow: leadTargetPick resolves the slot, then
+  // reportPick does the rest (board chip, tracker flip, clock hold, POST + notebook).
+  window.validateLead = (id, ev) => {
+    if (ev) ev.stopPropagation();
+    const src = MODE === "mock" ? MOCKLEADS : XLEADS.leads;
+    const l = (src || []).find(x => String(x.id) === String(id));
+    if (!l || !currentState) return;
+    const overall = leadTargetPick(l);
     if (overall == null) { alert(`No open pick resolves for "${l.team}" — validate manually from the pick card.`); return; }
     const comp = DATA.compByName.get(normName(l.player));
     reportPick(overall, comp ? comp.name : l.player);
     if (MODE === "live") window.dismissLead(String(l.id));   // durable dismissal; the chip already cleared via the reported filter
   };
-  window.dismissLead = async (id) => {
-    XLEADS.leads = XLEADS.leads.filter(l => l.id !== id); renderLeadStrip();
-    try { await fetch(`/api/xlead?id=${encodeURIComponent(id)}`, { method: "DELETE" }); } catch (e) {}
+  window.dismissLead = async (id, ev) => {
+    if (ev) ev.stopPropagation();
+    MOCKLEADS = MOCKLEADS.filter(l => String(l.id) !== String(id));
+    XLEADS.leads = XLEADS.leads.filter(l => String(l.id) !== String(id));
+    renderActive();
+    if (MODE === "live") try { await fetch(`/api/xlead?id=${encodeURIComponent(id)}`, { method: "DELETE" }); } catch (e) {}
   };
+  // Raw feed → war-room notebook: every lead id gets one note, tagged to the player when
+  // he keys to the board (else the team, else general). Dedupe survives reloads.
+  const LEAD_NOTED_KEY = "dd:leadNoted";
+  async function noteNewLeads(leads) {
+    let seen; try { seen = new Set(JSON.parse(localStorage.getItem(LEAD_NOTED_KEY) || "[]")); } catch (e) { seen = new Set(); }
+    let dirty = false;
+    for (const l of leads || []) {
+      const id = String(l.id);
+      if (seen.has(id)) continue;
+      seen.add(id); dirty = true;
+      const ov = leadTargetPick(l), ab = leadTeamAbbr(l.team);
+      const comp = DATA.compByName.get(normName(l.player));
+      await postIntel({ kind: "note",
+        note: `⚡ X lead: ${l.player} → ${l.team}${l.pick ? ` at #${l.pick}` : ""} per @${l.src}`
+          + (ov == null ? " (no open pick resolves)" : "") + (l.text ? ` — ${l.text}` : ""),
+        player_name: comp ? comp.name : null,
+        team: !comp && ab ? ab : null }, true);
+    }
+    if (dirty) try { localStorage.setItem(LEAD_NOTED_KEY, JSON.stringify([...seen].slice(-800))); } catch (e) {}
+  }
   async function pollXLeads() {
     if (MODE !== "live" || XLEADS.enabled === false) return;   // server said disabled — stop asking
     try {
       const d = await fetch("/api/xlead", { cache: "no-store" }).then(r => r.json());
       XLEADS.enabled = !!d.enabled;
-      if (d.enabled) { XLEADS.leads = d.leads || []; renderLeadStrip(); }
+      if (d.enabled) { XLEADS.leads = d.leads || []; noteNewLeads(XLEADS.leads); renderActive(); }
     } catch (e) {}
   }
 
