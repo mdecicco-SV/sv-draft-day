@@ -514,7 +514,10 @@
   .tkp.oc { border-color:var(--red); background:#fff0f1; color:var(--red); }
   @media (max-width:980px){ .tc-ticker { display:none; } }
   .tc-top { position:relative; display:flex; align-items:center; gap:12px; padding:13px 22px; border-bottom:1px solid var(--line); flex:0 0 auto; }
-  .tc-nav { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; align-items:center; gap:9px; }
+  /* in-flow, centered by auto margins within the FREE header space — a hard 50% absolute
+     center collides with long team names + the OTC tag; this also parks Report pick + ✕
+     together on the right edge */
+  .tc-nav { position:relative; display:flex; align-items:center; gap:9px; margin:0 auto; }
   .tc-nav-btn { border:1px solid var(--line); background:var(--card); border-radius:7px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:15px; font-weight:900; line-height:1; color:var(--ink); padding:0 0 2px; }
   .tc-nav-btn:hover:not(:disabled) { border-color:var(--red); color:var(--red); }
   .tc-nav-btn:disabled { opacity:.25; cursor:default; }
@@ -534,6 +537,7 @@
   .tc-top .tc-live { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--red); }
   .tc-top .tc-round { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
   .tc-x { margin-left:auto; border:none; background:none; font-size:22px; line-height:1; cursor:pointer; color:var(--muted); padding:2px 6px; }
+  .tc-nav ~ .tc-x { margin-left:0; }   /* nav's auto margins own the free space — ✕ stays flush right, Report pick beside it */
   .tc-x:hover { color:var(--ink); }
   .tc-band { display:flex; align-items:center; gap:16px; padding:10px 22px; border-bottom:1px solid var(--line); flex:0 0 auto; }
   .tc-band .tc-stats { flex:1 1 auto; border-bottom:none; padding:0; }
@@ -1135,6 +1139,10 @@
   body.mob .tc-selrow { flex-basis:100%; }
   body.mob .tc-pdrop .pdrop-btn { width:100%; min-width:0; }
   body.mob .tc-pdrop .pdrop-menu { min-width:0; width:100%; }
+  /* Report-pick search menu: the header button sits near the left edge on phones, so a
+     right-anchored 280px panel hangs off-screen — anchor to the backdrop and span it */
+  body.mob .tc-rep-wrap { position:static; }
+  body.mob .tc-rep-menu { top:auto; left:10px; right:10px; width:auto; margin-top:8px; }
   /* stat tiles: one swipeable strip (also covers the player dossier's .pp-stats) */
   body.mob .tc-stats { flex:1 1 100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; gap:0 16px; padding-bottom:3px; }
   body.mob .tc-stat { flex:0 0 auto; }
@@ -3965,6 +3973,12 @@
   // The panel renders itself only (never from the global render loop), so the composer draft,
   // tag pick, and open pickers survive live ticks; loadIntel refreshes just the feed list.
   let nbOpen=false, nbFilter="all", nbDraft="", nbTag=null, nbPicker=null, nbQ="", nbBusy=false, nbSearch="";
+  // auto-filed X-lead reports (noteNewLeads) can crowd the feed — toggleable, sticky per device
+  let nbShowX = (()=>{ try { return localStorage.getItem("dd:nbShowX") !== "0"; } catch (e) { return true; } })();
+  const nbIsXLead = (e) => /^⚡ X lead:/.test(e.note||"");
+  window.nbToggleX = () => { nbShowX = !nbShowX;
+    try { localStorage.setItem("dd:nbShowX", nbShowX ? "1" : "0"); } catch (e) {}
+    renderNotebook(); };
   window.toggleNotebook = (open) => {
     nbOpen = typeof open === "boolean" ? open : !nbOpen;
     $("nbBtn").classList.toggle("on", nbOpen);
@@ -3989,6 +4003,7 @@
     if (nbFilter==="players") evs = evs.filter(e=>e.player_name);
     else if (nbFilter==="teams") evs = evs.filter(e=>!e.player_name && e.team);
     else if (nbFilter==="general") evs = evs.filter(e=>!e.player_name && !e.team);
+    if (!nbShowX) evs = evs.filter(e=>!nbIsXLead(e));
     const q = nbSearch.trim().toLowerCase();
     if (q) evs = evs.filter(e => [e.note, e.player_name, e.team, e.agent].some(v => (v||"").toLowerCase().includes(q)));
     el.innerHTML = evs.length ? evs.map(e=>nbNoteRow(e)).join("")
@@ -4029,6 +4044,7 @@
           <button class="ctl primary" style="margin-left:auto;padding:4px 12px" onclick="nbSave()" ${nbBusy?"disabled":""}>Save</button>
         </div>${nbPickerHtml()}</div>
       <div class="nb-filters">${["all","players","teams","general"].map(f=>chip(nbFilter===f, `nbSetFilter('${f}')`, f[0].toUpperCase()+f.slice(1))).join("")}
+        <button class="nb-chip ${nbShowX?"on":""}" onclick="nbToggleX()" title="${nbShowX?"Hide":"Show"} auto-filed X intel reports">⚡ X</button>
         <input class="nb-search" id="nbSearchIn" type="search" placeholder="Search notes…" autocomplete="off" oninput="nbSearchInput(this.value)"></div>
       <div id="nbFeed"></div>`;
     $("nbText").value = nbDraft;   // unsent draft survives every re-render
@@ -6603,12 +6619,17 @@
     } else if (oc && timer.pick) {
       b.style.display = "";
       if (b.dataset.mode !== "live") {
-        b.dataset.mode = "live"; b.className = "prebanner liveoc";
+        b.dataset.mode = "live"; b.dataset.ocKey = ""; b.className = "prebanner liveoc";
         b.innerHTML = `<span class="oc-lab"><span class="pulse"></span>On the clock</span><span class="oc-team" id="ocbTeam"></span><span class="oc-cd" id="ocbCd"></span><span class="oc-meta" id="ocbMeta"></span>`;
       }
       b.onclick = () => openTeam(oc.team);
-      $("ocbTeam").innerHTML = `${teamLogo(oc.team,20)}${oc.team||"—"}`;
-      $("ocbMeta").textContent = `Pick #${oc.overall} · ${roundLabel(oc.round)}${oc.slot>0?` · slot ${fmtM(oc.slot)}`:""}`;
+      // logo/meta rewrite only on a pick change — recreating the <img> on every 250ms
+      // tick makes the logo flicker on mobile while it re-decodes
+      if (b.dataset.ocKey !== String(oc.overall)) {
+        b.dataset.ocKey = String(oc.overall);
+        $("ocbTeam").innerHTML = `${teamLogo(oc.team,20)}${oc.team||"—"}`;
+        $("ocbMeta").textContent = `Pick #${oc.overall} · ${roundLabel(oc.round)}${oc.slot>0?` · slot ${fmtM(oc.slot)}`:""}`;
+      }
       const cd = $("ocbCd");
       if (MODE === "live" && liveClock === "off") { cd.textContent = ""; }
       else {
