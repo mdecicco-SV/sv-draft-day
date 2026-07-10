@@ -3847,6 +3847,19 @@
     // phone columns are narrow — compact money ("$9.25M") and a signed over/under badge
     const money = MOBILE.matches ? fmtM : fmt$;
     const ou = MOBILE.matches ? (n => !n ? "slot" : (n>0?"+":"−")+fmtM(Math.abs(n))) : fmtOU;
+    // Room heat: least room = soft red, median = neutral gray, most room = soft green.
+    // Light tints only, on the Room cell — the ink stays the table's own.
+    const rooms = pools.map(t => t.room ?? 0);
+    const rMin = Math.min(...rooms), rMax = Math.max(...rooms);
+    const rMed = pctOf(rooms, 0.5) ?? (rMin + rMax) / 2;
+    const RED = [247,209,205], GRAY = [241,242,243], GREEN = [206,236,213];
+    const mix = (c1, c2, t) => `rgb(${c1.map((a,i)=>Math.round(a+(c2[i]-a)*t)).join(",")})`;
+    const roomBg = (v) => {
+      if (!Number.isFinite(v) || rMax === rMin) return "";
+      const bg = v <= rMed ? mix(RED, GRAY, rMed > rMin ? (v - rMin) / (rMed - rMin) : 1)
+                           : mix(GRAY, GREEN, rMax > rMed ? (v - rMed) / (rMax - rMed) : 0);
+      return ` style="background:${bg}"`;
+    };
     $("poolBody").innerHTML = pools.map(t => {
       const ouCls = t.overUnder>50000 ? "over" : t.overUnder<-50000 ? "under" : "atslot";
       const pctCls = t.pctNum>=4.8 ? "over" : t.pctNum<0 ? "under" : "atslot";
@@ -3855,7 +3868,7 @@
         <td>${t.picksMade}/${t.picksTotal}</td>
         <td>${money(t.pool)}</td>
         <td>${money(t.overage)}</td>
-        <td>${money(t.room)}</td>
+        <td${roomBg(t.room ?? 0)}>${money(t.room)}</td>
         <td class="hide-sm">${money(t.committedSlot)}</td>
         <td>${money(t.poolCharge)}${t.hasEst?' <span class="outag est atslot">est</span>':""}</td>
         <td><span class="outag ${ouCls}">${ou(t.overUnder)}</span></td>
