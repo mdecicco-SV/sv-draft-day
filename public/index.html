@@ -6394,16 +6394,21 @@
       }).catch(() => {});
     } catch (e) {}
   }
+  // The sim IS the official feed, so it must ignore the reported overlay: a real
+  // pick lands at the next official slot whether or not the war room flagged it
+  // reported. (derive().onClockIndex skips reported picks — using it here made
+  // the sim leapfrog a reported pick instead of confirming it.)
+  const mockOfficialIdx = () => mock.picks ? mock.picks.findIndex(p => !p.isDrafted && !p.isPass) : -1;
   function autoPickOne() {
-    const st = derive(mock.picks, mock.picks[0]?.year || 2026);
-    if (!st.onClock) return false;
-    applyPick(st.onClockIndex, choosePick(st.onClock)); return true;
+    const oi = mockOfficialIdx();
+    if (oi < 0) return false;
+    applyPick(oi, choosePick(mock.picks[oi])); return true;
   }
   window.draftManual = (name) => {
     if (MODE!=="mock" || mock.running || !mock.picks) return;
-    const st = derive(mock.picks, 2026); if (!st.onClock) return;
+    const oi = mockOfficialIdx(); if (oi < 0) return;
     const comp = DATA.compByName.get(normName(name));
-    applyPick(st.onClockIndex, comp ? { comp, bonus: negBonus(comp, st.onClock.slot, st.onClock.overall) } : null);
+    applyPick(oi, comp ? { comp, bonus: negBonus(comp, mock.picks[oi].slot, mock.picks[oi].overall) } : null);
     mock.nextAt = 0; pushMock();
   };
   function pushMock() { setState(derive(mock.picks, mock.picks[0]?.year || 2026)); }
@@ -6430,9 +6435,10 @@
   function onSpeed() { mock.speed = $("speed").value; mock.nextAt = 0; }
   const speedDelay = () => mock.speed==="turbo" ? 300 : 1200;
   function scheduleNext(force) {
-    const st = derive(mock.picks, 2026);
-    if (!st.onClock) { mock.nextAt = Infinity; return; }
-    if (mock.speed==="realtime") mock.nextAt = timer.endsAt;
+    if (mockOfficialIdx() < 0) { mock.nextAt = Infinity; return; }
+    // realtime paces off the pick clock; while the clock is HELD (reported pick
+    // awaiting confirmation) the official confirm arrives ~5s later instead
+    if (mock.speed==="realtime") mock.nextAt = timer.endsAt != null ? timer.endsAt : Date.now() + 5000;
     else if (force || !mock.nextAt) mock.nextAt = Date.now() + speedDelay();
   }
   let lastPre = false;
@@ -6491,8 +6497,7 @@
     if (pre !== lastPre) { lastPre = pre; renderActive(); }   // flip to live the moment the draft starts
     updatePreDraft();
     if (MODE!=="mock" || !mock.running || !mock.picks) return;
-    const st = derive(mock.picks, 2026);
-    if (!st.onClock) { mock.running=false; $("btnRun").textContent="▶ Start"; $("btnRun").classList.add("primary"); pushMock(); return; }
+    if (mockOfficialIdx() < 0) { mock.running=false; $("btnRun").textContent="▶ Start"; $("btnRun").classList.add("primary"); pushMock(); return; }
     if (mock.speed==="instant") { while (autoPickOne()) {} mock.running=false; $("btnRun").textContent="✓ Done"; pushMock(); return; }
     if (!mock.nextAt) scheduleNext(true);
     if (Date.now() >= mock.nextAt) { autoPickOne(); scheduleNext(true); pushMock(); }
