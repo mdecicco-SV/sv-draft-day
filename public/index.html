@@ -386,6 +386,8 @@
   .bcard .bc-no { font-size:10px; font-weight:700; color:var(--muted); }
   .bcard .bc-team { font-weight:900; font-size:14px; line-height:1.1; display:flex; align-items:center; gap:4px; }
   .bcard .bc-slot { font-size:10px; color:var(--muted); }
+  .bcard .bc-pool { font-size:9px; color:var(--muted); font-weight:700; }
+  .bcard.bc-heat .bc-pool { color:inherit; opacity:.8; }
   .bcard .bc-player { font-weight:700; font-size:11px; flex:1; margin-top:3px; line-height:1.3; }
   /* click-to-edit agency (player cards + Best Available table) — inline, no popup */
   .ag-edit { cursor:pointer; border-bottom:1px dashed var(--line); white-space:nowrap; }
@@ -1087,6 +1089,7 @@
   body.mob .bcard .bc-no { grid-column:1; grid-row:1; font-size:11px; }
   body.mob .bcard .bc-team { grid-column:1; grid-row:2; font-size:13px; }
   body.mob .bcard .bc-slot { grid-column:3; grid-row:1; font-size:11px; text-align:right; }
+  body.mob .bcard .bc-pool { grid-column:3; grid-row:2; font-size:10px; text-align:right; }
   body.mob .bcard .bc-player { grid-column:2; grid-row:1; margin-top:0; font-size:13px; }
   body.mob .bcard .bc-meta { grid-column:2; font-size:11px; margin-top:0; }
   body.mob .bcard .bc-bonus { grid-column:2 / -1; margin-top:0; }
@@ -3756,10 +3759,12 @@
       const onclick = p.isDrafted ? `openPlayer('${normName(p.player||"").replace(/'/g,"\\'")}')` : `expandPick(${p.overall})`;
       const expSel = cardPick===p.overall ? " expanded" : "";
       const land = landOverall===p.overall && Date.now()<landUntil ? " bc-land" : "";
+      const room = state.poolsMap && state.poolsMap[p.team] ? state.poolsMap[p.team].room : null;
       html += `<div class="${cardCls.trim().replace(/\s+/g," ")}${expSel}${land}"${cardStyle} data-overall="${p.overall}" ${onclock?'id="ocRow"':""} onclick="${onclick}">
         <div class="bc-no">#${p.overall}</div>
         <div class="bc-team">${teamLogo(p.team,15)}${p.team||"—"}</div>
         <div class="bc-slot">${p.slot>0?fmt$(p.slot):"—"}</div>
+        ${room!=null?`<div class="bc-pool" title="team's remaining bonus pool">pool ${fmtM(room)}</div>`:""}
         <div class="bc-player">${body}</div>${dotsHtml}</div>`;
     }
     html += `</div>`;
@@ -4832,6 +4837,10 @@
     ["hilvl",  "Hi Level", r => hiLvlOf(r) || "—"],
   ];
   let resCols = new Set((()=>{ try { return JSON.parse(localStorage.getItem("dd:resCols")||"[]"); } catch(e){ return []; } })());
+  // vs Slot column mode: $ over/under (default) or bonus as % of slot — sticky per device
+  let resPctMode = (()=>{ try { return localStorage.getItem("dd:resPct")==="1"; } catch(e){ return false; } })();
+  window.resPctSet = (v) => { resPctMode = !!v; try { localStorage.setItem("dd:resPct", v?"1":"0"); } catch(e){} renderResearchResults(); };
+  const pctOfSlot = (r) => (r.bonus!=null && r.slot>0) ? r.bonus/r.slot : null;
   window.toggleResCols = (e) => { if (e) e.stopPropagation(); resColsOpen = !resColsOpen; resPosOpen = false; renderResearch(); };
   window.resColTok = (k, e) => { if (e) e.stopPropagation(); setTog(resCols, k);
     localStorage.setItem("dd:resCols", JSON.stringify([...resCols])); renderResearch(); };
@@ -4954,10 +4963,70 @@
       : k==="age" ? (wizAgeOf(r) ?? -1) : k==="cls" ? (wizClsOf(r)||"") : k==="school" ? (r.school||"").toLowerCase()
       : k==="bt" ? fmtBT(r) : k==="htwt" ? (htIn(r) ?? -1) : k==="slot" ? (r.slot!=null?r.slot:-1)
       : k==="hilvl" ? (HI_RANK[hiLvlOf(r)] || -1)
+      : resPctMode ? (pctOfSlot(r) ?? -Infinity)
       : (r.diff!=null?r.diff:-Infinity);
     return [...rows].sort((a,b)=>{ const x=val(a), y=val(b);
       return (x<y?-1:x>y?1:0)*dir || (b.year-a.year) || (a.overall-b.overall); });
   }
+  // human-readable line of every active lens — subtitle on the PDF export
+  function resFilterDesc() {
+    const parts = [];
+    if (research.client) { const c = DATA.clientList.find(x=>x.key===research.client); if (c) parts.push(`Comp lens: ${c.name}`); }
+    if (research.hist) parts.push(`Comp lens: ${research.hist.name} '${String(research.hist.year).slice(2)} #${research.hist.overall}`);
+    const set = (lbl, s) => { if (s.size) parts.push(`${lbl} ${[...s].join("/")}`); };
+    set("Pos", research.pos); set("Class", research.cls); set("Level", research.lvl);
+    set("Money", research.money); set("Round", research.round); set("Hi level", research.hl);
+    set("Bats", research.bats); set("Throws", research.thr);
+    for (const s of RES_SLIDERS) { const lo = research[s.key+"Lo"], hi = research[s.key+"Hi"];
+      if (lo > s.min || hi < s.max) parts.push(`${s.lab} ${s.fmt(lo)}–${s.fmt(hi)}`); }
+    return parts.length ? parts.join(" · ") : "All 2018–25 signings (no lenses)";
+  }
+  // Print-ready export of the FULL current result set (not the on-screen cap) — opens a
+  // clean print window; the browser's Save-as-PDF does the rest. Always carries both
+  // vs-Slot readings: $ over/under AND bonus as % of slot.
+  window.resExportPdf = () => {
+    const rows = researchRows();
+    if (!rows.length) { alert("No signings match the current lenses — nothing to export."); return; }
+    const xcols = RES_XCOLS.filter(([k]) => resCols.has(k));
+    const signed = rows.filter(r=>r.diff!=null && r.bonus!=null);
+    const avgB = signed.length ? signed.reduce((s,r)=>s+r.bonus,0)/signed.length : null;
+    const overN = signed.filter(r=>r.diff>0).length;
+    const td = (v, cls) => `<td${cls?` class="${cls}"`:""}>${v}</td>`;
+    const body = rows.map(r=>`<tr>
+      ${td("'"+String(r.year).slice(2))}${td(`${_esc(wizName(r))} <span class="lv">${r.level}</span>`,"nm")}
+      ${td(posDispB(r))}${td("#"+r.overall,"r")}${td(teamAbbrevOf(r.team))}
+      ${td(r.bonus!=null?fmt$(r.bonus):"unsigned","r")}
+      ${td(r.diff!=null?(r.diff>0?"+":"")+fmtM(r.diff):"—","r")}
+      ${td(pctOfSlot(r)!=null?Math.round(100*pctOfSlot(r))+"%":"—","r")}
+      ${xcols.map(([,,cell])=>td(_esc(String(cell(r))))).join("")}</tr>`).join("");
+    const w = window.open("", "_blank");
+    if (!w) { alert("Popup blocked — allow popups for this site to export."); return; }
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>SV Draft Day — Research export</title><style>
+      body { font:10.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#141414; margin:26px; }
+      h1 { font-size:16px; margin:0 0 3px; }
+      .sub { color:#555; font-size:10.5px; margin:1px 0; }
+      table { border-collapse:collapse; width:100%; margin-top:12px; }
+      thead { display:table-header-group; }
+      th { text-align:left; font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#555;
+           border-bottom:1.5px solid #888; padding:4px 9px; white-space:nowrap; }
+      td { padding:3.5px 9px; border-bottom:.5px solid #ddd; white-space:nowrap; vertical-align:baseline; }
+      td.r, th.r { text-align:right; font-variant-numeric:tabular-nums; }
+      td.nm { font-weight:700; }
+      td .lv { font-weight:600; color:#888; font-size:8.5px; }
+      tbody tr:nth-child(even) td { background:#fafafa; }
+      tr { break-inside:avoid; }
+      @page { margin:13mm 10mm; }
+    </style></head><body>
+      <h1>SV Draft Day — Research</h1>
+      <div class="sub">${_esc(resFilterDesc())}</div>
+      <div class="sub">${rows.length} signings${signed.length?` · avg bonus ${fmtM(avgB)} · ${Math.round(100*overN/signed.length)}% over slot`:""} · exported ${new Date().toLocaleString()}</div>
+      <table><thead><tr><th>Yr</th><th>Player</th><th>Pos</th><th class="r">Pick</th><th>Team</th><th class="r">Bonus</th><th class="r">vs Slot</th><th class="r">% of Slot</th>${xcols.map(([,lbl])=>`<th>${lbl}</th>`).join("")}</tr></thead>
+      <tbody>${body}</tbody></table>
+    </body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
+  };
   function renderResearchResults() {
     const out = $("resTable"), sum = $("resSum"); if (!out) return;
     if (!DATA.slotHistory.length) { sum.innerHTML=""; out.innerHTML = `<div class="placeholder">Loading historical signings…</div>`; return; }
@@ -4965,7 +5034,11 @@
     const signed = rows.filter(r=>r.diff!=null && r.bonus!=null);
     const avgB = signed.length ? signed.reduce((s,r)=>s+r.bonus,0)/signed.length : null;
     const overN = signed.filter(r=>r.diff>0).length;
-    sum.innerHTML = `<span><b>${rows.length} matches</b>${signed.length?` · avg ${fmtM(avgB)} · ${Math.round(100*overN/signed.length)}% over slot`:""}</span>`;
+    sum.innerHTML = `<span><b>${rows.length} matches</b>${signed.length?` · avg ${fmtM(avgB)} · ${Math.round(100*overN/signed.length)}% over slot`:""}</span>
+      <span style="margin-left:auto;display:inline-flex;align-items:center;gap:4px"><span class="tc-wizlab">vs slot</span>
+        <button class="tc-chip${resPctMode?'':' on'}" onclick="resPctSet(false)" title="dollars over/under slot">$</button>
+        <button class="tc-chip${resPctMode?' on':''}" onclick="resPctSet(true)" title="bonus as % of slot value">%</button></span>
+      <button class="tc-chip" onclick="resExportPdf()" title="print-ready export of the full current result set (save as PDF)">⎙ PDF</button>`;
     if (!rows.length) { out.innerHTML = `<div class="placeholder">No signings match those lenses.</div>`; return; }
     const arrow = k => research.sortKey===k ? (research.sortDir>0?" ▲":" ▼") : "";
     const th = (k, lbl) => `<th class="sortable" onclick="resSort('${k}')">${lbl}${arrow(k)}</th>`;
@@ -4979,12 +5052,14 @@
       <td>#${r.overall}</td>
       <td style="color:var(--muted)">${teamAbbrevOf(r.team)}</td>
       <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
-      <td>${r.diff!=null?`<span class="vsv ${r.diff>50000?'over':r.diff<-50000?'under':'even'}">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td>
+      <td>${resPctMode
+        ? (pctOfSlot(r)!=null?`<span class="vsv ${r.diff>50000?'over':r.diff<-50000?'under':'even'}">${Math.round(100*pctOfSlot(r))}%</span>`:"—")
+        : (r.diff!=null?`<span class="vsv ${r.diff>50000?'over':r.diff<-50000?'under':'even'}">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—")}</td>
       ${xcols.map(([,,cell])=>`<td style="color:var(--muted)">${cell(r)}</td>`).join("")}</tr>`;
     let shown = rows.slice(0,CAP);
     // the searched player always pops in the set — pin him on top if he'd fall past the cap
     if (hK) { const hit = rows.find(r=>histKeyOf(r)===hK); if (hit && !shown.includes(hit)) shown = [hit, ...shown]; }
-    let h = `<table class="tc-upc"><thead><tr>${th("year","Yr")}${th("player","Player")}${th("pos","Pos")}${th("overall","Pick")}${th("team","Team")}${th("bonus","Bonus")}${th("diff","vs Slot")}${xcols.map(([k,lbl])=>th(k,lbl)).join("")}</tr></thead><tbody>`;
+    let h = `<table class="tc-upc"><thead><tr>${th("year","Yr")}${th("player","Player")}${th("pos","Pos")}${th("overall","Pick")}${th("team","Team")}${th("bonus","Bonus")}${th("diff",resPctMode?"% of Slot":"vs Slot")}${xcols.map(([k,lbl])=>th(k,lbl)).join("")}</tr></thead><tbody>`;
     h += shown.map(tr).join("");
     h += `</tbody></table>`;
     if (rows.length > CAP) h += `<div class="tc-feed-more">+ ${rows.length-CAP} more matches (sorting covers the full set)
