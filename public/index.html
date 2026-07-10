@@ -129,10 +129,15 @@
   .bcard .bc-lens { display:flex; align-items:center; gap:4px; margin-top:5px; flex-wrap:wrap; }
   .brow .idot { margin:0 2px; }
   /* ESPN-style pick ticker — bottom, slides up on each new pick (live + mock), any page */
-  /* reported (validated, unofficial) picks — amber until the feed confirms */
+  /* reported-ladder picks — amber until the feed confirms; soft (single-source) = dashed */
   .bcard.rep { border-color:#e3b505; background:#fffdf4; }
+  .bcard.rep.soft { border-style:dashed; background:#fffefa; }
   .bc-rep { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.4px; color:#8a6d00;
     background:#fff3cd; border:1px solid #e3b505; border-radius:4px; padding:0 4px; vertical-align:1px; }
+  .bc-rep.soft { background:none; border-style:dashed; }
+  .tc-reprow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 14px; padding:8px 12px;
+    background:#fff7e0; border:1px dashed #e3b505; border-radius:8px; font-size:13px; }
+  .tc-reprow b { font-weight:800; }
   .tc-rep-btn { border:1px solid #e3b505; background:#fff7e0; color:#8a6d00; font-weight:800; font-size:12px;
     border-radius:7px; padding:4px 10px; cursor:pointer; white-space:nowrap; }
   .tc-rep-btn.on, .tc-rep-btn:hover { background:#ffedb8; }
@@ -2135,6 +2140,9 @@
   // reported[]; mock keeps a local map so rehearsal never POSTs. mergeReported
   // keeps a just-POSTed local record alive across one stale cached poll (~8s).
   let REPORTED_LIVE = [], REPORTED_MOCK = new Map();
+  // three-step ladder: "reported" (soft — chip only) → "validated" (hard — tracker
+  // flips, clock holds) → official (API confirms, chip drops). Legacy no-status = hard.
+  const repHard = (rec) => !!rec && rec.status !== "reported";
   const mergeReported = (server, local) => {
     const have = new Set(server.map(x => x.overall));
     const fresh = local.filter(x => !have.has(x.overall) && x.at && (Date.now() - new Date(x.at).getTime()) < 8000);
@@ -2211,7 +2219,7 @@
     const reps = MODE === "mock" ? [...REPORTED_MOCK.values()] : REPORTED_LIVE;
     const repByOv = new Map(reps.map(r0 => [r0.overall, r0]));
     for (const p of picks) p.reported = (!p.isDrafted && repByOv.get(p.overall)) || null;
-    const onClockIndex = picks.findIndex(p => !p.isDrafted && !p.isPass && !p.reported);
+    const onClockIndex = picks.findIndex(p => !p.isDrafted && !p.isPass && !repHard(p.reported));
     const onClock = onClockIndex >= 0 ? picks[onClockIndex] : null;
     const pools = {};
     for (const p of picks) {
@@ -3167,7 +3175,7 @@
     hideRanks(); // rows re-render in place — don't strand an open hover card
     if ($("baChips") && !$("baChips").firstChild) renderBaChips();   // first paint of the chip bar
     const draftedBy = new Map(currentState.picks.filter(p=>p.isDrafted&&p.player).map(p=>[normName(p.player), p]));
-    const reportedKeys = new Set(currentState.picks.filter(p=>p.reported).map(p=>normName(p.reported.player)));
+    const reportedKeys = new Set(currentState.picks.filter(p=>repHard(p.reported)).map(p=>normName(p.reported.player)));
     const svOnly = $("fSv").checked, q = normName($("fQuery").value);
     const showDrafted = $("fDrafted")?.checked, ageOn = baAgeActive();
     const clickable = MODE==="mock" && !mock.running && currentState.onClock;
@@ -3277,7 +3285,7 @@
   function clientsInPlay(pk, state) {
     const team = pk.team, pool = state.poolsMap[team];
     const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
-    for (const p of state.picks) if (p.reported) drafted.add(normName(p.reported.player));
+    for (const p of state.picks) if (repHard(p.reported)) drafted.add(normName(p.reported.player));
     return DATA.clientList.filter(c=>(c.comp || rangeOf(c.key)) && !drafted.has(c.key)).map(c=>{
       const rec = latestIntel(c.key, team);
       const cap = intelFor(c.key);
@@ -3514,7 +3522,7 @@
     const el = $("boardPlayers"); if (!el) return;
     const sel = boardSelClients, bigOn = sel.size===0;
     const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
-    for (const p of state.picks) if (p.reported) drafted.add(normName(p.reported.player));
+    for (const p of state.picks) if (repHard(p.reported)) drafted.add(normName(p.reported.player));
     const clients = DATA.clientList.filter(c=>c.comp || rangeOf(c.key)).sort((a,b)=>(a.comp?.rank ?? 1e9)-(b.comp?.rank ?? 1e9));
     // one player selected -> the chip names whose board it is, never a bare "1 player"
     const selC = clients.filter(c=>sel.has(c.key));
@@ -3671,11 +3679,15 @@
         }
         dotsHtml = lines.join("");
       } else if (p.reported) {
-        // validated-but-unofficial selection — amber chip until the feed confirms
-        cardCls += " rep";
+        // unofficial selection on the ladder: soft REPORTED (single source, chip only)
+        // or hard VALIDATED (tracker flipped, clock held) — until the feed confirms
+        const hard = repHard(p.reported);
+        cardCls += hard ? " rep" : " rep soft";
         const ourRep = DATA.clients.has(normName(p.reported.player));
-        const repTitle = p.reported.auto ? `auto-validated · ${(p.reported.srcs||[]).map(s=>"@"+s).join(" ")}` : "war-room reported — awaiting MLB";
-        body = `${_esc(p.reported.player)}${ourRep?' <span class="svtag">SV</span>':''} <span class="bc-rep" title="${_esc(repTitle)}">REPORTED</span>`;
+        const srcs = (p.reported.srcs||[]).map(s=>"@"+s).join(" ");
+        const repTitle = hard ? (p.reported.auto ? `auto-validated · ${srcs}` : "validated — awaiting MLB")
+                              : `single source${srcs?` (${srcs})`:""} — open the pick to validate`;
+        body = `${_esc(p.reported.player)}${ourRep?' <span class="svtag">SV</span>':''} <span class="bc-rep${hard?"":" soft"}" title="${_esc(repTitle)}">${hard?"VALIDATED":"REPORTED"}</span>`;
         const comp = DATA.compByName.get(normName(p.reported.player));
         const meta = comp ? [comp.pos, schoolShort(comp.school)].filter(Boolean).join(" · ") : "";
         if (meta) dotsHtml = `<div class="bc-meta">${meta}</div>`;
@@ -4061,7 +4073,7 @@
   function reportPick(ov, name) {
     const st = currentState; if (!st) return;
     const pk = pickByOverall(st, ov); if (!pk || pk.isDrafted) return;
-    const rec = { overall: ov, player: name, team: pk.team || null, at: new Date().toISOString() };
+    const rec = { overall: ov, player: name, team: pk.team || null, at: new Date().toISOString(), status: "validated" };
     if (MODE === "mock") REPORTED_MOCK.set(ov, rec);
     else {
       REPORTED_LIVE = REPORTED_LIVE.filter(x => x.overall !== ov).concat([rec]);
@@ -4070,6 +4082,19 @@
     tcRepPanel = false; tcRepQ = ""; tcRepAdvance = ov;
     setState(derive(st.picks, st.year));   // instant local overlay; the 3s poll syncs the rest of the room
   }
+  // Upgrade a soft REPORTED chip to VALIDATED (step 2 of the ladder) in place.
+  function validateReported(ov) {
+    const st = currentState; if (!st) return;
+    const pk = pickByOverall(st, ov); if (!pk || !pk.reported || pk.isDrafted) return;
+    const rec = { ...pk.reported, status: "validated", at: new Date().toISOString() };
+    if (MODE === "mock") REPORTED_MOCK.set(ov, rec);
+    else {
+      REPORTED_LIVE = REPORTED_LIVE.filter(x => x.overall !== ov).concat([rec]);
+      fetch("/api/reported", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(rec) }).catch(()=>{});
+    }
+    setState(derive(st.picks, st.year));
+  }
+  window.tcRepValidate = (ov, e) => { if (e) e.stopPropagation(); validateReported(ov); };
   function unreportPick(ov) {
     if (MODE === "mock") REPORTED_MOCK.delete(ov);
     else {
@@ -4236,10 +4261,11 @@
       if (fs1 && fsTop0 != null) fs1.scrollLeft = fsTop0;
       return;
     }
-    // Reported (validated, unofficial) — mirror the pick-made flash. Auto-advance only
-    // when the report was just filed from THIS card; re-opening a reported pick stays
-    // put so the undo is reachable.
-    if (pk.reported) {
+    // VALIDATED (hard, unofficial) — mirror the pick-made flash. Auto-advance only
+    // when the report was just filed from THIS card; re-opening a validated pick stays
+    // put so the undo is reachable. Soft REPORTED picks fall through to the normal
+    // card with a validate/dismiss banner — the team intel stays visible.
+    if (repHard(pk.reported)) {
       const ourRep = DATA.clients.has(normName(pk.reported.player));
       if (tcRepAdvance === pk.overall && (!tcAdvance || tcAdvance.pick !== pk.overall)) {
         if (tcAdvance) clearTimeout(tcAdvance.timer);
@@ -4258,7 +4284,7 @@
           ${teamLogo(pk.team,30)}
           <span class="tc-abbr">${pk.team||"—"}</span>
           <span class="tc-ttl">Pick #${pk.overall} · ${pk.teamName||pk.team||""}</span>
-          <span class="tc-rep-live">⚡ Reported</span>
+          <span class="tc-rep-live">⚡ Validated</span>
           <button class="tc-x" onclick="closeTeamCard()">✕</button></div>
         <div class="tc-made">
           ${teamLogo(pk.team,52)}
@@ -4275,7 +4301,7 @@
     // Full roster of our undrafted clients, each scored against THIS team; in-play ones surface
     // first. "IN PLAY" = the teamintel rule: green/light-green + this pick not ruled out.
     const drafted = new Set(state.picks.filter(p=>p.isDrafted&&p.player).map(p=>normName(p.player)));
-    for (const p of state.picks) if (p.reported) drafted.add(normName(p.reported.player));   // reportedly gone = off the board
+    for (const p of state.picks) if (repHard(p.reported)) drafted.add(normName(p.reported.player));   // reportedly gone = off the board
     const inPlayKeys = new Set(tiClientsAt(pk, state).map(c=>c.key));
     const roster = DATA.clientList.filter(c=>(c.comp || rangeOf(c.key)) && !drafted.has(c.key)).map(c=>({
       c, f: fit(c.comp, team, c.key, state), inPlay: inPlayKeys.has(c.key)
@@ -4317,7 +4343,7 @@
         <button class="tc-nav-btn" onclick="navCardPick(1)" ${hasNext?"":"disabled"} title="Next pick">›</button>
         ${navMenu}
       </div>
-      ${(() => {   // manual reported-pick control (X-lead promotion rides the same POST later)
+      ${pk.reported ? "" : (() => {   // manual reported-pick control (hidden once a report is on this pick)
         tcRepLast = tcRepPanel ? repCandidates(state, tcRepQ) : [];
         const menu = tcRepPanel ? `<div class="tc-rep-menu" onclick="event.stopPropagation()">
             <input id="tcRepIn" type="search" placeholder="Reported player for ${team||"this pick"}…" autocomplete="off"
@@ -4329,6 +4355,10 @@
         return `<span class="tc-rep-wrap"><button class="tc-rep-btn${tcRepPanel?' on':''}" onclick="tcRepToggle(event)">⚡ Report pick</button>${menu}</span>`;
       })()}
       <button class="tc-x" onclick="closeTeamCard()">✕</button></div>`;
+    // soft REPORTED banner: single-source intel on this pick, awaiting validation
+    if (pk.reported) h += `<div class="tc-reprow">🟡 <b>${_esc(pk.reported.player)}</b> reported here${(pk.reported.srcs||[]).length?` per ${(pk.reported.srcs||[]).map(s=>"@"+_esc(s)).join(" ")}`:""} — single source, unvalidated
+      <button class="tc-rep-btn" onclick="tcRepValidate(${pk.overall},event)">✓ Validate</button>
+      <button class="tc-rep-btn" onclick="tcRepUndo(${pk.overall},event)">✕ Dismiss</button></div>`;
 
     // this team's own next pick after the one being viewed — the draft-wide next pick
     // is obvious from the board and doesn't belong in the lead stat slot
@@ -6042,7 +6072,7 @@
     currentState = s;
     if (s) $("yearBadge").textContent = `${s.year} MLB DRAFT`;
     if (s && s.onClock) {
-      const held = s.picks.some(p => p.reported && p.overall < s.onClock.overall);
+      const held = s.picks.some(p => repHard(p.reported) && p.overall < s.onClock.overall);
       if (s.onClock.overall !== timer.pick) setClockForPick(s.onClock, held);
       else if (timer.held && !held) {   // MLB confirmed the reported pick(s) — start the clock now
         timer.held = false;
@@ -6689,7 +6719,7 @@
       ? new Set(currentState.picks.filter(p => p.isDrafted && p.player).map(p => normName(p.player)))
       : new Set();
     // a validated (reported) player's lead chips clear too — the board chip carries it now
-    if (currentState) for (const p of currentState.picks) if (p.reported) drafted.add(normName(p.reported.player));
+    if (currentState) for (const p of currentState.picks) if (repHard(p.reported)) drafted.add(normName(p.reported.player));
     return (base || []).filter(l => l.confidence >= LEAD_MIN_CONF
       && (!l.at || isNaN(new Date(l.at)) || now - new Date(l.at).getTime() < LEAD_TTL_MS)
       && !drafted.has(normName(l.player))).slice(0, LEAD_SHOW);

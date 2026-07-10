@@ -39,11 +39,19 @@ module.exports = async (req, res) => {
       if (!Number.isFinite(overall) || overall < 1 || !player) {
         return res.status(400).json({ error: "need overall + player" });
       }
-      const rec = { overall, player, team: b.team || null, at: new Date().toISOString() };
+      // status ladder: "reported" (soft, single-source) | "validated" (default —
+      // manual war-room entries and click-validations are validated by definition)
+      const rec = { overall, player, team: b.team || null, at: new Date().toISOString(),
+                    status: b.status === "reported" ? "reported" : "validated" };
+      if (Array.isArray(b.srcs) && b.srcs.length) rec.srcs = b.srcs;
+      if (b.auto) rec.auto = true;
       await r.hset(HASH, String(overall), JSON.stringify(rec));
       await r.del(CACHE);
-      // notebook record (auto-validated leads are logged with richer context by /api/xlead)
-      if (!b.auto) await logNote({ note: `⚡ reported: ${player} → ${rec.team || "?"} at #${overall}`,
+      // notebook record (auto events are logged with richer context by /api/xlead)
+      if (!b.auto) await logNote({
+        note: rec.status === "reported"
+          ? `🟡 reported: ${player} → ${rec.team || "?"} at #${overall} — awaiting validation`
+          : `⚡ validated: ${player} → ${rec.team || "?"} at #${overall}`,
         player_name: player, team: rec.team, agent: b.agent || "war room" });
       return res.status(200).json({ ok: true, reported: rec });
     }
