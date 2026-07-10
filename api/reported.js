@@ -10,6 +10,7 @@
 // Writes DEL the draft cache so the next 3s war-room poll propagates immediately.
 
 const Redis = require("ioredis");
+const { logNote } = require("../lib/reportlog");
 
 const DEFAULT_YEAR = 2026;
 
@@ -41,13 +42,20 @@ module.exports = async (req, res) => {
       const rec = { overall, player, team: b.team || null, at: new Date().toISOString() };
       await r.hset(HASH, String(overall), JSON.stringify(rec));
       await r.del(CACHE);
+      // notebook record (auto-validated leads are logged with richer context by /api/xlead)
+      if (!b.auto) await logNote({ note: `⚡ reported: ${player} → ${rec.team || "?"} at #${overall}`,
+        player_name: player, team: rec.team, agent: b.agent || "war room" });
       return res.status(200).json({ ok: true, reported: rec });
     }
     if (req.method === "DELETE") {
       const overall = parseInt(req.query?.overall, 10);
       if (!Number.isFinite(overall)) return res.status(400).json({ error: "need overall" });
+      let prev = null;
+      try { prev = JSON.parse((await r.hget(HASH, String(overall))) || "null"); } catch (e) {}
       await r.hdel(HASH, String(overall));
       await r.del(CACHE);
+      if (prev) await logNote({ note: `↩ report withdrawn: ${prev.player} at #${overall}`,
+        player_name: prev.player, team: prev.team, agent: "war room" });
       return res.status(200).json({ ok: true });
     }
     const raw = await r.hgetall(HASH);

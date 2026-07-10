@@ -20,8 +20,14 @@
 //      DD_POLL_SECONDS (default 30), ANTHROPIC_API_KEY (shared w/ /api/ask), REDIS_URL.
 
 const Redis = require("ioredis");
+const { logNote } = require("../lib/reportlog");
+const { resolveTeamAbbrev, targetPick, corroborated } = require("../lib/leads");
+const { normName } = require("../lib/names");
 
 const POLL_MS = (parseInt(process.env.DD_POLL_SECONDS, 10) || 30) * 1000;
+const YEAR = 2026;
+const AUTOVAL_KEY = "dd:xlead:autoval";  // player+team groups already auto-validated (never re-fire)
+const AUTO_VALIDATE_SOURCES = parseInt(process.env.AUTO_VALIDATE_SOURCES, 10) || 2;
 const LEADS_KEY = "dd:xlead:leads";      // JSON array, newest first, capped
 const SEEN_KEY = "dd:xlead:seen";        // tweet urls already parsed (set)
 const LOCK_KEY = "dd:xlead:lock";        // TTL lock -> one refresh per window
@@ -148,10 +154,58 @@ async function refresh(r, url) {
     if (!parsed.length) return;
     const cur = JSON.parse((await r.get(LEADS_KEY)) || "[]");
     const have = new Set(cur.map((l) => l.id));
-    const merged = [...parsed.filter((l) => !have.has(l.id)), ...cur].slice(0, MAX_LEADS);
+    const fresh2 = parsed.filter((l) => !have.has(l.id));
+    const merged = [...fresh2, ...cur].slice(0, MAX_LEADS);
     await r.set(LEADS_KEY, JSON.stringify(merged));
+    // We hold the refresh lock — the single-writer seam for notebook records and
+    // corroboration auto-validation (client-side would fire once per device).
+    const state = JSON.parse((await r.get(`dd:cache:${YEAR}`)) || (await r.get(`dd:last:${YEAR}`)) || "null");
+    for (const l of fresh2) {
+      await logNote({
+        note: `📡 @${l.src}: ${l.team} → ${l.player}${l.pick ? ` at #${l.pick}` : ""} — ${l.text} · ${l.id}`,
+        player_name: l.player,
+        team: resolveTeamAbbrev(l.team, state ? state.pools : []),
+        agent: "x-feed",
+      });
+    }
+    await autoValidate(r, merged, state);
   } catch (err) {
     // swallow — next window retries; never surfaces to the war room
+  }
+}
+
+// Two distinct insiders on the same player+team = the war room's validation bar
+// (AUTO_VALIDATE_SOURCES). Files the reported pick exactly as a manual report
+// would, once per group ever — an undo is a human call the bot must not re-override.
+async function autoValidate(r, leads, state) {
+  if (!state || !state.picks) return;
+  const groups = corroborated(leads, { minSources: AUTO_VALIDATE_SOURCES, pools: state.pools || [] });
+  if (!groups.length) return;
+  const repRaw = await r.hgetall(`dd:reported:${YEAR}`);
+  const reportedOveralls = new Set(Object.keys(repRaw || {}).map(Number));
+  const reportedPlayers = new Set(Object.values(repRaw || {}).map((j) => {
+    try { return normName(JSON.parse(j).player); } catch (e) { return null; }
+  }).filter(Boolean));
+  const draftedPlayers = new Set(state.picks.filter((p) => p.isDrafted && p.player).map((p) => normName(p.player)));
+  for (const g of groups) {
+    if (await r.sismember(AUTOVAL_KEY, g.key)) continue;
+    const pk = normName(g.player);
+    if (draftedPlayers.has(pk) || reportedPlayers.has(pk)) {   // moot — never re-fire
+      await r.sadd(AUTOVAL_KEY, g.key); await r.expire(AUTOVAL_KEY, 60 * 60 * 24 * 3);
+      continue;
+    }
+    const teamAb = resolveTeamAbbrev(g.team, state.pools);
+    const overall = targetPick(state.picks, teamAb, g.pick, reportedOveralls);
+    if (overall == null) continue;   // unresolvable right now — retry on a later refresh
+    const rec = { overall, player: g.player, team: teamAb, at: new Date().toISOString(), auto: true, srcs: g.srcs };
+    await r.hset(`dd:reported:${YEAR}`, String(overall), JSON.stringify(rec));
+    await r.del(`dd:cache:${YEAR}`);
+    await r.sadd(AUTOVAL_KEY, g.key); await r.expire(AUTOVAL_KEY, 60 * 60 * 24 * 3);
+    reportedOveralls.add(overall); reportedPlayers.add(pk);
+    await logNote({
+      note: `⚡ auto-validated (${g.srcs.length} sources: ${g.srcs.map((s) => "@" + s).join(" ")}): ${g.player} → ${teamAb || g.team} at #${overall}`,
+      player_name: g.player, team: teamAb, agent: "auto",
+    });
   }
 }
 
