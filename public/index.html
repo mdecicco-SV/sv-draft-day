@@ -1628,9 +1628,9 @@
       const rows=[];
       for (let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const f=parseCsvLine(lines[i]); if(f.length<23) continue;
         const bonus=num(f[20]), slot=num(f[21]);
-        rows.push({ year:+f[1], round:f[2], overall:+f[3], mlbid:f[5]||"", first:f[6], last:f[7], pos:f[8], group:posGroupOf(f[8]),
+        rows.push({ year:+f[1], round:f[2], overall:num(f[3]), mlbid:f[5]||"", first:f[6], last:f[7], pos:f[8], group:posGroupOf(f[8]),
           level:(f[13]==="HS"?"HS":(isJucoSchool(f[14])?"JuCo":"College")), school:f[14], team:f[17], bonus, slot,
-          bats:f[9]||"", throws:f[10]||"", born:f[15]||"", ht:f[18]||"", wt:f[19]||"", full:f[16]||"",
+          bats:f[9]||"", throws:f[10]||"", born:f[15]||"", ht:f[18]||"", wt:num(f[19]), full:f[16]||"",
           diff:(f[22]!==""&&f[22]!=null?num(f[22]):(bonus!=null&&slot!=null?bonus-slot:null)) });
       }
       DATA.slotHistory = rows;
@@ -4507,10 +4507,26 @@
   let researchDrawn = false, resPosOpen = false, resClientsOpen = false, resColsOpen = false, resFiltersOpen = false;
   window.toggleResClients = () => { resClientsOpen = !resClientsOpen; renderResearch(); };
   window.toggleResFilters = () => { resFiltersOpen = !resFiltersOpen; renderResearch(); };   // mobile-only head
-  const BN_MAX = 10000000;
-  const RES_DEF = () => ({ pos:new Set(), cls:new Set(), lvl:new Set(), money:new Set(), round:new Set(),
-                           ageLo:16, ageHi:25, bnLo:0, bnHi:BN_MAX, client:null, hist:null, sortKey:"year", sortDir:-1 });
+  const BN_MAX = 10000000, OV_MAX = 1220;
+  const ftIn = v => `${Math.floor(v/12)}'${v%12}"`;
+  // dual-thumb slider specs — one table drives RES_DEF defaults, the pane markup,
+  // the shared resSlide handler, and the range filters (active only when narrowed;
+  // rows missing the value drop out only while the slider is active)
+  const RES_SLIDERS = [
+    { key:"age", lab:"Age",     min:16,   max:25,     step:0.1,   fmt:v=>v.toFixed(1),               of:r=>wizAgeOf(r) },
+    { key:"bn",  lab:"Bonus",   min:0,    max:BN_MAX, step:50000, fmt:v=>v>=BN_MAX?"$10M+":fmtM(v),  of:r=>r.bonus },
+    { key:"yr",  lab:"Year",    min:2018, max:2025,   step:1,     fmt:v=>"'"+String(v).slice(2),     of:r=>r.year },
+    { key:"ov",  lab:"Overall", min:1,    max:OV_MAX, step:1,     fmt:v=>"#"+v,                      of:r=>r.overall },
+    { key:"ht",  lab:"Height",  min:64,   max:84,     step:1,     fmt:ftIn,                          of:r=>htIn(r) },
+    { key:"wt",  lab:"Weight",  min:145,  max:300,    step:5,     fmt:v=>v+" lb",                    of:r=>r.wt },
+  ];
+  const resSlId = k => "res" + k[0].toUpperCase() + k.slice(1);   // "age" -> resAgeLo/resAgeHi/resAgeLab
+  const RES_DEF = () => { const d = { pos:new Set(), cls:new Set(), lvl:new Set(), money:new Set(), round:new Set(),
+      hl:new Set(), bats:new Set(), thr:new Set(), client:null, hist:null, sortKey:"year", sortDir:-1 };
+    for (const s of RES_SLIDERS) { d[s.key+"Lo"] = s.min; d[s.key+"Hi"] = s.max; }
+    return d; };
   research = RES_DEF();
+  let resShown = 50;   // rows revealed in the results table; resets whenever the population changes
   // optional display columns (persisted) — defaults stay Yr/Player/Pos/Pick/Team/Bonus/vs Slot
   const htIn = r => { const m = /^(\d+)-(\d+)/.exec(r.ht||""); return m ? (+m[1])*12 + (+m[2]) : null; };
   // highest pro level reached (hilevel.json, keyed by mlbid) — rank drives the column sort
@@ -4535,9 +4551,11 @@
   const rowPosTokens = (r) => r.group==="P" ? [posDisp(r)] : String(r.pos||"").toUpperCase().split(/[-\/,\s]+/).filter(Boolean);
   const setTog = (set, v) => { if (set.has(v)) set.delete(v); else set.add(v); };
   // any manual filter tweak drops whichever lens (client preload or player-search comp) is active
-  const resClearLens = () => { research.client = null; research.hist = null; };
+  const resClearLens = () => { research.client = null; research.hist = null; resShown = 50; };
   window.resChip = (g, v) => { setTog(research[g], v); resClearLens(); renderResearch(); };
-  window.resReset = () => { research = RES_DEF(); resPosOpen = false; resFindQ = ""; renderResearch(); };
+  window.resReset = () => { research = RES_DEF(); resPosOpen = false; resFindQ = ""; resShown = 50; renderResearch(); };
+  window.resMore = () => { resShown += 250; renderResearchResults(); };
+  window.resAll = () => { resShown = Infinity; renderResearchResults(); };
   window.toggleResPos = (e) => { if (e) e.stopPropagation(); resPosOpen = !resPosOpen; resColsOpen = false; renderResearch(); };
   window.resPosTok = (t, e) => { if (e) e.stopPropagation(); setTog(research.pos, t); resClearLens(); renderResearch(); };
   window.resPosGrp = (g, e) => { if (e) e.stopPropagation();
@@ -4563,7 +4581,7 @@
   };
   window.resHistPick = (i) => {
     const r = resFindMatches[i]; if (!r) return;
-    research = RES_DEF();
+    research = RES_DEF(); resShown = 50;
     research.hist = { key:histKeyOf(r), name:(r.first?r.first[0]+". ":"")+r.last, year:r.year, overall:r.overall };
     research.lvl.add(r.level);
     const cls = wizClsOf(r); if (cls) research.cls.add(cls);
@@ -4582,7 +4600,7 @@
   window.resClient = (key) => {
     if (research.client === key) { research = RES_DEF(); renderResearch(); return; }
     const c = (DATA.clientList.find(x=>x.key===key) || {}).comp; if (!c) return;
-    research = RES_DEF(); research.client = key;
+    research = RES_DEF(); research.client = key; resShown = 50;
     research.lvl.add(c.level==="HS" ? "HS" : /juco/i.test(c.level||"") ? "JuCo" : "College");
     const lc = levelClass(c);
     research.cls.add(c.level==="HS" ? "Prep" : lc.endsWith("SR") ? "SR+" : lc.endsWith("JR") ? "JR" : "Early col");
@@ -4592,13 +4610,16 @@
     if (Number.isFinite(a)) { research.ageLo = Math.max(16, Math.round((a-1)*10)/10); research.ageHi = Math.min(25, Math.round((a+1)*10)/10); }
     renderResearch(); };
   window.resSlide = () => {
-    let aLo = parseFloat($("resAgeLo").value), aHi = parseFloat($("resAgeHi").value);
-    if (aLo > aHi) [aLo, aHi] = [aHi, aLo];
-    let bLo = parseInt($("resBnLo").value,10), bHi = parseInt($("resBnHi").value,10);
-    if (bLo > bHi) [bLo, bHi] = [bHi, bLo];
-    Object.assign(research, { ageLo:aLo, ageHi:aHi, bnLo:bLo, bnHi:bHi, client:null, hist:null });
-    $("resAgeLab").textContent = `${aLo.toFixed(1)} – ${aHi.toFixed(1)}`;
-    $("resBnLab").textContent = `${fmtM(bLo)} – ${bHi>=BN_MAX?"$10M+":fmtM(bHi)}`;
+    const upd = {};
+    for (const s of RES_SLIDERS) {
+      const id = resSlId(s.key);
+      let lo = parseFloat($(id+"Lo").value), hi = parseFloat($(id+"Hi").value);
+      if (lo > hi) [lo, hi] = [hi, lo];
+      upd[s.key+"Lo"] = lo; upd[s.key+"Hi"] = hi;
+      $(id+"Lab").textContent = `${s.fmt(lo)} – ${s.fmt(hi)}`;
+    }
+    Object.assign(research, upd, { client:null, hist:null });
+    resShown = 50;
     renderResearchResults();
   };
   function researchRows() {
@@ -4610,9 +4631,13 @@
     if (research.round.size) rows = rows.filter(r => {
       const n = parseInt(r.round,10); if (!Number.isFinite(n)) return false;
       return research.round.has(n>=11 ? "11+" : String(n)); });
-    if (research.ageLo>16 || research.ageHi<25) rows = rows.filter(r=>{ const a=wizAgeOf(r); return a!=null && a>=research.ageLo && a<=research.ageHi; });
-    if (research.bnLo>0) rows = rows.filter(r=>r.bonus!=null && r.bonus>=research.bnLo);
-    if (research.bnHi<BN_MAX) rows = rows.filter(r=>r.bonus!=null && r.bonus<=research.bnHi);
+    if (research.hl.size)   rows = rows.filter(r => research.hl.has(hiLvlOf(r)));
+    if (research.bats.size) rows = rows.filter(r => research.bats.has((r.bats||"").replace("B","S")));
+    if (research.thr.size)  rows = rows.filter(r => research.thr.has(r.throws));
+    for (const s of RES_SLIDERS) {
+      const lo = research[s.key+"Lo"], hi = research[s.key+"Hi"];
+      if (lo > s.min || hi < s.max) rows = rows.filter(r => { const v = s.of(r); return v!=null && v>=lo && v<=hi; });
+    }
     // full-set sort — the cap applies after, so any column sort surfaces the true top
     const k = research.sortKey, dir = research.sortDir;
     const val = r => k==="player" ? (r.last+" "+r.first).toLowerCase()
@@ -4637,7 +4662,7 @@
     if (!rows.length) { out.innerHTML = `<div class="placeholder">No signings match those lenses.</div>`; return; }
     const arrow = k => research.sortKey===k ? (research.sortDir>0?" ▲":" ▼") : "";
     const th = (k, lbl) => `<th class="sortable" onclick="resSort('${k}')">${lbl}${arrow(k)}</th>`;
-    const CAP = 50;
+    const CAP = resShown;
     const xcols = RES_XCOLS.filter(([k]) => resCols.has(k));
     const hK = research.hist && research.hist.key;
     const tr = (r) => `<tr${hK && histKeyOf(r)===hK ? ' class="hl"' : ''}>
@@ -4655,7 +4680,10 @@
     let h = `<table class="tc-upc"><thead><tr>${th("year","Yr")}${th("player","Player")}${th("pos","Pos")}${th("overall","Pick")}${th("team","Team")}${th("bonus","Bonus")}${th("diff","vs Slot")}${xcols.map(([k,lbl])=>th(k,lbl)).join("")}</tr></thead><tbody>`;
     h += shown.map(tr).join("");
     h += `</tbody></table>`;
-    if (rows.length > CAP) h += `<div class="tc-feed-more">+ ${rows.length-CAP} more matches — tighten the lenses (sorting covers the full set)</div>`;
+    if (rows.length > CAP) h += `<div class="tc-feed-more">+ ${rows.length-CAP} more matches (sorting covers the full set)
+      <button class="tc-chip" style="margin-left:8px" onclick="resMore()">Show 250 more</button>
+      <button class="tc-chip" style="margin-left:6px" onclick="resAll()">Show all ${rows.length}</button></div>`;
+    else if (rows.length > 50) h += `<div class="tc-feed-more">all ${rows.length} shown</div>`;
     out.innerHTML = h;
   }
   function renderResearch() {
@@ -4663,7 +4691,8 @@
     researchDrawn = true;
     loadSlotHistory();   // lazy — repaints this view when the CSV lands
     const anyOn = research.pos.size||research.cls.size||research.lvl.size||research.money.size||research.round.size
-      || research.ageLo>16||research.ageHi<25||research.bnLo>0||research.bnHi<BN_MAX;
+      || research.hl.size||research.bats.size||research.thr.size
+      || RES_SLIDERS.some(s => research[s.key+"Lo"] > s.min || research[s.key+"Hi"] < s.max);
     const chipRow = (g, label, opts) => `<div class="tc-wizgrp"><span class="tc-wizlab">${label}</span>${opts.map(v=>
       `<button class="tc-chip${research[g].has(v)?' on':''}" onclick="resChip('${g}','${v}')">${v}</button>`).join("")}</div>`;
     // position dropdown: group headers select their whole family; tokens toggle solo
@@ -4703,17 +4732,18 @@
       ${chipRow("cls", "Class", WIZ_GROUPS.cls.opts)}
       ${chipRow("lvl", "Level", WIZ_GROUPS.lvl.opts)}
       ${chipRow("money", "Money", WIZ_GROUPS.money.opts)}
+      ${chipRow("hl", "Hi level", ["MLB","AAA","AA","A+","A","Rk"])}
+      ${chipRow("bats", "Bats", ["R","L","S"])}
+      ${chipRow("thr", "Throws", ["R","L"])}
       ${colsBtn}
-      <div class="res-slider"><span class="tc-wizlab">Age</span><span class="res-slab" id="resAgeLab"></span>
-        <div class="dual"><input type="range" id="resAgeLo" min="16" max="25" step="0.1" value="${research.ageLo}" oninput="resSlide()">
-        <input type="range" id="resAgeHi" min="16" max="25" step="0.1" value="${research.ageHi}" oninput="resSlide()"></div></div>
-      <div class="res-slider"><span class="tc-wizlab">Bonus</span><span class="res-slab" id="resBnLab"></span>
-        <div class="dual"><input type="range" id="resBnLo" min="0" max="${BN_MAX}" step="50000" value="${research.bnLo}" oninput="resSlide()">
-        <input type="range" id="resBnHi" min="0" max="${BN_MAX}" step="50000" value="${research.bnHi}" oninput="resSlide()"></div></div>
+      ${RES_SLIDERS.map(s => { const id = resSlId(s.key);
+        return `<div class="res-slider"><span class="tc-wizlab">${s.lab}</span><span class="res-slab" id="${id}Lab"></span>
+        <div class="dual"><input type="range" id="${id}Lo" min="${s.min}" max="${s.max}" step="${s.step}" value="${research[s.key+"Lo"]}" oninput="resSlide()">
+        <input type="range" id="${id}Hi" min="${s.min}" max="${s.max}" step="${s.step}" value="${research[s.key+"Hi"]}" oninput="resSlide()"></div></div>`; }).join("")}
       ${anyOn?`<div class="tc-wizgrp"><button class="tc-chip clear" onclick="resReset()">✕ clear all</button></div>`:""}
     </div></div></div>${cBox}`;
-    $("resAgeLab").textContent = `${research.ageLo.toFixed(1)} – ${research.ageHi.toFixed(1)}`;
-    $("resBnLab").textContent = `${fmtM(research.bnLo)} – ${research.bnHi>=BN_MAX?"$10M+":fmtM(research.bnHi)}`;
+    for (const s of RES_SLIDERS) $(resSlId(s.key)+"Lab").textContent =
+      `${s.fmt(research[s.key+"Lo"])} – ${s.fmt(research[s.key+"Hi"])}`;
     if (resFindQ) resFindInput(resFindQ);   // rebuild the typeahead menu after the innerHTML swap
     renderResearchResults();
   }
