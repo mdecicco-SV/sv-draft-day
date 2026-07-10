@@ -69,20 +69,13 @@
   body.mob .prebanner.liveoc .oc-meta { flex-basis:100%; text-align:center; margin-top:-2px; }
   .pulse { width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 0 0 rgba(255,42,34,.5); animation:pulse 1.6s infinite; }
   @keyframes pulse { 70% { box-shadow:0 0 0 7px rgba(255,42,34,0); } 100% { box-shadow:0 0 0 0 rgba(255,42,34,0); } }
-  /* X leading-intel strip: amber = unofficial, never the red/green of the official ticker */
-  #leadStrip { display:flex; flex-direction:column; gap:5px; padding:7px 16px; background:#fffaf0; border-bottom:1px solid #ecd9ac; position:sticky; top:90px; z-index:4; }
-  .lead-chip { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; font-size:13px; color:var(--ink); }
-  .lead-chip .lc-flag { background:#e8920e; color:#fff; font-weight:900; font-size:10.5px; letter-spacing:.5px; padding:2.5px 7px; border-radius:5px; }
-  .lead-chip .lc-rk, .lead-chip .lc-pick { color:var(--muted); font-weight:700; font-size:12px; }
-  .lead-chip .lc-arrow { color:#c8871c; font-weight:900; }
-  .lead-chip .lc-src { color:var(--muted); font-size:11.5px; font-weight:600; margin-left:auto; }
-  .lead-chip .lc-x { border:0; background:none; color:var(--muted); font-size:13px; cursor:pointer; padding:1px 5px; }
-  .lead-chip .lc-x:hover { color:var(--red); }
-  .lead-chip .lc-val { border:1px solid #e3b505; background:#fff7e0; color:#8a6d00; font-weight:800; font-size:11.5px;
-    border-radius:6px; padding:2px 8px; cursor:pointer; white-space:nowrap; }
-  .lead-chip .lc-val:hover { background:#ffedb8; }
-  body.mob #leadStrip { top:0; padding:6px 10px; }
-  body.mob .lead-chip .lc-src { flex-basis:100%; margin-left:0; }
+  /* X leading-intel: amber lead chip ON the target pick tile (no banner) — same amber
+     family as the reported ladder, flashing until the pick card is opened once */
+  .bcard.lead { border-color:#e3b505; background:#fffdf4; }
+  .bc-lead { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:800; letter-spacing:.3px;
+    color:#8a6d00; background:#fff3cd; border:1px solid #e3b505; border-radius:5px; padding:1px 6px; white-space:nowrap; }
+  .bc-lead.flash { animation:leadpulse 1.5s ease-in-out infinite; }
+  @keyframes leadpulse { 0%,100% { box-shadow:0 0 0 0 rgba(227,181,5,.5); } 50% { box-shadow:0 0 0 5px rgba(227,181,5,0); } }
   .ctl { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 11px; font:inherit; font-weight:700; cursor:pointer; }
   .ctl.primary { background:var(--red); color:#fff; border-color:var(--red); }
   .bar select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:8px; }
@@ -111,6 +104,23 @@
   #rksTip .rt-src { font-weight:700; color:#374151; }
   #rksTip .rt-asof { font-weight:600; color:#9aa0a6; font-size:10.5px; }
   #rksTip .rt-rk { font-weight:800; font-variant-numeric:tabular-nums; }
+  /* draft-history player card: any 2018–25 tracker name click-expands to his full research line */
+  .histlink { cursor:pointer; }
+  .histlink:hover { color:var(--red); text-decoration:underline; }
+  #histWrap { position:fixed; inset:0; z-index:500; display:none; background:rgba(15,18,24,.35); }
+  #histWrap.on { display:flex; align-items:center; justify-content:center; padding:18px; }
+  .hc { background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.25);
+    width:min(430px,100%); max-height:90vh; overflow-y:auto; padding:15px 18px 16px; }
+  .hc-head { display:flex; align-items:center; gap:8px; font-size:17px; font-weight:900; }
+  .hc-head .x { margin-left:auto; border:0; background:none; font-size:15px; cursor:pointer; color:var(--muted); }
+  .hc-sub { color:var(--muted); font-size:12.5px; font-weight:700; margin:3px 0 10px; }
+  .hc-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
+  .hc-kv { display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:13px; padding:4px 0; border-bottom:1px dashed var(--line); }
+  .hc-kv .k { color:var(--muted); font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+  .hc-kv .v { font-weight:800; font-variant-numeric:tabular-nums; text-align:right; }
+  .hc-links { display:flex; gap:8px; margin-top:13px; flex-wrap:wrap; }
+  .hc-links a { border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:12px; font-weight:800; color:var(--ink); text-decoration:none; }
+  .hc-links a:hover { border-color:var(--red); color:var(--red); }
   /* player-page source-ranks strip (the always-visible home for the per-publication ranks) */
   .pp-ranks { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding-top:9px; border-top:1px solid var(--line); }
   .pp-rk-t { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-right:2px; }
@@ -723,6 +733,9 @@
   .posb { font-size:8px; font-weight:800; color:#9aa2ae; vertical-align:1px; }
   .res-out { min-width:0; }
   .res-slider { display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:7px; }
+  .res-agein { flex-basis:100%; display:flex; align-items:center; gap:6px; }
+  .res-agein input { width:70px; padding:4px 6px; border:1px solid var(--line); border-radius:7px; font:inherit; font-size:13px; font-variant-numeric:tabular-nums; }
+  .res-agein span { color:var(--muted); font-size:11px; font-weight:700; }
   .res-slab { font-size:11px; font-weight:800; font-variant-numeric:tabular-nums; }
   .res-slider .dual { flex-basis:100%; }
   .dual { position:relative; height:22px; }
@@ -1305,9 +1318,6 @@
 </div>
 
 <div id="preBanner" class="prebanner" style="display:none"></div>
-<!-- Leading intel from the DraftDay_Feed sheet (/api/xlead) — UNOFFICIAL reports, amber-styled,
-     auto-clear when the MLB feed confirms. Hidden entirely unless the server is configured. -->
-<div id="leadStrip" style="display:none"></div>
 
 <main>
   <!-- OUR CLIENTS (hero) -->
@@ -1432,6 +1442,8 @@
 <div id="orgTip"></div>
 <div id="ticker"></div>
 <div id="rksTip"></div>
+<!-- draft-history player card: opened by clicking any historical (2018–25 tracker) name -->
+<div id="histWrap" onclick="closeHistCard()"><div class="hc" onclick="event.stopPropagation()" id="histCard"></div></div>
 <div id="teamCard" class="tc-backdrop" onclick="if(event.target===this)closeTeamCard()"></div>
 <div id="fitCard" class="tc-backdrop" onclick="if(event.target===this)closeFitCard()"></div>
 
@@ -1650,11 +1662,13 @@
   async function loadSlotHistory() {
     if (DATA.slotHistory.length) return;
     try {
-      const [txt, hi] = await Promise.all([
+      const [txt, hi, svr] = await Promise.all([
         fetch(SLOT_HISTORY_URL, { cache:"force-cache" }).then(r=>r.text()),
         fetch("/data/hilevel.json").then(r=>r.ok?r.json():{}).catch(()=>({})),   // mlbid → highest pro level (build_hilevel.py)
+        fetch("/data/svregistry.json").then(r=>r.ok?r.json():null).catch(()=>null),   // SV registry names for the history-card badge (build_svregistry.js)
       ]);
       DATA.hiLevel = hi || {};
+      DATA.svReg = new Set(Object.keys((svr && svr.names) || {}));
       const lines = txt.split(/\r?\n/);
       const num = s => { const n=parseFloat((s||"").replace(/[",]/g,"")); return Number.isFinite(n)?n:null; };
       const rows=[];
@@ -1801,7 +1815,7 @@
   const isPitcher = (pos) => /(^|\b)(P|RHP|LHP|SP|RP)\b/i.test(pos || "");
   const COLOR_HEX = { green:"#1a7f37","light green":"#86c98b", yellow:"#e3b505", orange:"#e8820e", red:"#C8102E" };
 
-  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], hiLevel:{}, fv:{}, fvMeta:{}, fvScale:80, rankTrend:{} };
+  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], hiLevel:{}, svReg:new Set(), fv:{}, fvMeta:{}, fvScale:80, rankTrend:{} };
   let boardSelClients = new Set(); // empty = Big Board (show every pick's in-play cluster);
                                    // non-empty = focus these clients' intel across the board
   let playerMenuOpen = false;      // Players dropdown open state (survives board re-renders)
@@ -3383,7 +3397,7 @@
     const curated = DRAFT_COMPS[c.key];
     const rows = curated ? curated.map(n=>slotSign(n)).filter(Boolean) : autoComps(comp);
     const rowsH = rows.map(r=>`<tr>
-        <td class="cmp-nm">${r.full || (r.first+" "+r.last)}</td>
+        <td class="cmp-nm"><span${histAttr(r)}>${r.full || (r.first+" "+r.last)}</span></td>
         <td>${r.pos}</td><td>${r.bats&&r.throws?`${r.bats}/${r.throws}`:"—"}</td>
         <td>${fmtHtWt(r)}</td>
         <td>${compAge(r.born, r.year)??"—"}</td>
@@ -3489,7 +3503,7 @@
         const pop = presented.has(normName(r.full || (r.first+" "+r.last)));
         return `<div class="cmp-em-row ${pop?'cmp-pop':''}">
           <span class="rr-no">'${String(r.year).slice(2)}</span>
-          <span class="cmp-em-nm">${r.full||(r.first+" "+r.last)}${pop?' <span class="cmp-popbadge">★ presented</span>':''}</span>
+          <span class="cmp-em-nm"><span${histAttr(r)}>${r.full||(r.first+" "+r.last)}</span>${pop?' <span class="cmp-popbadge">★ presented</span>':''}</span>
           <span class="cmp-em-meta">${r.pos} · #${r.overall} · ${r.team}</span>
           <span class="cmp-em-val">${fmt$(r.bonus)}${r.diff!=null?` <span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}">${r.diff>0?"+":""}${fmtM(r.diff)} vs slot</span>`:""}</span></div>`;
       }).join("") : `<div class="placeholder">No same-profile precedent in this context.</div>`;
@@ -3615,6 +3629,7 @@
   window.toggleRound = (r) => { openRounds.has(r) ? openRounds.delete(r) : openRounds.add(r); renderActive(); };
   function renderBoardGrid(state) {
     const svOnly = $("bSv").checked, focus = boardSelClients.size>0, CAP = 6;
+    const leadMap = leadsByPick();   // active X leads resolved onto their target pick tiles
     // Exactly one player selected → full intel-color "heat" board around that player.
     const single = boardSelClients.size===1 ? [...boardSelClients][0] : null;
     const singleC = single ? DATA.clientList.find(c=>c.key===single) : null;
@@ -3691,6 +3706,16 @@
         const comp = DATA.compByName.get(normName(p.reported.player));
         const meta = comp ? [comp.pos, schoolShort(comp.school)].filter(Boolean).join(" · ") : "";
         if (meta) dotsHtml = `<div class="bc-meta">${meta}</div>`;
+      } else if (leadMap.has(p.overall)) {
+        // active X lead resolved to this pick: amber chip, flashing until the card is opened
+        const l = leadMap.get(p.overall);
+        cardCls += " lead";
+        const flash = leadEngaged.has(String(l.id)) ? "" : " flash";
+        const ttl = l.text || `${l.player} → ${l.team} per @${l.src}`;
+        body = `<span class="bc-lead${flash}" title="${_esc(ttl)}">⚡ ${_esc(l.player)}</span>`;
+        const comp = DATA.compByName.get(normName(l.player));
+        const meta = comp ? [comp.pos, schoolShort(comp.school)].filter(Boolean).join(" · ") : "";
+        dotsHtml = `<div class="bc-meta">${meta ? meta + " · " : ""}per @${_esc(l.src)}</div>`;
       } else if (single) {
         // Full-color heat card for the one selected player — mirrors the sv-teamintel Draft Card:
         // a pick unchecked there (not in play) paints RED regardless of the team's intel color.
@@ -3822,6 +3847,19 @@
     // phone columns are narrow — compact money ("$9.25M") and a signed over/under badge
     const money = MOBILE.matches ? fmtM : fmt$;
     const ou = MOBILE.matches ? (n => !n ? "slot" : (n>0?"+":"−")+fmtM(Math.abs(n))) : fmtOU;
+    // Room heat: least room = soft red, median = neutral gray, most room = soft green.
+    // Light tints only, on the Room cell — the ink stays the table's own.
+    const rooms = pools.map(t => t.room ?? 0);
+    const rMin = Math.min(...rooms), rMax = Math.max(...rooms);
+    const rMed = pctOf(rooms, 0.5) ?? (rMin + rMax) / 2;
+    const RED = [247,209,205], GRAY = [241,242,243], GREEN = [206,236,213];
+    const mix = (c1, c2, t) => `rgb(${c1.map((a,i)=>Math.round(a+(c2[i]-a)*t)).join(",")})`;
+    const roomBg = (v) => {
+      if (!Number.isFinite(v) || rMax === rMin) return "";
+      const bg = v <= rMed ? mix(RED, GRAY, rMed > rMin ? (v - rMin) / (rMed - rMin) : 1)
+                           : mix(GRAY, GREEN, rMax > rMed ? (v - rMed) / (rMax - rMed) : 0);
+      return ` style="background:${bg}"`;
+    };
     $("poolBody").innerHTML = pools.map(t => {
       const ouCls = t.overUnder>50000 ? "over" : t.overUnder<-50000 ? "under" : "atslot";
       const pctCls = t.pctNum>=4.8 ? "over" : t.pctNum<0 ? "under" : "atslot";
@@ -3830,7 +3868,7 @@
         <td>${t.picksMade}/${t.picksTotal}</td>
         <td>${money(t.pool)}</td>
         <td>${money(t.overage)}</td>
-        <td>${money(t.room)}</td>
+        <td${roomBg(t.room ?? 0)}>${money(t.room)}</td>
         <td class="hide-sm">${money(t.committedSlot)}</td>
         <td>${money(t.poolCharge)}${t.hasEst?' <span class="outag est atslot">est</span>':""}</td>
         <td><span class="outag ${ouCls}">${ou(t.overUnder)}</span></td>
@@ -4359,6 +4397,15 @@
     if (pk.reported) h += `<div class="tc-reprow">🟡 <b>${_esc(pk.reported.player)}</b> reported here${(pk.reported.srcs||[]).length?` per ${(pk.reported.srcs||[]).map(s=>"@"+_esc(s)).join(" ")}`:""} — single source, unvalidated
       <button class="tc-rep-btn" onclick="tcRepValidate(${pk.overall},event)">✓ Validate</button>
       <button class="tc-rep-btn" onclick="tcRepUndo(${pk.overall},event)">✕ Dismiss</button></div>`;
+    // X-lead row: an active insider lead resolved to this pick — engage from here
+    const tcLead = pk.reported ? null : leadsByPick().get(pk.overall);
+    if (tcLead) {
+      leadEngaged.add(String(tcLead.id));   // card opened once → the tile chip stops flashing
+      const qid = String(tcLead.id).replace(/'/g,"\\'");
+      h += `<div class="tc-reprow" title="${_esc(tcLead.text||"")}">⚡ <b>${_esc(tcLead.player)}</b> lead here per @${_esc(tcLead.src)}${tcLead.mock?" (mock)":""} — unofficial X report
+        <button class="tc-rep-btn" onclick="validateLead('${qid}',event)">✓ Validate</button>
+        <button class="tc-rep-btn" onclick="dismissLead('${qid}',event)">✕ Dismiss</button></div>`;
+    }
 
     // this team's own next pick after the one being viewed — the draft-wide next pick
     // is obvious from the board and doesn't belong in the lead stat slot
@@ -4606,7 +4653,7 @@
       h += `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Pos</th><th>Pick</th><th>Bonus</th><th>vs Slot</th></tr></thead><tbody>`;
       h += rdRows.map(r=>`<tr>
           <td>'${String(r.year).slice(2)}</td>
-          <td class="pl">${r.first?r.first[0]+". ":""}${r.last} ${lvlTag(r)}</td>
+          <td class="pl"><span${histAttr(r)}>${r.first?r.first[0]+". ":""}${r.last}</span> ${lvlTag(r)}</td>
           <td style="color:var(--muted)">${posDispB(r)}</td>
           <td>#${r.overall}</td>
           <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
@@ -4679,6 +4726,41 @@
               return v==="Over slot" ? r.diff>50000 : v==="Under slot" ? r.diff<-50000 : Math.abs(r.diff)<=50000; } },
   };
   // HS/College/JuCo badge for tracker rows
+  // ── draft-history player card: any tracker name (research rows, precedent panels,
+  // slot-history lists) click-expands his full research line in one popover. A pick is
+  // uniquely (year, overall), so "year|overall" keys the row — no name quoting needed.
+  const histAttr = (r) => ` class="histlink" onclick="histCard('${r.year}|${r.overall}',event)" title="expand draft-history card"`;
+  window.histCard = (key, ev) => {
+    if (ev) ev.stopPropagation();
+    const [y, o] = String(key).split("|").map(Number);
+    const r = DATA.slotHistory.find(x => x.year === y && x.overall === o);
+    if (!r) return;
+    const kv = (k, v) => `<div class="hc-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    const name = wizName(r), age = wizAgeOf(r), diff = r.diff;
+    const sv = DATA.svReg.has(normName(name)) || DATA.svReg.has(normName(r.first + " " + r.last));
+    const bref = `https://www.baseball-reference.com/search/search.fcgi?search=${encodeURIComponent(name)}`;
+    $("histCard").innerHTML = `
+      <div class="hc-head">${_esc(name)}${sv ? ' <span class="svtag">SV</span>' : ""} ${lvlTag(r)}
+        <button class="x" onclick="closeHistCard()" aria-label="close">✕</button></div>
+      <div class="hc-sub">${r.year} · ${roundLabel(r.round)} · #${r.overall} overall · ${teamAbbrevOf(r.team)}${NAME_FWD[r.team] ? ` (${_esc(r.team)})` : ""}</div>
+      <div class="hc-grid">
+        ${kv("Pos", posDispB(r))}${kv("Level", r.level)}
+        ${kv("Class", wizClsOf(r) || "—")}${kv("Age", age != null ? age.toFixed(1) : "—")}
+        ${kv("B/T", fmtBT(r))}${kv("Ht/Wt", fmtHtWt(r))}
+        ${kv("Bonus", r.bonus != null ? fmt$(r.bonus) : "unsigned")}${kv("Slot $", r.slot != null ? fmt$(r.slot) : "—")}
+        ${kv("vs Slot", diff != null ? `<span class="vsv ${diff > 50000 ? "over" : diff < -50000 ? "under" : "even"}">${diff > 0 ? "+" : ""}${fmtM(diff)}</span>` : "—")}
+        ${kv("Hi level", hiLvlOf(r) || "—")}
+      </div>
+      ${kv("School", _esc(r.school || "—"))}
+      <div class="hc-links">
+        ${r.mlbid ? `<a href="https://www.mlb.com/player/${r.mlbid}" target="_blank" rel="noopener">MLB profile ↗</a>
+        <a href="https://baseballsavant.mlb.com/savant-player/${r.mlbid}" target="_blank" rel="noopener">Savant ↗</a>` : ""}
+        <a href="${bref}" target="_blank" rel="noopener">B-Ref search ↗</a>
+      </div>`;
+    $("histWrap").classList.add("on");
+  };
+  window.closeHistCard = () => $("histWrap").classList.remove("on");
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHistCard(); });
   const lvlTag = (r) => r.level==="HS" ? '<span class="tg lvl-hs">HS</span>'
     : r.level==="JuCo" ? '<span class="tg lvl-jc">JUCO</span>' : '<span class="tg lvl-col">COL</span>';
 
@@ -4696,7 +4778,7 @@
   // the shared resSlide handler, and the range filters (active only when narrowed;
   // rows missing the value drop out only while the slider is active)
   const RES_SLIDERS = [
-    { key:"age", lab:"Age",     min:16,   max:25,     step:0.1,   fmt:v=>v.toFixed(1),               of:r=>wizAgeOf(r) },
+    { key:"age", lab:"Age",     min:16,   max:25,     step:0.1,   fmt:v=>v.toFixed(1),               of:r=>wizAgeOf(r), input:true },
     { key:"bn",  lab:"Bonus",   min:0,    max:BN_MAX, step:50000, fmt:v=>v>=BN_MAX?"$10M+":fmtM(v),  of:r=>r.bonus },
     { key:"yr",  lab:"Year",    min:2018, max:2025,   step:1,     fmt:v=>"'"+String(v).slice(2),     of:r=>r.year },
     { key:"ov",  lab:"Overall", min:1,    max:OV_MAX, step:1,     fmt:v=>"#"+v,                      of:r=>r.overall },
@@ -4792,9 +4874,26 @@
     const a = parseFloat(compAge(c.born, 2026));
     if (Number.isFinite(a)) { research.ageLo = Math.max(16, Math.round((a-1)*10)/10); research.ageHi = Math.min(25, Math.round((a+1)*10)/10); }
     renderResearch(); };
+  // Age is typed, not slid: two decimal inputs sharing the ageLo/ageHi state. Repaint
+  // results only — a full re-render would wipe the field mid-typing. onchange (commit)
+  // normalizes the display: clamp 16–25, swap lo>hi, always one decimal.
+  window.resAgeType = (commit) => {
+    const loEl = $("resAgeLo"), hiEl = $("resAgeHi"); if (!loEl || !hiEl) return;
+    const clamp = v => Math.min(25, Math.max(16, Math.round(v*10)/10));
+    let lo = parseFloat(loEl.value), hi = parseFloat(hiEl.value);
+    lo = Number.isFinite(lo) ? clamp(lo) : 16;
+    hi = Number.isFinite(hi) ? clamp(hi) : 25;
+    if (lo > hi) [lo, hi] = [hi, lo];
+    research.ageLo = lo; research.ageHi = hi;
+    research.client = null; research.hist = null;   // manual tweak drops the active lens
+    resShown = 50;
+    if (commit === true) { loEl.value = lo.toFixed(1); hiEl.value = hi.toFixed(1); }
+    renderResearchResults();
+  };
   window.resSlide = () => {
     const upd = {};
     for (const s of RES_SLIDERS) {
+      if (s.input) continue;   // typed inputs (age) keep their own handler/state
       const id = resSlId(s.key);
       let lo = parseFloat($(id+"Lo").value), hi = parseFloat($(id+"Hi").value);
       if (lo > hi) [lo, hi] = [hi, lo];
@@ -4850,7 +4949,7 @@
     const hK = research.hist && research.hist.key;
     const tr = (r) => `<tr${hK && histKeyOf(r)===hK ? ' class="hl"' : ''}>
       <td>'${String(r.year).slice(2)}</td>
-      <td class="pl">${wizName(r)} ${lvlTag(r)}</td>
+      <td class="pl"><span${histAttr(r)}>${wizName(r)}</span> ${lvlTag(r)}</td>
       <td style="color:var(--muted)">${posDispB(r)}</td>
       <td>#${r.overall}</td>
       <td style="color:var(--muted)">${teamAbbrevOf(r.team)}</td>
@@ -4920,13 +5019,17 @@
       ${chipRow("thr", "Throws", ["R","L"])}
       ${colsBtn}
       ${RES_SLIDERS.map(s => { const id = resSlId(s.key);
+        if (s.input) return `<div class="res-slider"><span class="tc-wizlab">${s.lab}</span>
+          <div class="res-agein"><input type="number" id="${id}Lo" min="${s.min}" max="${s.max}" step="${s.step}" inputmode="decimal" value="${research[s.key+"Lo"].toFixed(1)}" oninput="resAgeType()" onchange="resAgeType(true)">
+          <span>to</span>
+          <input type="number" id="${id}Hi" min="${s.min}" max="${s.max}" step="${s.step}" inputmode="decimal" value="${research[s.key+"Hi"].toFixed(1)}" oninput="resAgeType()" onchange="resAgeType(true)"></div></div>`;
         return `<div class="res-slider"><span class="tc-wizlab">${s.lab}</span><span class="res-slab" id="${id}Lab"></span>
         <div class="dual"><input type="range" id="${id}Lo" min="${s.min}" max="${s.max}" step="${s.step}" value="${research[s.key+"Lo"]}" oninput="resSlide()">
         <input type="range" id="${id}Hi" min="${s.min}" max="${s.max}" step="${s.step}" value="${research[s.key+"Hi"]}" oninput="resSlide()"></div></div>`; }).join("")}
       ${anyOn?`<div class="tc-wizgrp"><button class="tc-chip clear" onclick="resReset()">✕ clear all</button></div>`:""}
     </div></div></div>${cBox}`;
-    for (const s of RES_SLIDERS) $(resSlId(s.key)+"Lab").textContent =
-      `${s.fmt(research[s.key+"Lo"])} – ${s.fmt(research[s.key+"Hi"])}`;
+    for (const s of RES_SLIDERS) { if (s.input) continue; $(resSlId(s.key)+"Lab").textContent =
+      `${s.fmt(research[s.key+"Lo"])} – ${s.fmt(research[s.key+"Hi"])}`; }
     if (resFindQ) resFindInput(resFindQ);   // rebuild the typeahead menu after the innerHTML swap
     renderResearchResults();
   }
@@ -6275,7 +6378,6 @@
                  ["tabResearch","viewResearch","research"],["tabFit","viewFit","fit"]];
   function renderActive() {
     if (!currentState) return;
-    renderLeadStrip();   // X-lead chips reconcile against fresh official picks on every repaint
     // refresh the open team card on live data ticks, but don't wipe an in-progress capture form
     if (cardPick!=null) {
       const ae = document.activeElement;
@@ -6562,7 +6664,7 @@
       await seedFromLive(); pushMock();
       // Demo X-lead chips in mock are DISABLED for now (per Mike, 7/10) — flip this
       // gate back on when the live capture wiring conversation resumes.
-      if (MOCK_LEADS_DEMO) { seedMockLeads(); renderLeadStrip(); }
+      if (MOCK_LEADS_DEMO) { seedMockLeads(); noteNewLeads(MOCKLEADS); }   // tile chips paint on the next board render
     } else { MOCKLEADS = []; pollLive(); }
   }
 
@@ -6678,11 +6780,13 @@
 
   // ---------- X leading intel: insider-account pick reports ahead of the MLB feed ----------
   // Server (/api/xlead) reads the DraftDay_Feed sheet the capture Apps Script fills and
-  // parses tweets; here we match names to the board, render amber UNOFFICIAL chips, and
-  // auto-clear once the official feed confirms. Silent unless the server is configured.
+  // parses tweets; here we resolve each lead to its target pick and paint an amber chip ON
+  // that board tile (no banner), auto-clearing once the official feed confirms. Every new
+  // lead also lands in the war-room notebook. Silent unless the server is configured.
   let XLEADS = { enabled: null, leads: [] };
+  const leadEngaged = new Set();   // lead ids whose pick card was opened — chip stops flashing
   const MOCK_LEADS_DEMO = false;   // demo tweets in mock mode — off until the live capture wiring resumes
-  let MOCKLEADS = [];   // synthetic leads seeded in mock mode so the alert strip can be rehearsed
+  let MOCKLEADS = [];   // synthetic leads seeded in mock mode so the tile chips can be rehearsed
   const LEAD_TTL_MS = 45 * 60 * 1000, LEAD_MIN_CONF = 0.55, LEAD_SHOW = 3;
   // Seed a couple of demo leads off the current mock board: upcoming picks × undrafted
   // SV clients (falling back to the top board). They reconcile/auto-clear exactly like
@@ -6724,57 +6828,71 @@
       && (!l.at || isNaN(new Date(l.at)) || now - new Date(l.at).getTime() < LEAD_TTL_MS)
       && !drafted.has(normName(l.player))).slice(0, LEAD_SHOW);
   }
-  function renderLeadStrip() {
-    const el = $("leadStrip"); if (!el) return;
-    // live → server leads; mock → seeded demo leads (rehearsal); pre-draft/other → none
-    const leads = MODE === "mock" ? activeLeads(MOCKLEADS)
-                : MODE === "live" ? activeLeads(XLEADS.leads) : [];
-    if (!leads.length) { el.style.display = "none"; el.innerHTML = ""; return; }
-    el.style.display = "";
-    el.innerHTML = leads.map(l => {
-      const ab = leadTeamAbbr(l.team);
-      const comp = DATA.compByName.get(normName(l.player));
-      const t = l.at ? new Date(l.at).getTime() : NaN;
-      const ago = isNaN(t) ? "" : ` · ${Math.max(0, Math.round((Date.now() - t) / 60000))}m ago`;
-      return `<div class="lead-chip" title="${_esc(l.text || "")}">
-        <span class="lc-flag">⚡ REPORTED</span>
-        <b>${comp ? playerLink(comp.name) : _esc(l.player)}</b>${comp ? `<span class="lc-rk">#${comp.rank}</span>` : ""}
-        <span class="lc-arrow">→</span> ${ab ? teamLogo(ab, 15) : ""}<b>${ab || _esc(l.team)}</b>
-        ${l.pick ? `<span class="lc-pick">at #${l.pick}</span>` : ""}
-        <span class="lc-src">per @${_esc(l.src)}${ago} · ${l.mock ? "mock" : "unofficial"}</span>
-        <button class="lc-val" onclick="validateLead('${String(l.id).replace(/'/g,"\\'")}')" title="validate — file as the reported pick (board chip, tracker, clock hold)">✓ Validate</button>
-        <button class="lc-x" onclick="dismissLead('${String(l.id).replace(/'/g,"\\'")}')" title="dismiss this report">✕</button>
-      </div>`;
-    }).join("");
-  }
-  // Promote a lead into the reported-pick flow: resolve the target pick (the lead's
-  // pick# if that slot is open and the team's, else the team's next open pick), then
-  // reportPick does the rest (board chip, tracker flip, clock hold, POST + notebook).
-  window.validateLead = (id) => {
-    const src = MODE === "mock" ? MOCKLEADS : XLEADS.leads;
-    const l = (src || []).find(x => String(x.id) === String(id));
-    if (!l || !currentState) return;
+  // live → server leads; mock → seeded demo leads (rehearsal); pre-draft/other → none
+  const modeLeads = () => MODE === "mock" ? activeLeads(MOCKLEADS)
+                        : MODE === "live" ? activeLeads(XLEADS.leads) : [];
+  // Resolve a lead to its target pick: the lead's pick# if that slot is open and the
+  // team's, else the team's next open pick. Shared by the tile chips and validateLead.
+  function leadTargetPick(l) {
+    if (!currentState) return null;
     const ab = leadTeamAbbr(l.team);
     const reported = new Set(currentState.picks.filter(p => p.reported).map(p => p.overall));
     const open = p => !p.isDrafted && !p.isPass && !reported.has(p.overall);
-    let overall = null;
-    if (l.pick != null) { const p = currentState.picks.find(x => x.overall === +l.pick); if (p && open(p) && (!ab || p.team === ab)) overall = p.overall; }
-    if (overall == null && ab) { const p = currentState.picks.find(x => x.team === ab && open(x)); if (p) overall = p.overall; }
+    if (l.pick != null) { const p = currentState.picks.find(x => x.overall === +l.pick); if (p && open(p) && (!ab || p.team === ab)) return p.overall; }
+    if (ab) { const p = currentState.picks.find(x => x.team === ab && open(x)); if (p) return p.overall; }
+    return null;   // no open pick — the lead lives only in the notebook
+  }
+  function leadsByPick() {
+    const m = new Map();
+    for (const l of modeLeads()) { const ov = leadTargetPick(l); if (ov != null && !m.has(ov)) m.set(ov, l); }
+    return m;
+  }
+  // Promote a lead into the reported-pick flow: leadTargetPick resolves the slot, then
+  // reportPick does the rest (board chip, tracker flip, clock hold, POST + notebook).
+  window.validateLead = (id, ev) => {
+    if (ev) ev.stopPropagation();
+    const src = MODE === "mock" ? MOCKLEADS : XLEADS.leads;
+    const l = (src || []).find(x => String(x.id) === String(id));
+    if (!l || !currentState) return;
+    const overall = leadTargetPick(l);
     if (overall == null) { alert(`No open pick resolves for "${l.team}" — validate manually from the pick card.`); return; }
     const comp = DATA.compByName.get(normName(l.player));
     reportPick(overall, comp ? comp.name : l.player);
     if (MODE === "live") window.dismissLead(String(l.id));   // durable dismissal; the chip already cleared via the reported filter
   };
-  window.dismissLead = async (id) => {
-    XLEADS.leads = XLEADS.leads.filter(l => l.id !== id); renderLeadStrip();
-    try { await fetch(`/api/xlead?id=${encodeURIComponent(id)}`, { method: "DELETE" }); } catch (e) {}
+  window.dismissLead = async (id, ev) => {
+    if (ev) ev.stopPropagation();
+    MOCKLEADS = MOCKLEADS.filter(l => String(l.id) !== String(id));
+    XLEADS.leads = XLEADS.leads.filter(l => String(l.id) !== String(id));
+    renderActive();
+    if (MODE === "live") try { await fetch(`/api/xlead?id=${encodeURIComponent(id)}`, { method: "DELETE" }); } catch (e) {}
   };
+  // Raw feed → war-room notebook: every lead id gets one note, tagged to the player when
+  // he keys to the board (else the team, else general). Dedupe survives reloads.
+  const LEAD_NOTED_KEY = "dd:leadNoted";
+  async function noteNewLeads(leads) {
+    let seen; try { seen = new Set(JSON.parse(localStorage.getItem(LEAD_NOTED_KEY) || "[]")); } catch (e) { seen = new Set(); }
+    let dirty = false;
+    for (const l of leads || []) {
+      const id = String(l.id);
+      if (seen.has(id)) continue;
+      seen.add(id); dirty = true;
+      const ov = leadTargetPick(l), ab = leadTeamAbbr(l.team);
+      const comp = DATA.compByName.get(normName(l.player));
+      await postIntel({ kind: "note",
+        note: `⚡ X lead: ${l.player} → ${l.team}${l.pick ? ` at #${l.pick}` : ""} per @${l.src}`
+          + (ov == null ? " (no open pick resolves)" : "") + (l.text ? ` — ${l.text}` : ""),
+        player_name: comp ? comp.name : null,
+        team: !comp && ab ? ab : null }, true);
+    }
+    if (dirty) try { localStorage.setItem(LEAD_NOTED_KEY, JSON.stringify([...seen].slice(-800))); } catch (e) {}
+  }
   async function pollXLeads() {
     if (MODE !== "live" || XLEADS.enabled === false) return;   // server said disabled — stop asking
     try {
       const d = await fetch("/api/xlead", { cache: "no-store" }).then(r => r.json());
       XLEADS.enabled = !!d.enabled;
-      if (d.enabled) { XLEADS.leads = d.leads || []; renderLeadStrip(); }
+      if (d.enabled) { XLEADS.leads = d.leads || []; noteNewLeads(XLEADS.leads); renderActive(); }
     } catch (e) {}
   }
 
