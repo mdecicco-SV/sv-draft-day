@@ -1618,13 +1618,17 @@
   async function loadSlotHistory() {
     if (DATA.slotHistory.length) return;
     try {
-      const txt = await fetch(SLOT_HISTORY_URL, { cache:"force-cache" }).then(r=>r.text());
+      const [txt, hi] = await Promise.all([
+        fetch(SLOT_HISTORY_URL, { cache:"force-cache" }).then(r=>r.text()),
+        fetch("/data/hilevel.json").then(r=>r.ok?r.json():{}).catch(()=>({})),   // mlbid → highest pro level (build_hilevel.py)
+      ]);
+      DATA.hiLevel = hi || {};
       const lines = txt.split(/\r?\n/);
       const num = s => { const n=parseFloat((s||"").replace(/[",]/g,"")); return Number.isFinite(n)?n:null; };
       const rows=[];
       for (let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const f=parseCsvLine(lines[i]); if(f.length<23) continue;
         const bonus=num(f[20]), slot=num(f[21]);
-        rows.push({ year:+f[1], round:f[2], overall:+f[3], first:f[6], last:f[7], pos:f[8], group:posGroupOf(f[8]),
+        rows.push({ year:+f[1], round:f[2], overall:+f[3], mlbid:f[5]||"", first:f[6], last:f[7], pos:f[8], group:posGroupOf(f[8]),
           level:(f[13]==="HS"?"HS":(isJucoSchool(f[14])?"JuCo":"College")), school:f[14], team:f[17], bonus, slot,
           bats:f[9]||"", throws:f[10]||"", born:f[15]||"", ht:f[18]||"", wt:f[19]||"", full:f[16]||"",
           diff:(f[22]!==""&&f[22]!=null?num(f[22]):(bonus!=null&&slot!=null?bonus-slot:null)) });
@@ -1765,7 +1769,7 @@
   const isPitcher = (pos) => /(^|\b)(P|RHP|LHP|SP|RP)\b/i.test(pos || "");
   const COLOR_HEX = { green:"#1a7f37","light green":"#86c98b", yellow:"#e3b505", orange:"#e8820e", red:"#C8102E" };
 
-  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], fv:{}, fvMeta:{}, fvScale:80, rankTrend:{} };
+  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], hiLevel:{}, fv:{}, fvMeta:{}, fvScale:80, rankTrend:{} };
   let boardSelClients = new Set(); // empty = Big Board (show every pick's in-play cluster);
                                    // non-empty = focus these clients' intel across the board
   let playerMenuOpen = false;      // Players dropdown open state (survives board re-renders)
@@ -4509,6 +4513,9 @@
   research = RES_DEF();
   // optional display columns (persisted) — defaults stay Yr/Player/Pos/Pick/Team/Bonus/vs Slot
   const htIn = r => { const m = /^(\d+)-(\d+)/.exec(r.ht||""); return m ? (+m[1])*12 + (+m[2]) : null; };
+  // highest pro level reached (hilevel.json, keyed by mlbid) — rank drives the column sort
+  const HI_RANK = { MLB:6, AAA:5, AA:4, "A+":3, A:2, Rk:1 };
+  const hiLvlOf = r => DATA.hiLevel[r.mlbid] || null;
   const RES_XCOLS = [
     ["age",    "Age",    r => { const a = wizAgeOf(r); return a==null ? "—" : a.toFixed(1); }],
     ["cls",    "Class",  r => wizClsOf(r) || "—"],
@@ -4516,6 +4523,7 @@
     ["bt",     "B/T",    r => fmtBT(r)],
     ["htwt",   "Ht/Wt",  r => fmtHtWt(r)],
     ["slot",   "Slot $", r => r.slot!=null ? fmtM(r.slot) : "—"],
+    ["hilvl",  "Hi Level", r => hiLvlOf(r) || "—"],
   ];
   let resCols = new Set((()=>{ try { return JSON.parse(localStorage.getItem("dd:resCols")||"[]"); } catch(e){ return []; } })());
   window.toggleResCols = (e) => { if (e) e.stopPropagation(); resColsOpen = !resColsOpen; resPosOpen = false; renderResearch(); };
@@ -4613,6 +4621,7 @@
       : k==="bonus" ? (r.bonus!=null?r.bonus:-1)
       : k==="age" ? (wizAgeOf(r) ?? -1) : k==="cls" ? (wizClsOf(r)||"") : k==="school" ? (r.school||"").toLowerCase()
       : k==="bt" ? fmtBT(r) : k==="htwt" ? (htIn(r) ?? -1) : k==="slot" ? (r.slot!=null?r.slot:-1)
+      : k==="hilvl" ? (HI_RANK[hiLvlOf(r)] || -1)
       : (r.diff!=null?r.diff:-Infinity);
     return [...rows].sort((a,b)=>{ const x=val(a), y=val(b);
       return (x<y?-1:x>y?1:0)*dir || (b.year-a.year) || (a.overall-b.overall); });
