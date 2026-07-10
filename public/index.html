@@ -4481,6 +4481,9 @@
   // tracker signings. "Class" is an age-derived eligibility proxy (no class-standing
   // source in the tracker).
   const wizAgeOf = r => { const a = parseFloat(compAge(r.born, r.year)); return Number.isFinite(a) ? a : null; };
+  // display name for tracker rows — the CSV's fullName is the common name ("PJ Morlando"
+  // where first/last is the legal "Perry Morlando"), so prefer it
+  const wizName = r => r.full || `${r.first||""} ${r.last||""}`.trim();
   const wizClsOf = r => {
     if (r.level==="HS") return "Prep";
     const a = wizAgeOf(r); if (a==null) return null;
@@ -4576,13 +4579,13 @@
       normName(r.first+" "+r.last).includes(q) || (r.full && normName(r.full).includes(q))
     ).sort((a,b)=>(b.year-a.year)||(a.overall-b.overall)).slice(0,8);
     menu.innerHTML = resFindMatches.map((r,i) =>
-      `<button class="res-findopt" onclick="resHistPick(${i})">${r.first?r.first[0]+". ":""}${r.last}
+      `<button class="res-findopt" onclick="resHistPick(${i})">${wizName(r)}
         <span>'${String(r.year).slice(2)} · #${r.overall} · ${teamAbbrevOf(r.team)} · ${posDispB(r)}</span></button>`).join("");
   };
   window.resHistPick = (i) => {
     const r = resFindMatches[i]; if (!r) return;
     research = RES_DEF(); resShown = 50;
-    research.hist = { key:histKeyOf(r), name:(r.first?r.first[0]+". ":"")+r.last, year:r.year, overall:r.overall };
+    research.hist = { key:histKeyOf(r), name:wizName(r), year:r.year, overall:r.overall };
     research.lvl.add(r.level);
     const cls = wizClsOf(r); if (cls) research.cls.add(cls);
     rowPosTokens(r).forEach(t => research.pos.add(t));
@@ -4667,7 +4670,7 @@
     const hK = research.hist && research.hist.key;
     const tr = (r) => `<tr${hK && histKeyOf(r)===hK ? ' class="hl"' : ''}>
       <td>'${String(r.year).slice(2)}</td>
-      <td class="pl">${r.first?r.first[0]+". ":""}${r.last} ${lvlTag(r)}</td>
+      <td class="pl">${wizName(r)} ${lvlTag(r)}</td>
       <td style="color:var(--muted)">${posDispB(r)}</td>
       <td>#${r.overall}</td>
       <td style="color:var(--muted)">${teamAbbrevOf(r.team)}</td>
