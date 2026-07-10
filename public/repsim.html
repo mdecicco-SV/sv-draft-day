@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SV Draft Day — Reported-Pick Simulation</title>
+<link rel="icon" href="/favicon.svg">
+<style>
+  /* Visual rehearsal of the reported-media-pick ladder. Styles are lifted verbatim
+     from index.html so what you see here is what the war room sees on draft night. */
+  @font-face { font-family:'Satoshi'; src:url('/fonts/Satoshi-Regular.otf') format('opentype'); font-weight:400; font-display:swap; }
+  @font-face { font-family:'Satoshi'; src:url('/fonts/Satoshi-Medium.otf') format('opentype'); font-weight:500; font-display:swap; }
+  @font-face { font-family:'Satoshi'; src:url('/fonts/Satoshi-Bold.otf') format('opentype'); font-weight:700; font-display:swap; }
+  @font-face { font-family:'Satoshi'; src:url('/fonts/Satoshi-Black.otf') format('opentype'); font-weight:900; font-display:swap; }
+  :root { --red:#ff2a22; --ink:#141414; --muted:#6b6b6b; --line:#e3e3e3; --bg:#f4f3f1; --good:#1a7f37;
+          --amber:#e3b505; --amber-ink:#8a6d00; --amber-bg:#fff7e0; --amber-chip:#fff3cd; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 'Satoshi',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         color:var(--ink); background:var(--bg); -webkit-font-smoothing:antialiased; }
+
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:#fff; border-bottom:3px solid var(--red); }
+  header .title { font-weight:900; letter-spacing:.2px; font-size:17px; }
+  header .simtag { font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#fff; background:var(--ink); border-radius:5px; padding:3px 8px; }
+  .hdr-clock { margin-left:auto; display:flex; align-items:center; gap:7px; background:#fafafa; border:1px solid var(--line); border-radius:999px; padding:3px 11px; font-size:13px; white-space:nowrap; }
+  .hdr-clock .hc-lab { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .hdr-clock .hc-tm { font-weight:800; }
+  .hdr-clock .hc-cd { font-weight:900; font-variant-numeric:tabular-nums; }
+  .hdr-clock.held { background:var(--amber-bg); border-color:var(--amber); }
+  .hdr-clock .hc-held { display:none; font-size:9.5px; font-weight:900; letter-spacing:.5px; color:var(--amber-ink); background:var(--amber-chip); border:1px solid var(--amber); border-radius:4px; padding:1px 5px; }
+  .hdr-clock.held .hc-held { display:inline-block; }
+  .hdr-clock.held .hc-cd { color:var(--amber-ink); }
+
+  /* narration rail — the only element that isn't part of the real app */
+  #rail { display:flex; align-items:center; gap:12px; padding:9px 16px; background:var(--ink); color:#fff; font-size:13.5px; min-height:44px; }
+  #rail .st { flex:0 0 auto; font-size:10px; font-weight:900; letter-spacing:.8px; color:#e8c46a; text-transform:uppercase; min-width:118px; }
+  #rail .cap { flex:1; font-weight:500; }
+  #rail .cap b { font-weight:800; }
+  #rail button { flex:0 0 auto; font:inherit; font-size:12px; font-weight:800; color:#fff; background:none; border:1px solid #555; border-radius:7px; padding:4px 12px; cursor:pointer; }
+  #rail button:hover, #rail button:focus-visible { border-color:#fff; outline:none; }
+  #dots { display:flex; gap:5px; flex:0 0 auto; }
+  #dots i { width:7px; height:7px; border-radius:50%; background:#4a4a4a; }
+  #dots i.on { background:#e8c46a; }
+
+  /* lead strip — verbatim from index.html */
+  #leadStrip { display:none; flex-direction:column; gap:5px; padding:7px 16px; background:#fffaf0; border-bottom:1px solid #ecd9ac; }
+  .lead-chip { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; font-size:13px; color:var(--ink); }
+  .lead-chip .lc-flag { background:#e8920e; color:#fff; font-weight:900; font-size:10.5px; letter-spacing:.5px; padding:2.5px 7px; border-radius:5px; }
+  .lead-chip .lc-rk, .lead-chip .lc-pick { color:var(--muted); font-weight:700; font-size:12px; }
+  .lead-chip .lc-arrow { color:#c8871c; font-weight:900; }
+  .lead-chip .lc-src { color:var(--muted); font-size:11.5px; font-weight:600; margin-left:auto; }
+  .lead-chip .lc-x { border:0; background:none; color:var(--muted); font-size:13px; cursor:pointer; padding:1px 5px; }
+  .lead-chip .lc-val { border:1px solid var(--amber); background:var(--amber-bg); color:var(--amber-ink); font-weight:800; font-size:11.5px; border-radius:6px; padding:2px 9px; cursor:pointer; }
+  .lead-chip { animation:chipIn .45s ease-out; }
+  @keyframes chipIn { from { opacity:0; transform:translateY(-7px); } to { opacity:1; transform:none; } }
+
+  main { padding:16px; max-width:960px; margin:0 auto; }
+  h4 { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:18px 0 6px; }
+  .board-grid { display:flex; flex-wrap:wrap; gap:5px; }
+  .bcard { background:#fff; border:1px solid var(--line); border-radius:9px; padding:7px 8px; width:104px; min-height:104px; font-size:12px; display:flex; flex-direction:column; }
+  .bcard.oc { border-color:var(--red); box-shadow:0 0 0 2px #fdeef0; }
+  .bcard.rep { border-color:var(--amber); background:#fffdf4; }
+  .bcard.rep.soft { border-style:dashed; background:#fffefa; }
+  .bcard .bc-no { font-size:10px; font-weight:700; color:var(--muted); }
+  .bcard .bc-team { font-weight:900; font-size:14px; line-height:1.1; display:flex; align-items:center; gap:4px; }
+  .bcard .bc-slot { font-size:10px; color:var(--muted); }
+  .bcard .bc-player { font-weight:700; font-size:11px; flex:1; margin-top:3px; line-height:1.3; }
+  .bcard .bc-meta { font-size:9px; color:var(--muted); font-weight:600; line-height:1.3; margin-top:1px; }
+  .bc-rep { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.4px; color:var(--amber-ink); background:var(--amber-chip); border:1px solid var(--amber); border-radius:4px; padding:0 4px; vertical-align:1px; }
+  .bc-rep.soft { background:none; border-style:dashed; }
+  .tlogo { vertical-align:middle; }
+  .bcard.bc-land { animation:bcLand .7s ease-out; }
+  @keyframes bcLand { 0% { box-shadow:0 0 0 3px rgba(255,42,34,.7); transform:scale(1.06); } 100% { box-shadow:none; transform:none; } }
+
+  table.ba { border-collapse:collapse; width:100%; max-width:430px; background:#fff; border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+  table.ba th { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); }
+  table.ba td { padding:6px 10px; font-size:13px; border-bottom:1px solid #f0f0ee; }
+  table.ba tr:last-child td { border-bottom:0; }
+  table.ba td.rk { color:var(--muted); font-weight:700; font-size:12px; width:34px; font-variant-numeric:tabular-nums; }
+  table.ba td .sub { color:var(--muted); font-size:11px; font-weight:600; }
+  table.ba tr.gone { opacity:.32; }
+  table.ba tr.gone td:nth-child(2) { text-decoration:line-through; }
+  .svtag { font-size:10px; font-weight:800; color:#fff; background:var(--red); border-radius:4px; padding:1px 5px; }
+
+  /* notebook toast — the ⚡ validated record */
+  #note { position:fixed; left:16px; bottom:76px; z-index:70; background:#fff; border:1px solid var(--line); border-left:4px solid var(--amber); border-radius:9px;
+          box-shadow:0 8px 24px rgba(0,0,0,.14); padding:9px 13px; font-size:13px; max-width:340px; opacity:0; transform:translateY(8px); transition:opacity .3s, transform .3s; pointer-events:none; }
+  #note.show { opacity:1; transform:none; }
+  #note .nb { font-size:10px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); margin-bottom:2px; }
+
+  #ticker { position:fixed; left:0; right:0; bottom:0; z-index:80; transform:translateY(115%); transition:transform .38s cubic-bezier(.2,.7,.3,1); pointer-events:none; }
+  #ticker.show { transform:translateY(0); }
+  #ticker .tk-inner { margin:0 auto; max-width:920px; display:flex; align-items:center; gap:13px; background:#141414; color:#fff; border-top:3px solid var(--red); border-radius:12px 12px 0 0; padding:12px 20px; box-shadow:0 -8px 26px rgba(0,0,0,.28); font-size:16px; flex-wrap:wrap; }
+  #ticker .tk-badge { background:var(--red); color:#fff; font-weight:900; font-size:12px; letter-spacing:.5px; padding:4px 9px; border-radius:6px; font-variant-numeric:tabular-nums; }
+  #ticker .tk-team { font-weight:900; font-size:20px; }
+  #ticker .tk-sel { color:#9aa0a6; font-size:12px; text-transform:uppercase; letter-spacing:.6px; }
+  #ticker .tk-player { font-weight:800; }
+  #ticker .tk-meta { color:#aaa; font-size:13px; }
+
+  @media (max-width:640px) {
+    header { padding:8px 12px; gap:6px 8px; flex-wrap:wrap; }
+    header .title { font-size:15px; }
+    .hdr-clock { margin-left:0; font-size:12px; padding:2px 9px; }
+    #rail { flex-wrap:wrap; padding:9px 12px; }
+    #rail .st { min-width:0; }
+    #rail .cap { flex-basis:100%; order:3; }
+    #leadStrip { padding:6px 10px; }
+    .lead-chip .lc-src { flex-basis:100%; margin-left:0; }
+    main { padding:12px; }
+    .bcard { width:calc(33.33% - 4px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lead-chip, .bcard.bc-land { animation:none; }
+    #ticker, #note { transition:none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">SV DRAFT DAY</span>
+  <span class="simtag">Reported-pick simulation</span>
+  <span class="hdr-clock" id="clock">
+    <span class="hc-lab">On clock</span>
+    <span class="hc-tm" id="clkTeam">MIN</span>
+    <span class="hc-cd" id="clkCd">4:12</span>
+    <span class="hc-held">HELD</span>
+  </span>
+</header>
+
+<div id="rail">
+  <span class="st" id="railStep">Step 0 · Pre</span>
+  <span class="cap" id="railCap">Draft night, pick 3. Watch the ladder: media lead → soft REPORTED → auto-VALIDATED → official.</span>
+  <span id="dots"><i></i><i></i><i></i><i></i></span>
+  <button id="btnPlay" onclick="togglePlay()">⏸ Pause</button>
+  <button onclick="replay()">↺ Replay</button>
+</div>
+
+<div id="leadStrip"></div>
+
+<main>
+  <h4>Round 1</h4>
+  <div class="board-grid" id="board"></div>
+
+  <h4>Best available</h4>
+  <table class="ba">
+    <tr><th></th><th>Player</th><th>Pos · School</th></tr>
+    <tbody id="baBody"></tbody>
+  </table>
+</main>
+
+<div id="note"><div class="nb">Notebook</div><span id="noteTxt"></span></div>
+
+<div id="ticker"><div class="tk-inner">
+  <span class="tk-badge">PICK 3</span>
+  <span class="tk-team">Twins</span>
+  <span class="tk-sel">select</span>
+  <span class="tk-player">Vahn Lackey</span>
+  <span class="tk-meta">C · Georgia Tech</span>
+</div></div>
+
+<script>
+// Real 2026 slate: order.json top-6 + composite top board. Picks 1–2 already in;
+// MIN is on the clock at #3 and the media lead names Vahn Lackey (composite #2).
+const ID = { CHW:145, TB:139, MIN:142, SF:137, PIT:134, KC:118 };
+const logo = (ab,s=15) => `<img class="tlogo" src="https://www.mlbstatic.com/team-logos/${ID[ab]}.svg" alt="${ab}" width="${s}" height="${s}" onerror="this.style.display='none'">`;
+
+const PICKS = [
+  { ov:1, ab:"CHW", slot:"$11.35M", player:"Roch Cholowsky", meta:"SS · UCLA", drafted:true },
+  { ov:2, ab:"TB",  slot:"$10.51M", player:"Grady Emerson",  meta:"SS · Fort Worth Christian HS", drafted:true },
+  { ov:3, ab:"MIN", slot:"$9.74M" },
+  { ov:4, ab:"SF",  slot:"$8.99M" },
+  { ov:5, ab:"PIT", slot:"$8.34M" },
+  { ov:6, ab:"KC",  slot:"$7.75M" },
+];
+const BA = [
+  { rk:2, name:"Vahn Lackey",   sub:"C · Georgia Tech" },
+  { rk:4, name:"Jackson Flora", sub:"RHP · UC Santa Barbara" },
+  { rk:5, name:"Jacob Lombard", sub:"SS · Gulliver Prep HS" },
+  { rk:6, name:"Eric Booth",    sub:"OF · Oak Grove HS" },
+  { rk:7, name:"Drew Burress",  sub:"OF · Georgia Tech" },
+];
+
+// pick-3 state through the ladder: "" | "soft" | "validated" | "official"
+let p3 = "", leads = [], clockLeft = 252, clockHeld = false, nextClock = false;
+
+function chip(l) {
+  return `<div class="lead-chip" title="${l.text}">
+    <span class="lc-flag">⚡ REPORTED</span>
+    <b>Vahn Lackey</b><span class="lc-rk">#2</span>
+    <span class="lc-arrow">→</span> ${logo("MIN")}<b>MIN</b>
+    <span class="lc-pick">at #3</span>
+    <span class="lc-src">per @${l.src} · ${l.ago} · unofficial</span>
+    <span class="lc-val">✓ Validate</span>
+    <button class="lc-x">✕</button>
+  </div>`;
+}
+
+function render() {
+  const strip = document.getElementById("leadStrip");
+  strip.style.display = leads.length ? "flex" : "none";
+  strip.innerHTML = leads.map(chip).join("");
+
+  document.getElementById("board").innerHTML = PICKS.map(p => {
+    let cls = "bcard", body = "";
+    if (p.drafted) body = `<div class="bc-player">${p.player}</div><div class="bc-meta">${p.meta}</div>`;
+    else if (p.ov === 3 && p3 === "soft") {
+      cls += " rep soft";
+      body = `<div class="bc-player">Vahn Lackey <span class="bc-rep soft">REPORTED</span></div><div class="bc-meta">C · Georgia Tech · #2</div>`;
+    } else if (p.ov === 3 && p3 === "validated") {
+      cls += " rep";
+      body = `<div class="bc-player">Vahn Lackey <span class="bc-rep">VALIDATED</span></div><div class="bc-meta">C · Georgia Tech · #2</div>`;
+    } else if (p.ov === 3 && p3 === "official") {
+      cls += " bc-land";
+      body = `<div class="bc-player">Vahn Lackey</div><div class="bc-meta">C · Georgia Tech</div>`;
+    } else body = `<div class="bc-player" style="color:#c9c9c9">—</div>`;
+    const onClock = p3 === "official" ? p.ov === 4 : p.ov === 3;
+    if (onClock && !p.drafted && p3 !== "official" || (p3 === "official" && p.ov === 4)) cls += " oc";
+    return `<div class="${cls}"><div class="bc-no">#${p.ov} · RD 1</div>
+      <div class="bc-team">${logo(p.ab)}${p.ab}</div><div class="bc-slot">${p.slot} slot</div>${body}</div>`;
+  }).join("");
+
+  document.getElementById("baBody").innerHTML = BA.map(b => {
+    const gone = b.name === "Vahn Lackey" && (p3 === "validated" || p3 === "official");
+    return `<tr class="${gone ? "gone" : ""}"><td class="rk">#${b.rk}</td><td>${b.name}</td><td class="sub">${b.sub}</td></tr>`;
+  }).join("");
+
+  const ck = document.getElementById("clock");
+  ck.classList.toggle("held", clockHeld);
+  document.getElementById("clkTeam").innerHTML = p3 === "official" ? "SF" : "MIN";
+  const m = Math.floor(clockLeft / 60), s = String(clockLeft % 60).padStart(2, "0");
+  document.getElementById("clkCd").textContent = `${m}:${s}`;
+}
+
+function setRail(step, label, cap) {
+  document.getElementById("railStep").textContent = label;
+  document.getElementById("railCap").innerHTML = cap;
+  document.querySelectorAll("#dots i").forEach((d, i) => d.classList.toggle("on", i <= step));
+}
+function toast(txt) {
+  document.getElementById("noteTxt").innerHTML = txt;
+  const n = document.getElementById("note");
+  n.classList.add("show");
+  setTimeout(() => n.classList.remove("show"), 4200);
+}
+
+// ---- timeline ----
+const STEPS = [
+  { t: 0, run() {
+      p3 = ""; leads = []; clockHeld = false; clockLeft = 252;
+      document.getElementById("ticker").classList.remove("show");
+      setRail(0, "Step 0 · Pre", "Pick 3, <b>Twins</b> on the clock. The X capture script is watching the insider list.");
+  }},
+  { t: 3000, run() {
+      leads = [{ src:"JeffPassan", ago:"0m ago", text:"Hearing the Twins are locked in on Vahn Lackey at 3." }];
+      p3 = "soft";
+      setRail(1, "Step 1 · Lead", "One source → lead chip + a <b>dashed soft REPORTED</b> chip files on the board. Clock keeps running.");
+  }},
+  { t: 8000, run() {
+      leads = [{ src:"kileymcd", ago:"0m ago", text:"Lackey to Minnesota, per sources." },
+               { src:"JeffPassan", ago:"5m ago", text:"Hearing the Twins are locked in on Vahn Lackey at 3." }];
+      setRail(1, "Step 1 · Lead", "A <b>second source</b> lands (@kileymcd). The server groups leads by resolved team…");
+  }},
+  { t: 10500, run() {
+      leads = []; p3 = "validated"; clockHeld = true;
+      setRail(2, "Step 2 · Auto-validate", "2 sources → server <b>auto-validates</b>: solid VALIDATED chip, Lackey off Best Available, <b>clock HELD</b> awaiting MLB.");
+      toast("⚡ validated: Vahn Lackey → MIN at #3 <span class='sub'>· auto (@JeffPassan @kileymcd)</span>");
+  }},
+  { t: 16000, run() {
+      p3 = "official"; clockHeld = false; clockLeft = 240; nextClock = true;
+      document.getElementById("ticker").classList.add("show");
+      setRail(3, "Step 3 · Official", "MLB feed confirms — chip clears to a normal drafted card, ticker fires, clock restarts for <b>SF at #4</b>.");
+  }},
+  { t: 21500, run() { document.getElementById("ticker").classList.remove("show"); }},
+  { t: 24000, run() { replay(); }},
+];
+
+let timers = [], playing = true, startedAt = 0, pausedAt = 0;
+function schedule(from) {
+  timers.forEach(clearTimeout); timers = [];
+  STEPS.filter(s => s.t >= from).forEach(s =>
+    timers.push(setTimeout(() => { s.run(); render(); }, s.t - from)));
+  startedAt = Date.now() - from;
+}
+function replay() { pausedAt = 0; playing = true; document.getElementById("btnPlay").textContent = "⏸ Pause"; STEPS[0].run(); render(); schedule(0); }
+function togglePlay() {
+  playing = !playing;
+  document.getElementById("btnPlay").textContent = playing ? "⏸ Pause" : "▶ Play";
+  if (playing) schedule(pausedAt);
+  else { pausedAt = Date.now() - startedAt; timers.forEach(clearTimeout); timers = []; }
+}
+
+// header clock tick (1s) — frozen while held or paused
+setInterval(() => {
+  if (playing && !clockHeld && clockLeft > 0 && (p3 !== "" || nextClock)) { clockLeft--; render(); }
+}, 1000);
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+replay();
+if (reduced) togglePlay();   // reduced motion: land paused on step 0, advance with ▶ Play
+</script>
+</body>
+</html>
