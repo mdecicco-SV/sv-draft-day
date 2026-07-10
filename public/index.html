@@ -104,6 +104,23 @@
   #rksTip .rt-src { font-weight:700; color:#374151; }
   #rksTip .rt-asof { font-weight:600; color:#9aa0a6; font-size:10.5px; }
   #rksTip .rt-rk { font-weight:800; font-variant-numeric:tabular-nums; }
+  /* draft-history player card: any 2018–25 tracker name click-expands to his full research line */
+  .histlink { cursor:pointer; }
+  .histlink:hover { color:var(--red); text-decoration:underline; }
+  #histWrap { position:fixed; inset:0; z-index:500; display:none; background:rgba(15,18,24,.35); }
+  #histWrap.on { display:flex; align-items:center; justify-content:center; padding:18px; }
+  .hc { background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.25);
+    width:min(430px,100%); max-height:90vh; overflow-y:auto; padding:15px 18px 16px; }
+  .hc-head { display:flex; align-items:center; gap:8px; font-size:17px; font-weight:900; }
+  .hc-head .x { margin-left:auto; border:0; background:none; font-size:15px; cursor:pointer; color:var(--muted); }
+  .hc-sub { color:var(--muted); font-size:12.5px; font-weight:700; margin:3px 0 10px; }
+  .hc-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
+  .hc-kv { display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:13px; padding:4px 0; border-bottom:1px dashed var(--line); }
+  .hc-kv .k { color:var(--muted); font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+  .hc-kv .v { font-weight:800; font-variant-numeric:tabular-nums; text-align:right; }
+  .hc-links { display:flex; gap:8px; margin-top:13px; flex-wrap:wrap; }
+  .hc-links a { border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:12px; font-weight:800; color:var(--ink); text-decoration:none; }
+  .hc-links a:hover { border-color:var(--red); color:var(--red); }
   /* player-page source-ranks strip (the always-visible home for the per-publication ranks) */
   .pp-ranks { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding-top:9px; border-top:1px solid var(--line); }
   .pp-rk-t { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-right:2px; }
@@ -1425,6 +1442,8 @@
 <div id="orgTip"></div>
 <div id="ticker"></div>
 <div id="rksTip"></div>
+<!-- draft-history player card: opened by clicking any historical (2018–25 tracker) name -->
+<div id="histWrap" onclick="closeHistCard()"><div class="hc" onclick="event.stopPropagation()" id="histCard"></div></div>
 <div id="teamCard" class="tc-backdrop" onclick="if(event.target===this)closeTeamCard()"></div>
 <div id="fitCard" class="tc-backdrop" onclick="if(event.target===this)closeFitCard()"></div>
 
@@ -1643,11 +1662,13 @@
   async function loadSlotHistory() {
     if (DATA.slotHistory.length) return;
     try {
-      const [txt, hi] = await Promise.all([
+      const [txt, hi, svr] = await Promise.all([
         fetch(SLOT_HISTORY_URL, { cache:"force-cache" }).then(r=>r.text()),
         fetch("/data/hilevel.json").then(r=>r.ok?r.json():{}).catch(()=>({})),   // mlbid → highest pro level (build_hilevel.py)
+        fetch("/data/svregistry.json").then(r=>r.ok?r.json():null).catch(()=>null),   // SV registry names for the history-card badge (build_svregistry.js)
       ]);
       DATA.hiLevel = hi || {};
+      DATA.svReg = new Set(Object.keys((svr && svr.names) || {}));
       const lines = txt.split(/\r?\n/);
       const num = s => { const n=parseFloat((s||"").replace(/[",]/g,"")); return Number.isFinite(n)?n:null; };
       const rows=[];
@@ -1794,7 +1815,7 @@
   const isPitcher = (pos) => /(^|\b)(P|RHP|LHP|SP|RP)\b/i.test(pos || "");
   const COLOR_HEX = { green:"#1a7f37","light green":"#86c98b", yellow:"#e3b505", orange:"#e8820e", red:"#C8102E" };
 
-  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], hiLevel:{}, fv:{}, fvMeta:{}, fvScale:80, rankTrend:{} };
+  let DATA = { composite:[], compByName:new Map(), orgs:{}, intel:[], clients:new Set(), clientList:[], leverage:null, slotHistory:[], hiLevel:{}, svReg:new Set(), fv:{}, fvMeta:{}, fvScale:80, rankTrend:{} };
   let boardSelClients = new Set(); // empty = Big Board (show every pick's in-play cluster);
                                    // non-empty = focus these clients' intel across the board
   let playerMenuOpen = false;      // Players dropdown open state (survives board re-renders)
@@ -3376,7 +3397,7 @@
     const curated = DRAFT_COMPS[c.key];
     const rows = curated ? curated.map(n=>slotSign(n)).filter(Boolean) : autoComps(comp);
     const rowsH = rows.map(r=>`<tr>
-        <td class="cmp-nm">${r.full || (r.first+" "+r.last)}</td>
+        <td class="cmp-nm"><span${histAttr(r)}>${r.full || (r.first+" "+r.last)}</span></td>
         <td>${r.pos}</td><td>${r.bats&&r.throws?`${r.bats}/${r.throws}`:"—"}</td>
         <td>${fmtHtWt(r)}</td>
         <td>${compAge(r.born, r.year)??"—"}</td>
@@ -3482,7 +3503,7 @@
         const pop = presented.has(normName(r.full || (r.first+" "+r.last)));
         return `<div class="cmp-em-row ${pop?'cmp-pop':''}">
           <span class="rr-no">'${String(r.year).slice(2)}</span>
-          <span class="cmp-em-nm">${r.full||(r.first+" "+r.last)}${pop?' <span class="cmp-popbadge">★ presented</span>':''}</span>
+          <span class="cmp-em-nm"><span${histAttr(r)}>${r.full||(r.first+" "+r.last)}</span>${pop?' <span class="cmp-popbadge">★ presented</span>':''}</span>
           <span class="cmp-em-meta">${r.pos} · #${r.overall} · ${r.team}</span>
           <span class="cmp-em-val">${fmt$(r.bonus)}${r.diff!=null?` <span class="tg ${r.diff>0?'over':r.diff<0?'under':'fit'}">${r.diff>0?"+":""}${fmtM(r.diff)} vs slot</span>`:""}</span></div>`;
       }).join("") : `<div class="placeholder">No same-profile precedent in this context.</div>`;
@@ -4619,7 +4640,7 @@
       h += `<table class="tc-upc"><thead><tr><th>Yr</th><th>Player</th><th>Pos</th><th>Pick</th><th>Bonus</th><th>vs Slot</th></tr></thead><tbody>`;
       h += rdRows.map(r=>`<tr>
           <td>'${String(r.year).slice(2)}</td>
-          <td class="pl">${r.first?r.first[0]+". ":""}${r.last} ${lvlTag(r)}</td>
+          <td class="pl"><span${histAttr(r)}>${r.first?r.first[0]+". ":""}${r.last}</span> ${lvlTag(r)}</td>
           <td style="color:var(--muted)">${posDispB(r)}</td>
           <td>#${r.overall}</td>
           <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
@@ -4692,6 +4713,41 @@
               return v==="Over slot" ? r.diff>50000 : v==="Under slot" ? r.diff<-50000 : Math.abs(r.diff)<=50000; } },
   };
   // HS/College/JuCo badge for tracker rows
+  // ── draft-history player card: any tracker name (research rows, precedent panels,
+  // slot-history lists) click-expands his full research line in one popover. A pick is
+  // uniquely (year, overall), so "year|overall" keys the row — no name quoting needed.
+  const histAttr = (r) => ` class="histlink" onclick="histCard('${r.year}|${r.overall}',event)" title="expand draft-history card"`;
+  window.histCard = (key, ev) => {
+    if (ev) ev.stopPropagation();
+    const [y, o] = String(key).split("|").map(Number);
+    const r = DATA.slotHistory.find(x => x.year === y && x.overall === o);
+    if (!r) return;
+    const kv = (k, v) => `<div class="hc-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    const name = wizName(r), age = wizAgeOf(r), diff = r.diff;
+    const sv = DATA.svReg.has(normName(name)) || DATA.svReg.has(normName(r.first + " " + r.last));
+    const bref = `https://www.baseball-reference.com/search/search.fcgi?search=${encodeURIComponent(name)}`;
+    $("histCard").innerHTML = `
+      <div class="hc-head">${_esc(name)}${sv ? ' <span class="svtag">SV</span>' : ""} ${lvlTag(r)}
+        <button class="x" onclick="closeHistCard()" aria-label="close">✕</button></div>
+      <div class="hc-sub">${r.year} · ${roundLabel(r.round)} · #${r.overall} overall · ${teamAbbrevOf(r.team)}${NAME_FWD[r.team] ? ` (${_esc(r.team)})` : ""}</div>
+      <div class="hc-grid">
+        ${kv("Pos", posDispB(r))}${kv("Level", r.level)}
+        ${kv("Class", wizClsOf(r) || "—")}${kv("Age", age != null ? age.toFixed(1) : "—")}
+        ${kv("B/T", fmtBT(r))}${kv("Ht/Wt", fmtHtWt(r))}
+        ${kv("Bonus", r.bonus != null ? fmt$(r.bonus) : "unsigned")}${kv("Slot $", r.slot != null ? fmt$(r.slot) : "—")}
+        ${kv("vs Slot", diff != null ? `<span class="vsv ${diff > 50000 ? "over" : diff < -50000 ? "under" : "even"}">${diff > 0 ? "+" : ""}${fmtM(diff)}</span>` : "—")}
+        ${kv("Hi level", hiLvlOf(r) || "—")}
+      </div>
+      ${kv("School", _esc(r.school || "—"))}
+      <div class="hc-links">
+        ${r.mlbid ? `<a href="https://www.mlb.com/player/${r.mlbid}" target="_blank" rel="noopener">MLB profile ↗</a>
+        <a href="https://baseballsavant.mlb.com/savant-player/${r.mlbid}" target="_blank" rel="noopener">Savant ↗</a>` : ""}
+        <a href="${bref}" target="_blank" rel="noopener">B-Ref search ↗</a>
+      </div>`;
+    $("histWrap").classList.add("on");
+  };
+  window.closeHistCard = () => $("histWrap").classList.remove("on");
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHistCard(); });
   const lvlTag = (r) => r.level==="HS" ? '<span class="tg lvl-hs">HS</span>'
     : r.level==="JuCo" ? '<span class="tg lvl-jc">JUCO</span>' : '<span class="tg lvl-col">COL</span>';
 
@@ -4880,7 +4936,7 @@
     const hK = research.hist && research.hist.key;
     const tr = (r) => `<tr${hK && histKeyOf(r)===hK ? ' class="hl"' : ''}>
       <td>'${String(r.year).slice(2)}</td>
-      <td class="pl">${wizName(r)} ${lvlTag(r)}</td>
+      <td class="pl"><span${histAttr(r)}>${wizName(r)}</span> ${lvlTag(r)}</td>
       <td style="color:var(--muted)">${posDispB(r)}</td>
       <td>#${r.overall}</td>
       <td style="color:var(--muted)">${teamAbbrevOf(r.team)}</td>
