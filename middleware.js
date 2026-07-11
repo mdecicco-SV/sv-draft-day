@@ -41,6 +41,11 @@ export default async function middleware(request) {
 
   const url = new URL(request.url);
   if (OPEN_PATHS.test(url.pathname)) return; // PWA install assets stay open
+  // X-watcher userscript posts cross-origin with its own shared key (no login cookie);
+  // the function re-validates the same key. Wrong/absent key falls through to the gate.
+  if (url.pathname === "/api/xlead-ingest" && process.env.DD_INGEST_KEY
+      && request.headers.get("x-dd-key") === process.env.DD_INGEST_KEY) return;
+
   const expected = await sha(PASSWORD);
 
   if (request.method === "POST" && url.pathname === "/__login") {

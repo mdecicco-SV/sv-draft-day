@@ -76,6 +76,16 @@
     color:#8a6d00; background:#fff3cd; border:1px solid #e3b505; border-radius:5px; padding:1px 6px; white-space:nowrap; }
   .bc-lead.flash { animation:leadpulse 1.5s ease-in-out infinite; }
   @keyframes leadpulse { 0%,100% { box-shadow:0 0 0 0 rgba(227,181,5,.5); } 50% { box-shadow:0 0 0 5px rgba(227,181,5,0); } }
+  /* X fast lane: header paste button + watcher heartbeat dot */
+  .paste-wrap { position:relative; }
+  .xhb { width:7px; height:7px; border-radius:50%; background:#c9c9c9; display:inline-block; margin-left:5px; vertical-align:1px; }
+  .xhb.live { background:#1a7f37; box-shadow:0 0 0 2px rgba(26,127,55,.18); }
+  .paste-panel { display:none; position:absolute; top:calc(100% + 8px); right:0; z-index:120; background:#fff; border:1px solid var(--line);
+    border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.16); padding:10px; width:340px; }
+  .paste-panel.on { display:block; }
+  .paste-panel textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px; font:inherit; font-size:13px; resize:vertical; }
+  .paste-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:7px; }
+  body.mob .paste-panel { position:fixed; left:10px; right:10px; top:52px; width:auto; }
   .ctl { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 11px; font:inherit; font-weight:700; cursor:pointer; }
   .ctl.primary { background:var(--red); color:#fff; border-color:var(--red); }
   .bar select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:8px; }
@@ -1320,6 +1330,16 @@
   <!-- push bell: rendered only when /api/push says the server is configured AND the
        browser can push (on iOS that means the installed home-screen PWA) -->
   <span id="pushCtl"></span>
+  <!-- X fast lane: paste a tweet into the lead ladder + watcher heartbeat dot -->
+  <span class="paste-wrap" id="pasteWrap" style="display:none">
+    <button class="ctl" onclick="togglePaste(event)" title="Paste an insider tweet — parses into the lead ladder in seconds">⚡<span id="xhb" class="xhb" title="X watcher quiet"></span></button>
+    <div id="pastePanel" class="paste-panel" onclick="event.stopPropagation()">
+      <textarea id="pasteIn" rows="3" placeholder="Paste tweet text (include the x.com link if you have it)…"
+        onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')pasteSend()"></textarea>
+      <div class="paste-row"><span class="fc2-dim">→ same ladder as the bot: parse · soft-file · 2-source validate</span>
+        <button class="ctl primary" id="pasteGo" onclick="pasteSend()">Send</button></div>
+    </div>
+  </span>
   <span class="hdr-clock" id="hdrClock" style="display:none"></span>
   <!-- hidden pill: kept only as the load-error surface (pollLive unhides it) -->
   <span class="badge" id="yearBadge" style="display:none">2026 MLB DRAFT</span>
@@ -7217,11 +7237,46 @@
     }
     if (dirty) try { localStorage.setItem(LEAD_NOTED_KEY, JSON.stringify([...seen].slice(-800))); } catch (e) {}
   }
+  // ---------- X fast lane: paste a tweet straight into the ladder + watcher heartbeat ----------
+  // The paste POST rides the login cookie; /api/xlead-ingest drops it in the Redis inbox
+  // and clears the refresh lock, so the follow-up poll parses it within seconds.
+  window.togglePaste = (ev) => {
+    if (ev) ev.stopPropagation();
+    const p = $("pastePanel"); if (!p) return;
+    p.classList.toggle("on");
+    if (p.classList.contains("on")) $("pasteIn").focus();
+  };
+  document.addEventListener("click", (e) => {
+    const p = $("pastePanel");
+    if (p && p.classList.contains("on") && !(e.target.closest && e.target.closest(".paste-wrap"))) p.classList.remove("on");
+  });
+  window.pasteSend = async () => {
+    const el = $("pasteIn"), btn = $("pasteGo");
+    const text = (el.value || "").trim();
+    if (!text) return;
+    btn.disabled = true; btn.textContent = "…";
+    try {
+      const r = await fetch("/api/xlead-ingest", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paste: true, tweets: [{ text }] }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+      el.value = ""; $("pastePanel").classList.remove("on");
+      setTimeout(pollXLeads, 800);   // lock is cleared — this poll runs the parse
+    } catch (e) { alert("Paste failed: " + e.message); }
+    btn.disabled = false; btn.textContent = "Send";
+  };
+  function renderXhb(d) {
+    const w = $("pasteWrap"); if (w) w.style.display = d.enabled ? "" : "none";
+    const hb = $("xhb"); if (!hb) return;
+    const live = d.hbAt && (Date.now() - d.hbAt) < 90000;
+    hb.classList.toggle("live", !!live);
+    hb.title = live ? "X watcher live" : "X watcher quiet — paste lane + sheet bot only";
+  }
   async function pollXLeads() {
     if (MODE !== "live" || XLEADS.enabled === false) return;   // server said disabled — stop asking
     try {
       const d = await fetch("/api/xlead", { cache: "no-store" }).then(r => r.json());
       XLEADS.enabled = !!d.enabled;
+      renderXhb(d);
       // NO noteNewLeads here: api/xlead's refresh lock is the single writer for live
       // notebook records — client-side noting fires once per war-room device (N dupes)
       if (d.enabled) { XLEADS.leads = d.leads || []; renderActive(); }

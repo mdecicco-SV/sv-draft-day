@@ -33,6 +33,8 @@ const LEADS_KEY = "dd:xlead:leads";      // JSON array, newest first, capped
 const SEEN_KEY = "dd:xlead:seen";        // tweet urls already parsed (set)
 const LOCK_KEY = "dd:xlead:lock";        // TTL lock -> one refresh per window
 const DISMISS_KEY = "dd:xlead:dismissed";
+const INBOX_KEY = "dd:xlead:inbox";      // fast-lane rows from /api/xlead-ingest (watcher + paste)
+const HB_KEY = "dd:xlead:hb";            // watcher heartbeat (ms epoch) — surfaced to the console dot
 const MAX_LEADS = 60;
 const MAX_PARSE_PER_RUN = 40;            // cap Haiku batch size per refresh
 const PARSE_MODEL = process.env.XLEAD_MODEL || "claude-sonnet-5";   // Sonnet minimum for lead parsing (per Brandon, 7/10)
@@ -139,7 +141,20 @@ async function refresh(r, url) {
   const locked = await r.set(LOCK_KEY, "1", "PX", POLL_MS, "NX");
   if (!locked) return;
   try {
-    const tweets = await fetchSheetRows(url);
+    // fast-lane inbox (watcher userscript / console paste) merges AHEAD of the sheet —
+    // same URL dedupe below, so a tweet arriving via both paths parses once
+    let inbox = [];
+    try {
+      const raw = await r.lrange(INBOX_KEY, 0, -1);
+      if (raw.length) {
+        await r.del(INBOX_KEY);
+        inbox = raw.map((j) => { try { return JSON.parse(j); } catch (e) { return null; } }).filter(Boolean);
+      }
+    } catch (e) {}
+    let sheet = [];
+    try { sheet = await fetchSheetRows(url); }
+    catch (e) { if (!inbox.length) throw e; }   // sheet down: fast lane keeps flowing
+    const tweets = [...inbox, ...sheet];
     if (!tweets.length) return;
     // only parse tweets we haven't parsed before (dedupe by url via a Redis set)
     const fresh = [];
@@ -280,11 +295,11 @@ module.exports = async (req, res) => {
     if (!enabled) return res.status(200).json({ enabled: false, leads: [] });
 
     await refresh(r, url);
-    const [rawLeads, dismissed] = await Promise.all([r.get(LEADS_KEY), r.smembers(DISMISS_KEY)]);
+    const [rawLeads, dismissed, hb] = await Promise.all([r.get(LEADS_KEY), r.smembers(DISMISS_KEY), r.get(HB_KEY)]);
     const drop = new Set(dismissed || []);
     const leads = JSON.parse(rawLeads || "[]").filter((l) => !drop.has(l.id));
     res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json({ enabled: true, leads, fetchedAt: new Date().toISOString() });
+    return res.status(200).json({ enabled: true, leads, hbAt: hb ? +hb : null, fetchedAt: new Date().toISOString() });
   } catch (err) {
     return res.status(500).json({ error: String(err.message || err) });
   }
