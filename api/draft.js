@@ -33,6 +33,12 @@ function num(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Traded picks MLB's feed hasn't processed yet (Passan 7/10/26: Pirates sent
+// CB-A #34 to the White Sox). year -> overall -> teamId; pool math downstream
+// follows the override. Harmless no-op once statsapi catches up.
+const PICK_TEAM_OVERRIDES = { 2026: { 34: 145 } };
+const OVERRIDE_TEAM_NAMES = { 145: "Chicago White Sox" };
+
 // Flatten the rounds->picks tree into one ordered list of normalized picks.
 function normalize(raw, year) {
   const rounds = raw?.drafts?.rounds || [];
@@ -59,6 +65,13 @@ function normalize(raw, year) {
         isDrafted: !!p.isDrafted,
         isPass: !!p.isPass,
       });
+    }
+  }
+  for (const p of picks) {
+    const oid = (PICK_TEAM_OVERRIDES[Number(year)] || {})[p.overall];
+    if (oid && oid !== p.teamId) {
+      p.teamId = oid; p.team = abbr(oid);
+      p.teamName = OVERRIDE_TEAM_NAMES[oid] || p.teamName;
     }
   }
   picks.sort((a, b) => (a.overall ?? 1e9) - (b.overall ?? 1e9));

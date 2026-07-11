@@ -470,6 +470,12 @@ def build_leverage(years=(2021, 2022, 2023, 2024, 2025)):
     return out
 
 
+# Traded picks statsapi hasn't processed yet (Passan 7/10/26: PIT sent CB-A #34
+# to CHW). overall -> (teamId, teamName), applies to DRAFT_YEAR only; mirror of
+# PICK_TEAM_OVERRIDES in api/draft.js. Harmless no-op once the feed updates.
+PICK_TEAM_OVERRIDES = {34: (145, "Chicago White Sox")}
+
+
 def build_order():
     """Static draft-order skeleton (teams + slots, all undrafted) so the board
     renders on any server without the /api/draft serverless function."""
@@ -480,14 +486,18 @@ def build_order():
     for rd in raw.get("drafts", {}).get("rounds", []):
         for p in rd.get("picks", []):
             tid = (p.get("team") or {}).get("id")
+            ov = int(p["pickNumber"]) if p.get("pickNumber") else None
+            name = (p.get("team") or {}).get("name")
+            if ov in PICK_TEAM_OVERRIDES:
+                tid, name = PICK_TEAM_OVERRIDES[ov]
             sv = p.get("pickValue")
             picks.append({
-                "overall": int(p["pickNumber"]) if p.get("pickNumber") else None,
+                "overall": ov,
                 "round": str(p.get("pickRound")) if p.get("pickRound") is not None else None,
                 "roundPick": int(p["roundPickNumber"]) if p.get("roundPickNumber") else None,
                 "teamId": tid,
                 "team": ID_TO_ABBR.get(tid),
-                "teamName": (p.get("team") or {}).get("name"),
+                "teamName": name,
                 "slot": float(sv) if sv not in (None, "") else None,
                 "isDrafted": False, "isPass": False, "player": None, "playerId": None,
                 "school": None, "schoolClass": None, "bucket": "UNK", "bonus": None, "rank": None,
