@@ -1,7 +1,8 @@
 // Leading pick intel from the X insider list — surfaces "TEAM taking PLAYER"
 // reports ahead of the MLB feed flipping isDrafted.
 //
-//   GET    /api/xlead        -> { enabled, leads:[...], fetchedAt }
+//   GET    /api/xlead        -> { enabled, leads:[...], raw:[...], fetchedAt }
+//                               raw = last 100 captured tweets pre-parse, newest first
 //   DELETE /api/xlead?id=..  -> dismiss a bad lead (war-room manual)
 //
 // ARCHITECTURE. X polling is NOT done here — it's a Google Apps Script
@@ -35,6 +36,12 @@ const LOCK_KEY = "dd:xlead:lock";        // TTL lock -> one refresh per window
 const DISMISS_KEY = "dd:xlead:dismissed";
 const INBOX_KEY = "dd:xlead:inbox";      // fast-lane rows from /api/xlead-ingest (watcher + paste)
 const HB_KEY = "dd:xlead:hb";            // watcher heartbeat (ms epoch) — surfaced to the console dot
+const RAWLOG_KEY = "dd:xlead:rawlog";    // every captured tweet, pre-parse — feeds the notebook Raw tab
+const RAWLOG_MAX = 300;
+const RAW_RETURN = 100;                  // newest-first slice served on GET
+// A lead whose target isn't the on-the-clock pick is HELD (no chip) and re-attempted
+// every refresh window until its team comes up; stop retrying after this long.
+const HOLD_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_LEADS = 60;
 const MAX_PARSE_PER_RUN = 40;            // cap Haiku batch size per refresh
 const PARSE_MODEL = process.env.XLEAD_MODEL || "claude-sonnet-5";   // Sonnet minimum for lead parsing (per Brandon, 7/10)
@@ -153,9 +160,8 @@ async function refresh(r, url) {
     } catch (e) {}
     let sheet = [];
     try { sheet = await fetchSheetRows(url); }
-    catch (e) { if (!inbox.length) throw e; }   // sheet down: fast lane keeps flowing
+    catch (e) {}   // sheet down: fast lane + the retry ladder below keep running
     const tweets = [...inbox, ...sheet];
-    if (!tweets.length) return;
     // only parse tweets we haven't parsed before (dedupe by url via a Redis set)
     const fresh = [];
     for (const t of tweets) {
@@ -163,16 +169,24 @@ async function refresh(r, url) {
       if (await r.sismember(SEEN_KEY, t.url)) continue;
       fresh.push(t);
     }
-    if (!fresh.length) return;
-    await r.sadd(SEEN_KEY, ...fresh.map((t) => t.url));
-    await r.expire(SEEN_KEY, 60 * 60 * 24 * 3);
-    const parsed = await parseTweets(fresh);
-    if (!parsed.length) return;
-    const cur = JSON.parse((await r.get(LEADS_KEY)) || "[]");
-    const have = new Set(cur.map((l) => l.id));
-    const fresh2 = parsed.filter((l) => !have.has(l.id));
-    const merged = [...fresh2, ...cur].slice(0, MAX_LEADS);
-    await r.set(LEADS_KEY, JSON.stringify(merged));
+    let fresh2 = [];
+    if (fresh.length) {
+      await r.sadd(SEEN_KEY, ...fresh.map((t) => t.url));
+      await r.expire(SEEN_KEY, 60 * 60 * 24 * 3);
+      // raw log: every captured tweet lands here pre-parse, whatever the parse
+      // outcome — the notebook Raw tab streams this
+      await r.rpush(RAWLOG_KEY, ...fresh.map((t) => JSON.stringify({
+        src: t.src, text: (t.text || "").slice(0, 600), url: t.url, at: t.at })));
+      await r.ltrim(RAWLOG_KEY, -RAWLOG_MAX, -1);
+      await r.expire(RAWLOG_KEY, 60 * 60 * 24 * 3);
+      const parsed = await parseTweets(fresh);
+      if (parsed.length) {
+        const cur = JSON.parse((await r.get(LEADS_KEY)) || "[]");
+        const have = new Set(cur.map((l) => l.id));
+        fresh2 = parsed.filter((l) => !have.has(l.id));
+        await r.set(LEADS_KEY, JSON.stringify([...fresh2, ...cur].slice(0, MAX_LEADS)));
+      }
+    }
     // We hold the refresh lock — the single-writer seam for notebook records and
     // corroboration auto-validation (client-side would fire once per device).
     const state = JSON.parse((await r.get(`dd:cache:${YEAR}`)) || (await r.get(`dd:last:${YEAR}`)) || "null");
@@ -184,11 +198,28 @@ async function refresh(r, url) {
         agent: "x-feed",
       });
     }
-    await softFile(r, fresh2, state);
-    await autoValidate(r, merged, state);
+    // The ladder runs over ALL live leads EVERY window, not just fresh parses:
+    // chips gate to the on-the-clock pick, so a held early lead must re-attempt
+    // each refresh to fire the instant its team comes up.
+    const dismissed = new Set(await r.smembers(DISMISS_KEY));
+    const now = Date.now();
+    const active = JSON.parse((await r.get(LEADS_KEY)) || "[]").filter((l) =>
+      !dismissed.has(l.id) &&
+      (!l.at || isNaN(new Date(l.at)) || now - new Date(l.at).getTime() < HOLD_TTL_MS));
+    await softFile(r, active, state);
+    await autoValidate(r, active, state);
   } catch (err) {
     // swallow — next window retries; never surfaces to the war room
+    if (process.env.XLEAD_DEBUG) console.error("xlead refresh:", err);
   }
+}
+
+// The pick currently on the clock — first slot that's undrafted, not a pass, and
+// not hard-reported (a validated rec holds/advances the room past it, mirroring
+// index.html's onClockIndex). Chips only file here; everything else is held.
+function onClockPick(picks, recByOverall) {
+  const hard = (rec) => !!rec && rec.status !== "reported";
+  return (picks || []).find((p) => !p.isDrafted && !p.isPass && !hard(recByOverall.get(p.overall))) || null;
 }
 
 // STEP 1 of the reported ladder: a single credible source puts a soft REPORTED
@@ -200,10 +231,13 @@ async function softFile(r, leads, state) {
   const HASH = `dd:reported:${YEAR}`;
   const repRaw = await r.hgetall(HASH);
   const reportedOveralls = new Set(Object.keys(repRaw || {}).map(Number));
-  const reportedPlayers = new Set(Object.values(repRaw || {}).map((j) => {
-    try { return normName(JSON.parse(j).player); } catch (e) { return null; }
-  }).filter(Boolean));
+  const recByOverall = new Map();
+  for (const [ov, j] of Object.entries(repRaw || {})) {
+    try { recByOverall.set(+ov, JSON.parse(j)); } catch (e) {}
+  }
+  const reportedPlayers = new Set([...recByOverall.values()].map((rec) => normName(rec.player)).filter(Boolean));
   const drafted = new Set(state.picks.filter((p) => p.isDrafted && p.player).map((p) => normName(p.player)));
+  const otc = onClockPick(state.picks, recByOverall);
   for (const l of leads) {
     if (!l.player || !l.team || (l.confidence ?? 0) < 0.55) continue;
     const teamAb = resolveTeamAbbrev(l.team, state.pools);
@@ -216,6 +250,7 @@ async function softFile(r, leads, state) {
     }
     const overall = targetPick(state.picks, teamAb, l.pick, reportedOveralls);
     if (overall == null) continue;   // unresolvable right now — retry on a later refresh
+    if (!otc || overall !== otc.overall) continue;   // held — chips only the on-the-clock pick; retried every window
     const rec = { overall, player: l.player, team: teamAb, at: new Date().toISOString(),
                   status: "reported", srcs: [String(l.src).toLowerCase()] };
     await r.hset(HASH, String(overall), JSON.stringify(rec));
@@ -234,15 +269,16 @@ async function softFile(r, leads, state) {
 // files directly as validated — tracker flips, clock holds. Once per group ever.
 async function autoValidate(r, leads, state) {
   if (!state || !state.picks) return;
-  const groups = corroborated(leads, { minSources: AUTO_VALIDATE_SOURCES, pools: state.pools || [] });
+  const groups = corroborated(leads, { minSources: AUTO_VALIDATE_SOURCES, ttlMs: HOLD_TTL_MS, pools: state.pools || [] });
   if (!groups.length) return;
   const HASH = `dd:reported:${YEAR}`;
   const repRaw = await r.hgetall(HASH);
   const reportedOveralls = new Set(Object.keys(repRaw || {}).map(Number));
-  const recByPlayer = new Map();
-  for (const j of Object.values(repRaw || {})) {
-    try { const rec = JSON.parse(j); recByPlayer.set(normName(rec.player), rec); } catch (e) {}
+  const recByOverall = new Map(), recByPlayer = new Map();
+  for (const [ov, j] of Object.entries(repRaw || {})) {
+    try { const rec = JSON.parse(j); recByOverall.set(+ov, rec); recByPlayer.set(normName(rec.player), rec); } catch (e) {}
   }
+  const otc = onClockPick(state.picks, recByOverall);
   const draftedPlayers = new Set(state.picks.filter((p) => p.isDrafted && p.player).map((p) => normName(p.player)));
   for (const g of groups) {
     if (await r.sismember(AUTOVAL_KEY, g.key)) continue;
@@ -260,6 +296,7 @@ async function autoValidate(r, leads, state) {
       const teamAb = resolveTeamAbbrev(g.team, state.pools);
       const overall = targetPick(state.picks, teamAb, g.pick, reportedOveralls);
       if (overall == null) continue;   // unresolvable right now — retry on a later refresh
+      if (!otc || overall !== otc.overall) continue;   // held — chips only the on-the-clock pick; retried every window
       rec = { overall, player: g.player, team: teamAb, at: new Date().toISOString(),
               status: "validated", auto: true, srcs: g.srcs };
     }
@@ -295,11 +332,15 @@ module.exports = async (req, res) => {
     if (!enabled) return res.status(200).json({ enabled: false, leads: [] });
 
     await refresh(r, url);
-    const [rawLeads, dismissed, hb] = await Promise.all([r.get(LEADS_KEY), r.smembers(DISMISS_KEY), r.get(HB_KEY)]);
+    const [rawLeads, dismissed, hb, rawlog] = await Promise.all([
+      r.get(LEADS_KEY), r.smembers(DISMISS_KEY), r.get(HB_KEY), r.lrange(RAWLOG_KEY, -RAW_RETURN, -1)]);
     const drop = new Set(dismissed || []);
     const leads = JSON.parse(rawLeads || "[]").filter((l) => !drop.has(l.id));
+    // raw = every captured tweet pre-parse (notebook Raw tab), newest first
+    const raw = (rawlog || []).map((j) => { try { return JSON.parse(j); } catch (e) { return null; } })
+      .filter(Boolean).reverse();
     res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json({ enabled: true, leads, hbAt: hb ? +hb : null, fetchedAt: new Date().toISOString() });
+    return res.status(200).json({ enabled: true, leads, raw, hbAt: hb ? +hb : null, fetchedAt: new Date().toISOString() });
   } catch (err) {
     return res.status(500).json({ error: String(err.message || err) });
   }

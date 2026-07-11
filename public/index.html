@@ -4130,8 +4130,23 @@
     return `<span class="tag">general</span>`;
   }
   const nbNoteRow = (e, mini) => `<div class="nb-note"><div class="m"><span class="t">${nbTime(e.created_at)}</span>${nbTagChip(e)}${e.agent?`<span class="t">${_esc(e.agent)}</span>`:""}${mini?"":`<button class="del" onclick="nbDelete(${e.id})" aria-label="delete note">✕</button>`}</div><div class="txt">${_esc(e.note||"")}</div></div>`;
+  // Raw tab row: one captured tweet (watcher / sheet bot / paste), pre-parse.
+  // ↗ links out only when the url is a real status link (paste rows carry manual: ids).
+  const nbRawRow = (t) => {
+    const link = /^https?:\/\/(x|twitter)\.com\/[^/]+\/status\//.test(t.url||"");
+    return `<div class="nb-note"><div class="m"><span class="t">${nbTime(t.at)}</span><span class="tag">@${_esc(t.src||"?")}</span>${link?`<a class="del" style="text-decoration:none" href="${_esc(t.url)}" target="_blank" rel="noopener" aria-label="open tweet">↗</a>`:""}</div><div class="txt">${_esc(t.text||"")}</div></div>`;
+  };
   function renderNbFeed() {
     const el = $("nbFeed"); if (!el || !nbOpen) return;
+    if (nbFilter === "raw") {   // live X capture stream, not Supabase notes
+      if (MODE !== "live" || XLEADS.enabled === false) { el.innerHTML = `<div class="placeholder">Raw shows the live X feed only.</div>`; return; }
+      let tws = XLEADS.raw || [];
+      const rq = nbSearch.trim().toLowerCase();
+      if (rq) tws = tws.filter(t => [t.text, t.src].some(v => (v||"").toLowerCase().includes(rq)));
+      el.innerHTML = tws.length ? tws.map(nbRawRow).join("")
+        : `<div class="placeholder">${rq ? "No tweets match." : "No tweets captured yet."}</div>`;
+      return;
+    }
     let evs = nbNotes();   // API returns newest-first
     if (nbFilter==="players") evs = evs.filter(e=>e.player_name);
     else if (nbFilter==="teams") evs = evs.filter(e=>!e.player_name && e.team);
@@ -4176,7 +4191,7 @@
           ${chip(nbTag?.type==="team", "nbTogglePicker('team')", nbTag?.type==="team" ? nbTag.abbr+" ▾" : "Team ▾")}
           <button class="ctl primary" style="margin-left:auto;padding:4px 12px" onclick="nbSave()" ${nbBusy?"disabled":""}>Save</button>
         </div>${nbPickerHtml()}</div>
-      <div class="nb-filters">${["all","players","teams","general"].map(f=>chip(nbFilter===f, `nbSetFilter('${f}')`, f[0].toUpperCase()+f.slice(1))).join("")}
+      <div class="nb-filters">${["all","players","teams","general","raw"].map(f=>chip(nbFilter===f, `nbSetFilter('${f}')`, f[0].toUpperCase()+f.slice(1))).join("")}
         <button class="nb-chip ${nbShowX?"on":""}" onclick="nbToggleX()" title="${nbShowX?"Hide":"Show"} auto-filed X intel reports">⚡ X</button>
         <input class="nb-search" id="nbSearchIn" type="search" placeholder="Search notes…" autocomplete="off" oninput="nbSearchInput(this.value)"></div>
       <div id="nbFeed"></div>`;
@@ -7153,9 +7168,11 @@
   // ---------- X leading intel: insider-account pick reports ahead of the MLB feed ----------
   // Server (/api/xlead) reads the DraftDay_Feed sheet the capture Apps Script fills and
   // parses tweets; here we resolve each lead to its target pick and paint an amber chip ON
-  // that board tile (no banner), auto-clearing once the official feed confirms. Every new
-  // lead also lands in the war-room notebook. Silent unless the server is configured.
-  let XLEADS = { enabled: null, leads: [] };
+  // that board tile (no banner) — v2: ONLY when that pick is on the clock; earlier leads
+  // hold in the notebook Raw tab and fire when their team comes up. Auto-clears once the
+  // official feed confirms. Every new lead also lands in the war-room notebook. Silent
+  // unless the server is configured.
+  let XLEADS = { enabled: null, leads: [], raw: [] };   // raw = captured tweets pre-parse (notebook Raw tab)
   const leadEngaged = new Set();   // lead ids whose pick card was opened — chip stops flashing
   const MOCK_LEADS_DEMO = false;   // demo tweets in mock mode — off until the live capture wiring resumes
   let MOCKLEADS = [];   // synthetic leads seeded in mock mode so the tile chips can be rehearsed
@@ -7209,8 +7226,12 @@
     if (ABBR_TO_ID[up]) return up;
     const low = t.trim().toLowerCase();
     const pools = currentState ? currentState.pools : [];
+    // full-string containment first, nickname (last word) only as a fallback —
+    // else "Chicago White Sox" hits Boston via the shared "Sox"
     const hit = pools.find(p => { const n = (p.teamName || "").toLowerCase();
-      return n && (n.includes(low) || low.includes(n.split(" ").pop())); });
+      return n && (n.includes(low) || low.includes(n)); })
+      || pools.find(p => { const n = (p.teamName || "").toLowerCase();
+      return n && low.includes(n.split(" ").pop()); });
     return hit ? hit.team : null;
   }
   function activeLeads(base) {
@@ -7241,8 +7262,13 @@
     return null;   // no open pick — the lead lives only in the notebook
   }
   function leadsByPick() {
+    // v2 gating: a lead chips a tile only when it resolves to the on-the-clock pick.
+    // Earlier leads live in the Raw tab / notebook and fire (server ladder re-attempts
+    // every refresh window) the moment their team comes up.
     const m = new Map();
-    for (const l of modeLeads()) { const ov = leadTargetPick(l); if (ov != null && !m.has(ov)) m.set(ov, l); }
+    const otc = currentState && currentState.onClock;
+    if (!otc) return m;
+    for (const l of modeLeads()) { if (leadTargetPick(l) === otc.overall && !m.has(otc.overall)) m.set(otc.overall, l); }
     return m;
   }
   // Promote a lead into the reported-pick flow: leadTargetPick resolves the slot, then
@@ -7327,7 +7353,10 @@
       renderXhb(d);
       // NO noteNewLeads here: api/xlead's refresh lock is the single writer for live
       // notebook records — client-side noting fires once per war-room device (N dupes)
-      if (d.enabled) { XLEADS.leads = d.leads || []; renderActive(); }
+      if (d.enabled) {
+        XLEADS.leads = d.leads || []; XLEADS.raw = d.raw || []; renderActive();
+        if (nbOpen && nbFilter === "raw") renderNbFeed();   // Raw tab rides this poll, not the 12s intel poll
+      }
     } catch (e) {}
   }
 
