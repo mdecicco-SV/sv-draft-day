@@ -4604,9 +4604,9 @@
       ["On the clock", `<span id="tcClock">${fmtCountdown(clockMs)}</span>`, onClockHere?"time remaining":"time allotted"],
       ["Available pool", pool?(pool.hasEst?"~":"")+fmt$(pool.room):"—", "team bonus pool"],
       ["Pick slot value", pk.slot>0?fmtM(pk.slot):"—", "slot value"],
+      ["Their next pick", teamNext?`#${teamNext.overall}`:"—", teamNext?`R${teamNext.round} · slot ${teamNext.slot>0?fmtM(teamNext.slot):"—"}`:"none after this"],
       ["Team spent", pool?fmt$(pool.poolCharge)+(pool.hasEst?" est":""):"—", "spent to date"],
       ["Over / under", pool?fmtOU(pool.overUnder):"—", "vs slot"],
-      ["Their next pick", teamNext?`#${teamNext.overall}`:"—", teamNext?`R${teamNext.round} · slot ${teamNext.slot>0?fmtM(teamNext.slot):"—"}`:"none after this"],
     ];
     // stats + player selector share one horizontal band (card fills the screen, no scrolling)
     let selHtml;
