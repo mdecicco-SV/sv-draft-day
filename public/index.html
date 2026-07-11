@@ -621,7 +621,11 @@
   .tc-mat.tc-mat-full .cell b { font-size:15px; font-weight:900; line-height:1.1; }
   .tc-mat.tc-mat-full .cell .mrk { font-size:9px; font-weight:800; }
   .tc-mat.tc-mat-full .cell .mrk.rk-hi { color:#1a7f37; } .tc-mat.tc-mat-full .cell .mrk.rk-lo { color:#8f0e22; }
-  /* Prior Drafts panel: per-year dropdown headers, class summary always visible */
+  /* Prior Drafts (panel 1's "Past Drafts" flip): per-year dropdown headers, class summary always visible */
+  .tc-pdbtn { margin-left:auto; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.4px;
+    border:1px solid var(--line); background:#fff; border-radius:6px; padding:2px 8px; cursor:pointer; color:var(--muted); white-space:nowrap; }
+  .tc-pdbtn:hover, .tc-pdbtn.on { border-color:var(--red); color:var(--red); }
+  .tc-priorwrap { flex:1 1 auto; min-height:0; overflow-y:auto; }
   .tc-pdhead { display:flex; align-items:center; gap:8px 12px; padding:7px 8px; border-top:1px solid var(--line); font-size:11.5px; cursor:pointer; border-radius:6px; flex-wrap:wrap; }
   .tc-pdhead:hover, .tc-pdhead.open { background:#f7f8fa; }
   .tc-pdhead b { font-size:13px; font-weight:900; }
@@ -1882,6 +1886,7 @@
   let tcRepPanel = false, tcRepQ = "", tcRepLast = [];   // "Report pick" typeahead state (survives re-renders)
   let tcRepAdvance = null;     // overall # just reported FROM this card — one-shot auto-advance
   let tcScrollDraft = false;   // one-shot: center the open pick in The Draft flow on open/nav
+  let tcPriorView = false;     // panel 1 flipped to the org's Prior Drafts (Past Drafts button)
   // Research tab filters — initialized to RES_DEF() in the Research section below
   let research;
   // Mobile card modules: which are expanded (survives re-renders + pick nav; per-device).
@@ -2290,11 +2295,18 @@
   }
   function moneyCell(p) {            // "slot $X · $Y OVER $Z" — known money only; model estimates
     const eb = effectiveBonus(p);    // stay in the entry form as a suggestion, never shown as fact
-    const known = eb.bonus != null && (p.bonus != null || eb.src), parts = [];
+    // mock: the sim engine writes its guess into p.bonus — only a chip-entered value shows
+    const known = MODE==="mock" && p.isDrafted
+      ? !!p.bonusUser
+      : eb.bonus != null && (p.bonus != null || eb.src), parts = [];
     if (p.slot > 0) parts.push(`slot ${fmtM(p.slot)}`);
     if (known) parts.push(fmtM(eb.bonus));
     let s = parts.join(" · ");
-    if (known && p.slot > 0) s += " " + ouTag(eb.bonus - p.slot, eb.src && eb.src!=="confirmed" ? eb.src.slice(0,3).toUpperCase() : eb.est);
+    if (known && p.slot > 0) {
+      const est = MODE==="mock" && p.isDrafted ? !p.bonusV
+                : eb.src && eb.src!=="confirmed" ? eb.src.slice(0,3).toUpperCase() : eb.est;
+      s += " " + ouTag(eb.bonus - p.slot, est);
+    }
     return s;
   }
 
@@ -2317,10 +2329,15 @@
         if (p.isDrafted && isPool) { t.committedSlot += p.slot; t.picksMade += 1; }
         const eb = effectiveBonus(p);
         // only KNOWN money hits the books — official feed bonus or a war-room logged
-        // figure; the model's automatic guess never accrues against a team's pool
-        const known = eb.bonus != null && (p.bonus != null || eb.src);
+        // figure; the model's automatic guess never accrues against a team's pool.
+        // Mock: the sim engine writes its own guess into p.bonus, so a drafted pick
+        // books ONLY once a bonus is chip-entered (bonusUser); unchecked box = our
+        // estimate (flags the team's numbers with ~).
+        const known = MODE==="mock" && p.isDrafted
+          ? !!p.bonusUser
+          : eb.bonus != null && (p.bonus != null || eb.src);
         if (known) {
-          if (eb.est) t.hasEst = true;
+          if (MODE==="mock" && p.isDrafted ? !p.bonusV : eb.est) t.hasEst = true;
           if (isPool) { t.poolBonusPaid += eb.bonus; t.knownSlot += p.slot; }
           t.poolCharge += isPool ? eb.bonus : Math.max(0, eb.bonus - LATE_EXEMPT);
         }
@@ -3842,12 +3859,15 @@
       const onclick = p.isDrafted ? `openPlayer('${normName(p.player||"").replace(/'/g,"\\'")}')` : `expandPick(${p.overall})`;
       const expSel = cardPick===p.overall ? " expanded" : "";
       const land = landOverall===p.overall && Date.now()<landUntil ? " bc-land" : "";
-      const room = state.poolsMap && state.poolsMap[p.team] ? state.poolsMap[p.team].room : null;
+      const tPool = state.poolsMap ? state.poolsMap[p.team] : null;
+      const room = tPool ? tPool.room : null;
+      // ~ marks a pool that includes chip-entered ESTIMATES (unvalidated money)
+      const poolPre = tPool && tPool.hasEst ? "~" : "";
       html += `<div class="${cardCls.trim().replace(/\s+/g," ")}${expSel}${land}"${cardStyle} data-overall="${p.overall}" ${onclock?'id="ocRow"':""} onclick="${onclick}">
         <div class="bc-no">#${p.overall}</div>
         <div class="bc-team">${teamLogo(p.team,15)}${p.team||"—"}</div>
         <div class="bc-slot">${p.slot>0?fmt$(p.slot):"—"}</div>
-        ${room!=null?`<div class="bc-pool" title="team's remaining bonus pool">pool ${fmtM(room)}</div>`:""}
+        ${room!=null?`<div class="bc-pool" title="team's remaining bonus pool${poolPre?" — includes estimated bonuses":""}">pool ${poolPre}${fmtM(room)}</div>`:""}
         <div class="bc-player">${body}</div>${dotsHtml}</div>`;
     }
     html += `</div>`;
@@ -3973,7 +3993,7 @@
         <td>${t.picksMade}/${t.picksTotal}</td>
         <td>${money(t.pool)}</td>
         <td>${money(t.overage)}</td>
-        <td${roomBg(t.room ?? 0)}>${money(t.room)}</td>
+        <td${roomBg(t.room ?? 0)}>${t.hasEst?"~":""}${money(t.room)}</td>
         <td>${money(t.poolCharge)}${t.hasEst?' <span class="outag est atslot">est</span>':""}</td>
         <td>${hasKnown ? `<span class="outag ${ouCls}">${ou(t.overUnder)}</span>` : `<span class="sub">—</span>`}</td>
         <td>${t.poolCharge ? `<span class="outag ${pctCls}">${t.pctNum>=0?"+":""}${t.pctNum.toFixed(1)}%</span>` : `<span class="sub">—</span>`}</td>
@@ -4179,7 +4199,7 @@
     if (TV && !tvShowCard) return;   // TV screens stay a passive market map by default
     const st = currentState; if (!st) return;
     const pk = pickByOverall(st, ov); if (!pk || pk.isDrafted) return;
-    cardPick = ov; armed = null; tcMenuOpen = false; tcNavMenu = null; tcScrollDraft = true;
+    cardPick = ov; armed = null; tcMenuOpen = false; tcNavMenu = null; tcScrollDraft = true; tcPriorView = false;
     // Team-profile mode by default — but a board filtered to a player opens on him
     // (renderTeamCard drops the preselect if he's not on the card's roster).
     evalPlayer = null;
@@ -4193,7 +4213,7 @@
     document.body.style.overflow = "hidden";
   };
   window.closeTeamCard = () => {
-    cardPick = null; evalPlayer = null; armed = null; tcMenuOpen = false; tcNavMenu = null;
+    cardPick = null; evalPlayer = null; armed = null; tcMenuOpen = false; tcNavMenu = null; tcPriorView = false;
     if (tcAdvance) { clearTimeout(tcAdvance.timer); tcAdvance = null; }
     const bd = $("teamCard"); if (bd) { bd.classList.remove("on"); bd.innerHTML = ""; }
     document.body.style.overflow = "";
@@ -4258,7 +4278,7 @@
   function goCardPick(ov, keepNavMenu) {
     const st = currentState; if (!st) return;
     const pk = pickByOverall(st, ov); if (!pk || pk.isDrafted) return;
-    cardPick = ov; armed = null; tcMenuOpen = false; tcScrollDraft = true;
+    cardPick = ov; armed = null; tcMenuOpen = false; tcScrollDraft = true; tcPriorView = false;
     tcRepPanel = false; tcRepQ = "";
     tcNavMenu = keepNavMenu || null;
     if (tcAdvance) { clearTimeout(tcAdvance.timer); tcAdvance = null; }
@@ -4526,7 +4546,7 @@
     const clockMs = (onClockHere && timer.pick===pk.overall && timer.endsAt!=null) ? (timer.endsAt-Date.now()) : allotment(pk.round)*1000;
     const stats = [
       ["On the clock", `<span id="tcClock">${fmtCountdown(clockMs)}</span>`, onClockHere?"time remaining":"time allotted"],
-      ["Available pool", pool?fmt$(pool.room):"—", "team bonus pool"],
+      ["Available pool", pool?(pool.hasEst?"~":"")+fmt$(pool.room):"—", "team bonus pool"],
       ["Pick slot value", pk.slot>0?fmtM(pk.slot):"—", "slot value"],
       ["Team spent", pool?fmt$(pool.poolCharge)+(pool.hasEst?" est":""):"—", "spent to date"],
       ["Over / under", pool?fmtOU(pool.overUnder):"—", "vs slot"],
@@ -4561,7 +4581,6 @@
       ${mobPanels(`${renderTcTheDraft(state, team, pk, sel)}
       ${renderTcProfile(state, team, pk, o, sel)}
       ${renderTcPickHistory(pk)}
-      ${renderTcPriorDrafts(pk)}
       ${renderTcProspects(team, sel)}`)}
     </div>`;
 
@@ -4614,7 +4633,11 @@
   // player selected: a compact teamintel strip on top (color dot + latest report) and
   // his dots emphasized in the flow.
   function renderTcTheDraft(state, team, pk, sel) {
-    let h = `<div class="tc-panel" data-q="draft"><h4><span class="n">1</span> The Draft · ${team}</h4>`;
+    // "Past Drafts" flips this panel to the org's 2018-25 classes (was its own panel —
+    // a 5th box wrapped the 4-column grid onto a near-empty second row)
+    const pdBtn = `<button class="tc-pdbtn${tcPriorView?" on":""}" onclick="toggleTcPrior(event)">${tcPriorView?"‹ The Draft":"Past Drafts"}</button>`;
+    let h = `<div class="tc-panel" data-q="draft"><h4><span class="n">1</span> ${tcPriorView?`Prior Drafts · ${team}`:`The Draft · ${team}`}${pdBtn}</h4>`;
+    if (tcPriorView) return h + `<div class="tc-priorwrap">${tcPriorDraftsBody(pk)}</div></div>`;
     const picks = state.picks.filter(p => p.team === team);
     if (!picks.length) return h + `<div class="placeholder">No picks for ${team}.</div></div>`;
     if (sel) {
@@ -4795,10 +4818,11 @@
     return h + `</div>`;
   }
 
-  // Panel 4 — Prior Drafts: this org's full classes 2018–25, one dropdown per year.
-  // The same pattern read panel 1 gives for the current draft, as a lookback: each
-  // year header carries the class summary; expanding lists every pick with slot,
-  // bonus, and colored over/under. Names click through to the history card.
+  // Prior Drafts (behind panel 1's "Past Drafts" button): this org's full classes
+  // 2018–25, one dropdown per year. The same pattern read panel 1 gives for the
+  // current draft, as a lookback: each year header carries the class summary;
+  // expanding lists every pick with slot, bonus, and colored over/under. Names
+  // click through to the history card.
   const priorOpen = new Set();   // "TEAM|year" — session-only, survives live re-renders
   window.togglePriorYear = (team, yr, ev) => {
     if (ev) ev.stopPropagation();
@@ -4806,13 +4830,17 @@
     priorOpen.has(k) ? priorOpen.delete(k) : priorOpen.add(k);
     renderTeamCard(currentState);
   };
-  function renderTcPriorDrafts(pk) {
-    let h = `<div class="tc-panel" data-q="priordrafts"><h4><span class="n">4</span> Prior Drafts</h4>
-      <div class="tc-sub">this org's classes, 2018–25</div>`;
-    if (!DATA.slotHistory.length) return h + `<div class="placeholder">Loading historical signings…</div></div>`;
+  window.toggleTcPrior = (ev) => {
+    if (ev) ev.stopPropagation();
+    tcPriorView = !tcPriorView;
+    renderTeamCard(currentState);
+  };
+  function tcPriorDraftsBody(pk) {
+    let h = `<div class="tc-sub">this org's classes, 2018–25</div>`;
+    if (!DATA.slotHistory.length) return h + `<div class="placeholder">Loading historical signings…</div>`;
     const myName = pk.teamName || "";
     const rows = DATA.slotHistory.filter(r => (NAME_FWD[r.team]||r.team) === myName);
-    if (!rows.length) return h + `<div class="placeholder">No tracker history for ${_esc(myName || pk.team || "")}.</div></div>`;
+    if (!rows.length) return h + `<div class="placeholder">No tracker history for ${_esc(myName || pk.team || "")}.</div>`;
     const byYear = new Map();
     for (const r of rows) { if (!byYear.has(r.year)) byYear.set(r.year, []); byYear.get(r.year).push(r); }
     for (const yr of [...byYear.keys()].sort((a,b)=>b-a)) {
@@ -4838,7 +4866,7 @@
         h += `</tbody></table>`;
       }
     }
-    return h + `</div>`;
+    return h;
   }
 
   // Precedent-lens machinery (shared with the Research tab): combinable filters over
@@ -6104,7 +6132,7 @@
   // mode: prospects at the selected player's position group get the highlight — the
   // depth he'd be walking into with this org.
   function renderTcProspects(team, sel) {
-    let h = `<div class="tc-panel" data-q="prospects"><h4><span class="n">5</span> Top 30 Org Prospects</h4>`;
+    let h = `<div class="tc-panel" data-q="prospects"><h4><span class="n">4</span> Top 30 Org Prospects</h4>`;
     h += `<div class="tc-sub">Composite · MLB.com + Baseball America</div>`;
     const rows = (DATA.prospects && DATA.prospects[teamAlias(team)]) || [];
     if (!rows.length) return h + `<div class="placeholder">No prospect list for ${team}.</div></div>`;
