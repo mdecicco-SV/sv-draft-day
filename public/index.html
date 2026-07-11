@@ -1283,10 +1283,14 @@
     cursor:pointer; display:flex; align-items:center; justify-content:center; }
   #nbBtn.on { border-color:var(--red); box-shadow:0 6px 18px rgba(200,16,46,.25); }
   body.tv #nbBtn { display:none; }   /* TV screens stay a passive market map */
-  #nbPanel { display:none; position:fixed; right:18px; bottom:76px; z-index:98; width:380px; max-width:calc(100vw - 24px);
+  #nbPanel { display:none; position:fixed; right:18px; bottom:76px; z-index:98; width:var(--nbw, 460px); max-width:calc(100vw - 24px);
     max-height:min(560px, 72vh); flex-direction:column; overflow:hidden; background:#fff;
     border:1px solid var(--line); border-radius:14px; box-shadow:0 16px 44px rgba(0,0,0,.24); }
   #nbPanel.on { display:flex; }
+  /* left-edge drag handle: panel is right-anchored, so dragging left = wider (sticky per device) */
+  .nb-resize { position:absolute; left:0; top:0; bottom:0; width:7px; cursor:ew-resize; z-index:2; }
+  .nb-resize:hover, .nb-resize.drag { background:linear-gradient(to right, rgba(255,42,34,.28), transparent); }
+  body.mob .nb-resize { display:none; }
   .nb-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line);
     font-weight:800; font-size:13px; }
   .nb-head .x { margin-left:auto; border:0; background:none; font-size:16px; cursor:pointer; color:var(--muted); padding:2px 6px; }
@@ -4104,6 +4108,27 @@
   // ---------- WAR-ROOM NOTEBOOK — shared free-form notes (kind:"note" via /api/intel) ----------
   // The panel renders itself only (never from the global render loop), so the composer draft,
   // tag pick, and open pickers survive live ticks; loadIntel refreshes just the feed list.
+  // notebook width: drag the panel's left edge (right-anchored, so left = wider); sticky
+  (() => {
+    try { const w = +localStorage.getItem("dd:nbW"); if (w >= 340) document.documentElement.style.setProperty("--nbw", w + "px"); } catch (e) {}
+    let drag = null;
+    document.addEventListener("pointerdown", (e) => {
+      const h = e.target.closest && e.target.closest(".nb-resize"); if (!h) return;
+      drag = { x: e.clientX, w: $("nbPanel").getBoundingClientRect().width };
+      h.classList.add("drag"); e.preventDefault();
+    });
+    document.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const w = Math.max(340, Math.min(Math.min(920, innerWidth - 40), drag.w + (drag.x - e.clientX)));
+      document.documentElement.style.setProperty("--nbw", w + "px");
+    });
+    document.addEventListener("pointerup", () => {
+      if (!drag) return;
+      drag = null;
+      document.querySelectorAll(".nb-resize.drag").forEach(el => el.classList.remove("drag"));
+      try { localStorage.setItem("dd:nbW", parseInt(getComputedStyle($("nbPanel")).width) || 460); } catch (e) {}
+    });
+  })();
   let nbOpen=false, nbFilter="all", nbDraft="", nbTag=null, nbPicker=null, nbQ="", nbBusy=false, nbSearch="";
   // auto-filed X-lead reports (noteNewLeads) can crowd the feed — toggleable, sticky per device
   let nbShowX = (()=>{ try { return localStorage.getItem("dd:nbShowX") !== "0"; } catch (e) { return true; } })();
@@ -4181,7 +4206,7 @@
   function renderNotebook() {
     const el = $("nbPanel"); if (!el) return;
     const chip = (on, click, label) => `<button class="nb-chip ${on?"on":""}" onclick="${click}">${label}</button>`;
-    el.innerHTML = `<div class="nb-head">📝 War-room notebook<button class="x" onclick="toggleNotebook(false)" aria-label="close">✕</button></div>
+    el.innerHTML = `<div class="nb-resize" title="drag to resize"></div><div class="nb-head">📝 War-room notebook<button class="x" onclick="toggleNotebook(false)" aria-label="close">✕</button></div>
       <div class="nb-comp">
         <textarea id="nbText" rows="2" placeholder="Note for the room… (⌘/Ctrl-Enter saves)"
           oninput="nbInput(this.value)" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')nbSave()"></textarea>
