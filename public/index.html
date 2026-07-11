@@ -596,24 +596,7 @@
   .tc-vgrid .mv .ms { font-size:10px; color:var(--muted); margin-left:1px; }
   .tc-vgrid .mr { font-size:12.5px; color:var(--ink); }
   .tc-vgrid .mr .rk-hi { color:#1a7f37; } .tc-vgrid .mr .rk-lo { color:#c8102e; }
-  /* mix-metric spectrums: dot on a fixed pole-to-pole axis, gray tick = league avg */
-  .spec-row { display:flex; align-items:center; gap:10px; padding:6px 0 8px; border-top:1px solid var(--line); }
-  .spec-k { font-size:12px; color:var(--muted); font-weight:700; flex:0 0 122px; }
-  .spec-track { flex:1; display:flex; align-items:center; gap:7px; min-width:0; }
-  .spec-end { font-size:8px; font-weight:800; color:var(--muted); letter-spacing:.4px; }
-  .spec-line { position:relative; flex:1; height:22px; }
-  .spec-line::before { content:""; position:absolute; left:0; right:0; top:11px; height:2px; background:var(--line); border-radius:1px; }
-  .spec-avg { position:absolute; top:4px; width:2px; height:15px; background:#9aa2ab; transform:translateX(-50%); border-radius:1px; }
-  .spec-avg-lb { position:absolute; top:-6px; transform:translateX(-50%); font-size:7px; font-weight:800; color:#9aa2ab; letter-spacing:.3px; }
-  .spec-dot { position:absolute; top:7px; width:10px; height:10px; border-radius:50%; background:var(--ink); transform:translateX(-50%); box-shadow:0 0 0 2px #fff; }
-  .spec-dot.rk-hi { background:#1a7f37; } .spec-dot.rk-lo { background:#c8102e; }
-  .spec-pv { font-size:11.5px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; margin:0 2px; }
-  .spec-pv.dim { color:var(--muted); font-weight:700; }
-  .spec-rank { flex:0 0 auto; font-size:12.5px; font-weight:800; font-variant-numeric:tabular-nums; }
-  .spec-rank .rk-hi { color:#1a7f37; } .spec-rank .rk-lo { color:#c8102e; }
-  .spec-cap { font-size:9px; color:var(--muted); padding:4px 0 0; }
-  .spec-avg-demo { display:inline-block; width:2px; height:9px; background:#9aa2ab; vertical-align:-1px; margin-right:3px; }
-  /* 4-way HS/COL × Hitter/Pitcher heat matrix — a compact, right-anchored support graphic */
+  /* 4-way HS/COL × Hitter/Pitcher heat matrix — quadrant % + league rank per quadrant */
   .tc-mat { display:grid; grid-template-columns:auto 74px 74px; gap:3px; margin:7px 0 0 auto; width:max-content; }
   .tc-mat .hd { font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.3px;
     color:var(--muted); display:flex; align-items:center; justify-content:center; }
@@ -621,6 +604,21 @@
     border:1px solid var(--line); font-size:9.5px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--ink); }
   /* compound selector so it beats the later, equal-specificity .tc-sub rule (font + margin) */
   .tc-sub.tc-mat-cap { margin:6px 0 2px; font-size:6.5px; letter-spacing:.2px; text-align:right; }
+  /* full-width identity matrix: quadrant %, plus that quadrant's league rank of 30 */
+  .tc-mat.tc-mat-full { width:100%; grid-template-columns:34px 1fr 1fr; gap:5px; margin:10px 0 0; }
+  .tc-mat.tc-mat-full .hd { font-size:9px; }
+  .tc-mat.tc-mat-full .cell { height:46px; flex-direction:column; gap:1px; border-radius:7px; }
+  .tc-mat.tc-mat-full .cell b { font-size:15px; font-weight:900; line-height:1.1; }
+  .tc-mat.tc-mat-full .cell .mrk { font-size:9px; font-weight:800; }
+  .tc-mat.tc-mat-full .cell .mrk.rk-hi { color:#1a7f37; } .tc-mat.tc-mat-full .cell .mrk.rk-lo { color:#8f0e22; }
+  /* Prior Drafts panel: per-year dropdown headers, class summary always visible */
+  .tc-pdhead { display:flex; align-items:center; gap:8px 12px; padding:7px 8px; border-top:1px solid var(--line); font-size:11.5px; cursor:pointer; border-radius:6px; flex-wrap:wrap; }
+  .tc-pdhead:hover, .tc-pdhead.open { background:#f7f8fa; }
+  .tc-pdhead b { font-size:13px; font-weight:900; }
+  .tc-pdhead > span { color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums; }
+  .tc-pdhead .vsv { font-size:11px; }
+  .tc-pdhead .pd-c { margin-left:auto; color:var(--muted); }
+  .tc-pdtab { margin:2px 0 8px; }
   .tc-feed-row { display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-top:1px solid var(--line); }
   .tc-feed-row:first-child { border-top:none; }
   .tc-feed-meta { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); }
@@ -4543,6 +4541,7 @@
       ${mobPanels(`${renderTcTheDraft(state, team, pk, sel)}
       ${renderTcProfile(state, team, pk, o, sel)}
       ${renderTcPickHistory(pk)}
+      ${renderTcPriorDrafts(pk)}
       ${renderTcProspects(team, sel)}`)}
     </div>`;
 
@@ -4658,13 +4657,7 @@
     const hg = o.hgLevels, lgHG = DATA.lgHomegrown || {};
     const myName = pk.teamName || "";
     const lt = DATA.leagueTend, tt = lt ? lt.byTeam.get(myName) : null;
-    const rankTot = lt ? lt.byTeam.size : 30;
     // Clean 2-column read: Pct% · Rank ("14th of 30"); homegrown & debut are raw team rates.
-    // The two mix metrics render as spectrums below the grid (fixed pole-to-pole axis) — their
-    // value label + rank still flip to the side of the player under evaluation.
-    const selC = sel && sel.c ? sel.c.comp : null;
-    const hitSel = selC ? (selC.posGroup || posGroupOf(selC.pos)) !== "P" : false;
-    const colSel = selC ? !!(selC.level && selC.level !== "HS") : false;
     const mrow = (label, valPct, avgPct, rank, side) => {   // avgPct kept in the signature — callers still pass it
       const val = valPct==null ? (lt ? "—" : "…") : `${Math.round(valPct)}%${side?` <span class="ms">${side}</span>`:""}`;
       const rk = rank ? `<span class="${rkCls(rank)}">${ord(rank)} of 30</span>` : "";
@@ -4690,41 +4683,24 @@
       }
     }
     h += `<div class="tc-vgrid"><div class="mh"></div><div class="mh">Pct%</div><div class="mh">Rank</div>${rows}</div>`;
-    // Mix metrics as spectrums: fixed axis (hitters↔pitchers, College↔HS), team dot at its share,
-    // gray tick = league avg. Value label + rank keep the flip convention (side of the player under eval).
-    // Both poles carry their own %, so the dot needs no floating label; bold pole = the side
-    // being ranked (flips to the evaluated player's side), the other pole dims.
-    const spec = (label, nmL, nmR, pos, avg, rank, boldR) => {
-      const cl = x => Math.max(3, Math.min(97, x));
-      const vL = pos==null?null:`${Math.round(100-pos)}%`, vR = pos==null?null:`${Math.round(pos)}%`;
-      const inner = pos==null ? "" :
-        `<span class="spec-avg" style="left:${cl(avg)}%"></span><span class="spec-avg-lb" style="left:${cl(avg)}%">lg</span>
-         <span class="spec-dot ${rank?rkCls(rank):""}" style="left:${cl(pos)}%"></span>`;
-      return `<div class="spec-row"><div class="spec-k">${label}</div>
-        <div class="spec-track"><span class="spec-end">${nmL}</span>${vL?`<span class="spec-pv${boldR?" dim":""}">${vL}</span>`:""}<div class="spec-line">${inner}</div>${vR?`<span class="spec-pv${boldR?"":" dim"}">${vR}</span>`:""}<span class="spec-end">${nmR}</span></div>
-        <div class="spec-rank">${rank?`<span class="${rkCls(rank)}">${ord(rank)} of 30</span>`:pos==null?(lt?"—":"…"):""}</div></div>`;
-    };
-    if (tt) {
-      h += spec("Pitchers vs hitters", "HIT", "P", tt.pPct, lt.avgP,
-        hitSel ? (rankTot+1)-lt.rankP(myName) : lt.rankP(myName), !hitSel);
-      h += spec("HS vs College", "COL", "HS", tt.hsPct, lt.avgHS,
-        colSel ? (rankTot+1)-lt.rankHS(myName) : lt.rankHS(myName), !colSel);
-      h += `<div class="spec-cap"><span class="spec-avg-demo"></span> lg = league average · dot = this team, 2018–25 · rank follows the bold side</div>`;
-    } else {
-      h += spec("Pitchers vs hitters","HIT","P",null) + spec("HS vs College","COL","HS",null);
-    }
-    // 4-way distribution: HS/COL × Hitter/Pitcher across 2018-25, shaded by share of the team's picks
+    // 4-way identity matrix, full width: HS/COL × Hit/Pit shares of the team's 2018–25
+    // picks, each quadrant carrying its league rank — "where do they rank of 30 in
+    // drafting ____". Replaces the old spectrum rows; the grid owns the space.
     if (tt) {
       const total = tt.hsHit + tt.hsP + tt.colHit + tt.colP;
       if (total >= 10) {
-        const cells = [["hsHit"],["colHit"],["hsP"],["colP"]].map(([k]) => ({ k, share: tt[k]/total, n: tt[k] }));
+        const teams = [...lt.byTeam.values()];
+        const shareOf = (v, k) => { const n = v.hsHit + v.hsP + v.colHit + v.colP; return n ? v[k]/n : 0; };
+        const rankOf = (k) => 1 + teams.filter(x => shareOf(x, k) > shareOf(tt, k)).length;
+        const cells = ["hsHit","colHit","hsP","colP"].map(k => ({ k, share: tt[k]/total, n: tt[k], rank: rankOf(k) }));
         const maxShare = Math.max(...cells.map(c=>c.share)) || 1;
-        const cell = (c) => `<span class="cell" style="background:rgba(200,16,46,${(0.07+0.45*(c.share/maxShare)).toFixed(3)})" title="${c.n} of ${total}">${Math.round(100*c.share)}%</span>`;
-        h += `<div class="tc-mat">
+        const cell = (c) => `<span class="cell" style="background:rgba(200,16,46,${(0.07+0.45*(c.share/maxShare)).toFixed(3)})" title="${c.n} of ${total} picks">
+          <b>${Math.round(100*c.share)}%</b><span class="mrk ${rkCls(c.rank)}">${ord(c.rank)} of 30</span></span>`;
+        h += `<div class="tc-mat tc-mat-full">
           <span class="hd"></span><span class="hd">HS</span><span class="hd">COL</span>
           <span class="hd">Hit</span>${cell(cells[0])}${cell(cells[1])}
           <span class="hd">Pit</span>${cell(cells[2])}${cell(cells[3])}</div>`;
-        h += `<div class="tc-sub tc-mat-cap">N=${total}</div>`;
+        h += `<div class="tc-sub tc-mat-cap">share of the team's ${total} picks, 2018–25 · rank 1 of 30 = league's heaviest drafter of that type</div>`;
       }
     }
     // The org's actual picks in THIS round (special rounds fold forward), for the
@@ -4796,6 +4772,52 @@
       <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
       <td>${r.diff!=null?`<span class="vsv ${r.diff>50000?'over':r.diff<-50000?'under':'even'}">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`).join("");
     h += `</tbody></table>`;
+    return h + `</div>`;
+  }
+
+  // Panel 4 — Prior Drafts: this org's full classes 2018–25, one dropdown per year.
+  // The same pattern read panel 1 gives for the current draft, as a lookback: each
+  // year header carries the class summary; expanding lists every pick with slot,
+  // bonus, and colored over/under. Names click through to the history card.
+  const priorOpen = new Set();   // "TEAM|year" — session-only, survives live re-renders
+  window.togglePriorYear = (team, yr, ev) => {
+    if (ev) ev.stopPropagation();
+    const k = team + "|" + yr;
+    priorOpen.has(k) ? priorOpen.delete(k) : priorOpen.add(k);
+    renderTeamCard(currentState);
+  };
+  function renderTcPriorDrafts(pk) {
+    let h = `<div class="tc-panel" data-q="priordrafts"><h4><span class="n">4</span> Prior Drafts</h4>
+      <div class="tc-sub">this org's classes, 2018–25</div>`;
+    if (!DATA.slotHistory.length) return h + `<div class="placeholder">Loading historical signings…</div></div>`;
+    const myName = pk.teamName || "";
+    const rows = DATA.slotHistory.filter(r => (NAME_FWD[r.team]||r.team) === myName);
+    if (!rows.length) return h + `<div class="placeholder">No tracker history for ${_esc(myName || pk.team || "")}.</div></div>`;
+    const byYear = new Map();
+    for (const r of rows) { if (!byYear.has(r.year)) byYear.set(r.year, []); byYear.get(r.year).push(r); }
+    for (const yr of [...byYear.keys()].sort((a,b)=>b-a)) {
+      const ps = byYear.get(yr).sort((a,b)=>a.overall-b.overall);
+      const signed = ps.filter(r=>r.bonus!=null);
+      const spend = signed.reduce((s,r)=>s+r.bonus,0);
+      const ou = signed.reduce((s,r)=>s+(r.diff||0),0);
+      const hsPct = Math.round(100*ps.filter(r=>r.level==="HS").length/ps.length);
+      const open = priorOpen.has(pk.team + "|" + yr);
+      h += `<div class="tc-pdhead${open?' open':''}" onclick="togglePriorYear('${pk.team}',${yr},event)">
+        <b>'${String(yr).slice(2)}</b><span>${ps.length} picks</span><span>${fmtM(spend)} bonuses</span>
+        <span class="vsv ${ou>50000?'over':ou<-50000?'under':'even'}">${ou>0?"+":""}${fmtM(ou)} vs slot</span>
+        <span>${hsPct}% HS</span><span class="pd-c">${open?"▾":"▸"}</span></div>`;
+      if (open) {
+        h += `<table class="tc-upc tc-pdtab"><thead><tr><th>Pick</th><th>Player</th><th>Pos</th><th>Slot</th><th>Bonus</th><th>vs Slot</th></tr></thead><tbody>`;
+        h += ps.map(r=>`<tr>
+          <td>#${r.overall}</td>
+          <td class="pl"><span${histAttr(r)}>${r.first?r.first[0]+". ":""}${r.last}</span> ${lvlTag(r)}</td>
+          <td style="color:var(--muted)">${posDispB(r)}</td>
+          <td style="color:var(--muted)">${r.slot!=null?fmtM(r.slot):"—"}</td>
+          <td>${r.bonus!=null?fmtM(r.bonus):`<span style="color:var(--muted);font-weight:600;font-size:11px">unsigned</span>`}</td>
+          <td>${r.diff!=null?`<span class="vsv ${r.diff>50000?'over':r.diff<-50000?'under':'even'}">${r.diff>0?"+":""}${fmtM(r.diff)}</span>`:"—"}</td></tr>`).join("");
+        h += `</tbody></table>`;
+      }
+    }
     return h + `</div>`;
   }
 
@@ -6062,7 +6084,7 @@
   // mode: prospects at the selected player's position group get the highlight — the
   // depth he'd be walking into with this org.
   function renderTcProspects(team, sel) {
-    let h = `<div class="tc-panel" data-q="prospects"><h4><span class="n">4</span> Top 30 Org Prospects</h4>`;
+    let h = `<div class="tc-panel" data-q="prospects"><h4><span class="n">5</span> Top 30 Org Prospects</h4>`;
     h += `<div class="tc-sub">Composite · MLB.com + Baseball America</div>`;
     const rows = (DATA.prospects && DATA.prospects[teamAlias(team)]) || [];
     if (!rows.length) return h + `<div class="placeholder">No prospect list for ${team}.</div></div>`;
