@@ -739,6 +739,9 @@
   .posb { font-size:8px; font-weight:800; color:#9aa2ae; vertical-align:1px; }
   .res-out { min-width:0; }
   .res-slider { display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:7px; }
+  .res-typed { display:inline-flex; align-items:center; gap:3px; margin-left:auto; }
+  .res-typed input { width:72px; padding:2px 5px; border:1px solid var(--line); border-radius:6px; font:inherit; font-size:11px; font-variant-numeric:tabular-nums; text-align:right; }
+  .res-typed > span { color:var(--muted); font-weight:700; font-size:11px; }
   .res-agein { flex-basis:100%; display:flex; align-items:center; gap:6px; }
   .res-agein input { width:70px; padding:4px 6px; border:1px solid var(--line); border-radius:7px; font:inherit; font-size:13px; font-variant-numeric:tabular-nums; }
   .res-agein span { color:var(--muted); font-size:11px; font-weight:700; }
@@ -4867,6 +4870,12 @@
     const toks = POS_TREE[g], all = toks.every(t=>research.pos.has(t));
     toks.forEach(t => all ? research.pos.delete(t) : research.pos.add(t));
     resClearLens(); renderResearch(); };
+  // every non-pitcher token — the "Hitters · all" comprehensive select
+  const HIT_TOKS = Object.entries(POS_TREE).filter(([g])=>g!=="P").flatMap(([,toks])=>toks);
+  window.resPosHitters = (e) => { if (e) e.stopPropagation();
+    const all = HIT_TOKS.every(t=>research.pos.has(t));
+    HIT_TOKS.forEach(t => all ? research.pos.delete(t) : research.pos.add(t));
+    resClearLens(); renderResearch(); };
   // ── player search: find a drafted player in the tracker and load his profile as comp
   // lenses (level, class, positions, age ±1) — his row pops in the result set so you can
   // judge whether a current comp is "in bounds". Mutually exclusive with client preload.
@@ -4939,9 +4948,30 @@
       if (lo > hi) [lo, hi] = [hi, lo];
       upd[s.key+"Lo"] = lo; upd[s.key+"Hi"] = hi;
       $(id+"Lab").textContent = `${s.fmt(lo)} – ${s.fmt(hi)}`;
+      const lt = $(id+"LoT"), ht = $(id+"HiT");   // keep the typed twins in step
+      if (lt) lt.value = lo; if (ht) ht.value = hi;
     }
     Object.assign(research, upd, { client:null, hist:null });
     resShown = 50;
+    renderResearchResults();
+  };
+  // typed twin of a dual slider: same clamp/swap contract as resAgeType, results-only
+  // repaint mid-typing; commit (blur/Enter) snaps the fields and thumbs into place
+  window.resType = (key, commit) => {
+    const s = RES_SLIDERS.find(x => x.key === key); if (!s) return;
+    const id = resSlId(key);
+    const loEl = $(id+"LoT"), hiEl = $(id+"HiT"); if (!loEl || !hiEl) return;
+    const clamp = v => Math.min(s.max, Math.max(s.min, v));
+    let lo = parseFloat(loEl.value), hi = parseFloat(hiEl.value);
+    lo = Number.isFinite(lo) ? clamp(lo) : s.min;
+    hi = Number.isFinite(hi) ? clamp(hi) : s.max;
+    if (lo > hi) [lo, hi] = [hi, lo];
+    research[key+"Lo"] = lo; research[key+"Hi"] = hi;
+    research.client = null; research.hist = null;
+    resShown = 50;
+    $(id+"Lo").value = lo; $(id+"Hi").value = hi;   // move the slider thumbs
+    $(id+"Lab").textContent = `${s.fmt(lo)} – ${s.fmt(hi)}`;
+    if (commit === true) { loEl.value = lo; hiEl.value = hi; }
     renderResearchResults();
   };
   function researchRows() {
@@ -5022,13 +5052,15 @@
     const avgB = signed.length ? signed.reduce((s,r)=>s+r.bonus,0)/signed.length : null;
     const overN = signed.filter(r=>r.diff>0).length;
     const td = (v, cls) => `<td${cls?` class="${cls}"`:""}>${v}</td>`;
-    const body = rows.map(r=>`<tr>
+    const body = rows.map(r=>{
+      const vs = r.diff==null ? "" : r.diff>50000 ? " over" : r.diff<-50000 ? " under" : "";
+      return `<tr>
       ${td("'"+String(r.year).slice(2))}${td(`${_esc(wizName(r))} <span class="lv">${r.level}</span>`,"nm")}
       ${td(posDispB(r))}${td("#"+r.overall,"r")}${td(teamAbbrevOf(r.team))}
       ${td(r.bonus!=null?fmt$(r.bonus):"unsigned","r")}
-      ${td(r.diff!=null?(r.diff>0?"+":"")+fmtM(r.diff):"—","r")}
-      ${td(slotPctFmt(r)||"—","r")}
-      ${xcols.map(([k,,cell])=>td(_esc(String(cell(r))), k==="school"?"w":"")).join("")}</tr>`).join("");
+      ${td(r.diff!=null?(r.diff>0?"+":"")+fmtM(r.diff):"—","r"+vs)}
+      ${td(slotPctFmt(r)||"—","r"+vs)}
+      ${xcols.map(([k,,cell])=>td(_esc(String(cell(r))), k==="school"?"w":"")).join("")}</tr>`;}).join("");
     const w = window.open("", "_blank");
     if (!w) { alert("Popup blocked — allow popups for this site to export."); return; }
     // auto-fit: orientation + type scale follow the column count so every column stays
@@ -5048,6 +5080,8 @@
       td.r, th.r { text-align:right; font-variant-numeric:tabular-nums; }
       td.nm { font-weight:700; }
       td.w { white-space:normal; }
+      td.over { color:#1a7f37; font-weight:700; } td.under { color:#c8102e; font-weight:700; }
+      * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       td .lv { font-weight:600; color:#888; font-size:${Math.round(fs*0.82*10)/10}px; }
       tbody tr:nth-child(even) td { background:#fafafa; }
       tr { break-inside:avoid; }
@@ -5114,14 +5148,19 @@
       || RES_SLIDERS.some(s => research[s.key+"Lo"] > s.min || research[s.key+"Hi"] < s.max);
     const chipRow = (g, label, opts) => `<div class="tc-wizgrp"><span class="tc-wizlab">${label}</span>${opts.map(v=>
       `<button class="tc-chip${research[g].has(v)?' on':''}" onclick="resChip('${g}','${v}')">${v}</button>`).join("")}</div>`;
-    // position dropdown: group headers select their whole family; tokens toggle solo
-    const posMenu = !resPosOpen ? "" : `<div class="res-posmenu" onclick="event.stopPropagation()">${Object.entries(POS_TREE).map(([g,toks])=>{
+    // position dropdown: group headers select their whole family; tokens toggle solo;
+    // "Hitters · all" is the comprehensive non-pitcher select
+    const allHit = HIT_TOKS.every(t=>research.pos.has(t));
+    const hitOnly = allHit && research.pos.size === HIT_TOKS.length;
+    const posMenu = !resPosOpen ? "" : `<div class="res-posmenu" onclick="event.stopPropagation()">
+      <div class="res-posrow"><button class="tc-chip grp${allHit?' on':''}" onclick="resPosHitters(event)">Hitters · all (non-P)</button></div>
+      ${Object.entries(POS_TREE).map(([g,toks])=>{
       const all = toks.every(t=>research.pos.has(t));
       const grpBtn = toks.length>1 ? `<button class="tc-chip grp${all?' on':''}" onclick="resPosGrp('${g}',event)">${g} · all</button>` : "";
       return `<div class="res-posrow">${grpBtn}${toks.map(t=>
         `<button class="tc-chip${research.pos.has(t)?' on':''}" onclick="resPosTok('${t}',event)">${t}</button>`).join("")}</div>`;}).join("")}</div>`;
     const posBtn = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab">Position</span>
-      <button class="tc-chip${research.pos.size?' on':''}" onclick="toggleResPos(event)">${research.pos.size?[...research.pos].join(" "):"Any"} ▾</button>${posMenu}</div>`;
+      <button class="tc-chip${research.pos.size?' on':''}" onclick="toggleResPos(event)">${research.pos.size?(hitOnly?"Hitters":[...research.pos].join(" ")):"Any"} ▾</button>${posMenu}</div>`;
     // display-columns dropdown: same pattern as the position dropdown
     const colsMenu = !resColsOpen ? "" : `<div class="res-posmenu" onclick="event.stopPropagation()"><div class="res-posrow">${RES_XCOLS.map(([k,lbl])=>
       `<button class="tc-chip${resCols.has(k)?' on':''}" onclick="resColTok('${k}',event)">${lbl}</button>`).join("")}</div></div>`;
@@ -5148,8 +5187,8 @@
       <div class="res-fwrap${resFiltersOpen?"":" closed"}"><div class="tc-wiz">
       ${chipRow("round", "Round", RES_ROUNDS)}
       ${posBtn}
-      ${chipRow("cls", "Class", WIZ_GROUPS.cls.opts)}
       ${chipRow("lvl", "Level", WIZ_GROUPS.lvl.opts)}
+      ${chipRow("cls", "Class", WIZ_GROUPS.cls.opts)}
       ${chipRow("money", "Money", WIZ_GROUPS.money.opts)}
       ${chipRow("hl", "Hi level", ["MLB","AAA","AA","A+","A","Rk"])}
       ${chipRow("bats", "Bats", ["R","L","S"])}
@@ -5161,6 +5200,9 @@
           <span>to</span>
           <input type="number" id="${id}Hi" min="${s.min}" max="${s.max}" step="${s.step}" inputmode="decimal" value="${research[s.key+"Hi"].toFixed(1)}" oninput="resAgeType()" onchange="resAgeType(true)"></div></div>`;
         return `<div class="res-slider"><span class="tc-wizlab">${s.lab}</span><span class="res-slab" id="${id}Lab"></span>
+        <span class="res-typed"><input type="number" class="res-slin" id="${id}LoT" min="${s.min}" max="${s.max}" step="${s.step}" inputmode="numeric" value="${research[s.key+"Lo"]}" oninput="resType('${s.key}')" onchange="resType('${s.key}',true)">
+        <span>–</span>
+        <input type="number" class="res-slin" id="${id}HiT" min="${s.min}" max="${s.max}" step="${s.step}" inputmode="numeric" value="${research[s.key+"Hi"]}" oninput="resType('${s.key}')" onchange="resType('${s.key}',true)"></span>
         <div class="dual"><input type="range" id="${id}Lo" min="${s.min}" max="${s.max}" step="${s.step}" value="${research[s.key+"Lo"]}" oninput="resSlide()">
         <input type="range" id="${id}Hi" min="${s.min}" max="${s.max}" step="${s.step}" value="${research[s.key+"Hi"]}" oninput="resSlide()"></div></div>`; }).join("")}
       ${anyOn?`<div class="tc-wizgrp"><button class="tc-chip clear" onclick="resReset()">✕ clear all</button></div>`:""}
