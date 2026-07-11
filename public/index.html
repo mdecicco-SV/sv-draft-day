@@ -626,12 +626,14 @@
     border:1px solid var(--line); background:#fff; border-radius:6px; padding:2px 8px; cursor:pointer; color:var(--muted); white-space:nowrap; }
   .tc-pdbtn:hover, .tc-pdbtn.on { border-color:var(--red); color:var(--red); }
   .tc-priorwrap { flex:1 1 auto; min-height:0; overflow-y:auto; }
-  .tc-pdhead { display:flex; align-items:center; gap:8px 12px; padding:7px 8px; border-top:1px solid var(--line); font-size:11.5px; cursor:pointer; border-radius:6px; flex-wrap:wrap; }
+  /* inside the scroll wrap the sub can't keep its tuck-under-h4 negative margin — it clips */
+  .tc-priorwrap .tc-sub { margin-top:0; }
+  .tc-pdhead { display:flex; align-items:center; gap:8px 12px; padding:7px 26px 7px 8px; border-top:1px solid var(--line); font-size:11.5px; cursor:pointer; border-radius:6px; flex-wrap:wrap; position:relative; }
   .tc-pdhead:hover, .tc-pdhead.open { background:#f7f8fa; }
   .tc-pdhead b { font-size:13px; font-weight:900; }
   .tc-pdhead > span { color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums; }
   .tc-pdhead .vsv { font-size:11px; }
-  .tc-pdhead .pd-c { margin-left:auto; color:var(--muted); }
+  .tc-pdhead .pd-c { position:absolute; right:9px; top:50%; transform:translateY(-50%); color:var(--muted); }
   .tc-pdtab { margin:2px 0 8px; }
   .tc-feed-row { display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-top:1px solid var(--line); }
   .tc-feed-row:first-child { border-top:none; }
@@ -1692,6 +1694,20 @@
   // only the first bucket, which drops the OF half of two-way listings in position matching
   const posGroupsOf = (pos) => { const s=new Set();
     String(pos||"").toUpperCase().split(/[\/,+\s]+/).forEach(t=>{ const g=posGroupOf(t); if(g!=="?") s.add(g); }); return s; };
+  // Finer buckets for T30 depth comparison: middle infielders compare only with
+  // middle infielders (SS/2B), 1B with 1B, 3B with 3B; OF stays bunched, C its own.
+  // A generic "IF"/"INF"/"UTL" listing matches any infield bag.
+  const posFineOf = (t) => {
+    if (/RHP|LHP|SP|RP|^P$/.test(t)) return ["P"];
+    if (t==="C") return ["C"];
+    if (/SS|2B|MIF/.test(t)) return ["MIF"];
+    if (/1B/.test(t)) return ["1B"];
+    if (/3B/.test(t)) return ["3B"];
+    if (/OF|CF|LF|RF/.test(t)) return ["OF"];
+    if (/IF|INF|UTL|UT/.test(t)) return ["MIF","1B","3B"];
+    return []; };
+  const posFinesOf = (pos) => { const s=new Set();
+    String(pos||"").toUpperCase().split(/[\/,+\s]+/).forEach(t=>posFineOf(t).forEach(g=>s.add(g))); return s; };
   function parseCsvLine(line) {
     const out=[]; let cur="", q=false;
     for (let i=0;i<line.length;i++){ const ch=line[i];
@@ -4707,8 +4723,9 @@
       return `<div class="mk">${label}</div><div class="mv">${val}</div><div class="mr">${rk}</div>`;
     };
     let rows = "";
-    if (hg && hg.fortyManAll) {
-      rows += mrow("40-man homegrown", 100*hg.fortyMan/hg.fortyManAll, lgHG.avg40, hg.rank40);
+    if (hg && (hg.fortyManAll || hg.orgAll)) {
+      // either % row can survive a partial bake (a zeroed 40-man feed once blanked both)
+      if (hg.fortyManAll) rows += mrow("40-man homegrown", 100*hg.fortyMan/hg.fortyManAll, lgHG.avg40, hg.rank40);
       if (hg.orgAll) rows += mrow("Org homegrown", 100*hg.total/hg.orgAll, lgHG.avgOrg, hg.rankOrg);
     } else {
       rows += `<div class="mk">Homegrown</div><div class="mv">${o.homegrown!=null?o.homegrown:"—"}</div><div class="mr"></div>`;
@@ -6136,10 +6153,13 @@
     h += `<div class="tc-sub">Composite · MLB.com + Baseball America</div>`;
     const rows = (DATA.prospects && DATA.prospects[teamAlias(team)]) || [];
     if (!rows.length) return h + `<div class="placeholder">No prospect list for ${team}.</div></div>`;
-    const selGrp = sel && sel.c.comp ? (sel.c.comp.posGroup || posGroupOf(sel.c.comp.pos)) : null;
+    // fine position buckets: MIF vs MIF, 1B vs 1B, 3B vs 3B; OF/C/P each their own
+    const selGrps = sel && sel.c.comp ? posFinesOf(sel.c.comp.pos) : null;
+    const grpMatch = (pos) => { if (!selGrps || !selGrps.size) return false;
+      for (const g of posFinesOf(pos)) if (selGrps.has(g)) return true; return false; };
     h += `<table class="tc-upc"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Lvl</th><th>Age</th></tr></thead><tbody>`;
     h += rows.slice(0,30).map(r=>{
-      const match = selGrp && posGroupsOf(r.pos).has(selGrp);
+      const match = grpMatch(r.pos);
       const nm = tcInitialName(r.name);
       return `<tr${match?' style="background:#fff5f6"':''}>
         <td style="color:var(--muted)">${r.rank}</td>
@@ -6149,9 +6169,9 @@
         <td>${r.age!=null?r.age:"—"}</td></tr>`;
     }).join("");
     h += `</tbody></table>`;
-    if (selGrp) {
+    if (selGrps && selGrps.size) {
       const shown = rows.slice(0,30);
-      const nm = shown.filter(r=>posGroupsOf(r.pos).has(selGrp)).length;
+      const nm = shown.filter(r=>grpMatch(r.pos)).length;
       const last = tcInitialName(sel.c.name).split(" ").slice(-1)[0];
       h += `<div class="tc-feed-more">${nm} of ${shown.length} in ${last}'s position group</div>`;
     }
