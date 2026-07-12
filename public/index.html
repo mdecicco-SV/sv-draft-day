@@ -454,7 +454,7 @@
   .bc-bform label { display:inline-flex; align-items:center; gap:2px; color:var(--muted); cursor:pointer; white-space:nowrap; }
   .bc-bform button { font:inherit; border:1px solid var(--line); border-radius:4px; background:#fff; cursor:pointer; padding:1px 5px; }
   .bc-bform button.ok { background:#1a7f37; border-color:#1a7f37; color:#fff; }
-  .bc-qk { display:flex; gap:3px; width:100%; margin-top:2px; }
+  .bc-qk { display:flex; flex-wrap:wrap; gap:3px; width:100%; margin-top:2px; }
   .bc-qk button { color:var(--muted); padding:1px 5px; }
   .bc-qk button:hover { color:var(--ink); border-color:#9aa2ae; }
   .bcard .bc-ti { display:flex; flex-wrap:wrap; gap:2px; margin-top:auto; padding-top:3px; }
@@ -3794,9 +3794,9 @@
     }
   };
 
-  // manual overrides on the auto-fold of completed rounds (session-scoped)
-  const openRounds = new Set();
-  window.toggleRound = (r) => { openRounds.has(r) ? openRounds.delete(r) : openRounds.add(r); renderActive(); };
+  // rounds the user manually collapsed (session-scoped) — everything shows by default
+  const closedRounds = new Set();
+  window.toggleRound = (r) => { closedRounds.has(r) ? closedRounds.delete(r) : closedRounds.add(r); renderActive(); };
   function renderBoardGrid(state) {
     const svOnly = $("bSv").checked, teamSel = $("bTeam")?.value || "", focus = boardSelClients.size>0, CAP = 6;
     const leadMap = leadsByPick();   // active X leads resolved onto their target pick tiles
@@ -3806,9 +3806,9 @@
     // One continuous flex grid; full-width round headers force a wrap. Dedupe by
     // round so interleaved comp/PPI picks don't re-emit "Round 1" repeatedly.
     let html = `<div class="board-grid">`;
-    // Completed rounds fold to a one-line summary so the current round owns the
-    // screen — SV picks stay named on the folded header; tap re-expands. Not
-    // applied in SV-only mode (that view is already sparse).
+    // Every pick shows by default. A completed round folds to its one-line summary
+    // only when the user taps its header — SV picks stay named on the folded header;
+    // tap again re-expands. Not offered in SV-only / team view (already sparse).
     const rdStat = new Map();
     for (const p of state.picks) {
       let s = rdStat.get(p.round); if (!s) rdStat.set(p.round, s = { total:0, done:0, sv:[] });
@@ -3827,8 +3827,8 @@
       if (svOnly && !ours) continue;
       if (teamSel && p.team!==teamSel) continue;
       const rs = rdStat.get(p.round), complete = rs.done === rs.total;
-      // team view is sparse like SV-only — no round folding there either
-      const folded = complete && p.overall < activeStart && !svOnly && !teamSel && !openRounds.has(String(p.round));
+      // manual-only fold; activeStart still guards CBT stragglers sitting past the active round
+      const folded = complete && p.overall < activeStart && !svOnly && !teamSel && closedRounds.has(String(p.round));
       if (!seenRounds.has(p.round)) {
         seenRounds.add(p.round);
         const sum = complete ? ` <span class="rc-sum">· ✓ ${rs.total} picks${rs.sv.length?` · <b>SV:</b> ${rs.sv.map(_esc).join(", ")}`:""}</span><span class="rc-tgl">${folded?"▸ expand":"▾ collapse"}</span>` : "";
