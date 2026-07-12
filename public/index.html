@@ -346,6 +346,8 @@
   #viewPools td.pool-avcell { max-width:230px; }
   .pool-av { display:inline-flex; align-items:center; gap:3px; margin-right:6px; white-space:nowrap; cursor:pointer; }
   .pool-av:hover { text-decoration:underline; }
+  .pool-avmore { color:var(--red); font-weight:700; cursor:pointer; white-space:nowrap; }
+  .pool-avmore:hover { text-decoration:underline; }
   table.ba tr.sv { background:#fff5f6; }
   table.ba tbody tr.clickrow:hover { background:#f6f7f9; cursor:pointer; }
   table.ba td.ba-draft { width:1%; white-space:nowrap; }
@@ -1284,11 +1286,12 @@
      sideways-scrolling table — everything dropped here lives in the team card / player
      dossier. Desktop keeps the full tables (all rules key off body.mob). */
   /* pools: Team / Picks / Pool / Overage / Room (the priority columns, in Mike's order) —
-     Spent(6) / Over-Under(7) / %(8) go */
+     Pool Room(6) / Spent(7) / Over-Under(8) / %(9) / SV Available(10) go */
   body.mob #viewPools th:nth-child(6), body.mob #viewPools td:nth-child(6),
   body.mob #viewPools th:nth-child(7), body.mob #viewPools td:nth-child(7),
   body.mob #viewPools th:nth-child(8), body.mob #viewPools td:nth-child(8),
-  body.mob #viewPools th:nth-child(9), body.mob #viewPools td:nth-child(9) { display:none; }
+  body.mob #viewPools th:nth-child(9), body.mob #viewPools td:nth-child(9),
+  body.mob #viewPools th:nth-child(10), body.mob #viewPools td:nth-child(10) { display:none; }
   /* best available on mobile: full table, swipeable left-right (all hide-sm columns
      come back — School/Commit/Agency/Age/Ranks/Trend — reachable by horizontal scroll
      rather than being dropped). B/T stays always-visible. */
@@ -2412,6 +2415,7 @@
       t.remainingSlot = t.pool - t.committedSlot;        // slot $ of pool picks not yet made
       t.ceiling = t.pool * CUSHION;                      // hard spend wall
       t.room = t.ceiling - t.poolCharge;                 // AMMO: $ still spendable within the rules
+      t.roomPool = t.pool - t.poolCharge;                // room vs the pool alone (before the 5% cushion)
       t.overUnder = t.poolBonusPaid - t.knownSlot;       // over (+) / banked (−) vs slot, known-money picks only
       t.overage = t.ceiling - t.pool;                    // the 5% cushion in $ — max spend allowed over the pool
       t.pctNum = t.pool ? (t.poolCharge - t.pool)/t.pool*100 : 0;
@@ -4043,7 +4047,7 @@
   function jumpCurrent() { document.getElementById("ocRow")?.scrollIntoView({ block:"center", behavior:"smooth" }); }
   // ---------- VIEW: BONUS POOLS ----------
   const POOL_COLS = [["team","Team"],["picksMade","Picks"],["pool","Pool"],["overage","Overage"],["room","Room"],
-                     ["poolCharge","Spent"],["overUnder","Over/Under"],["pctNum","%"],["svAvail","SV Available"]];
+                     ["roomPool","Pool Room"],["poolCharge","Spent"],["overUnder","Over/Under"],["pctNum","%"],["svAvail","SV Available"]];
   let poolSort = { key:"room", dir:-1 };   // dir: -1 desc, 1 asc
   window.sortPools = (key) => {
     if (poolSort.key === key) poolSort.dir *= -1;
@@ -4060,6 +4064,9 @@
         && rem.some(p => tiInPlayAt(c.key, team, p.overall)))
       .sort((a,b)=> intelColorRank(a.key,team)-intelColorRank(b.key,team) || (a.comp?.rank ?? 1e9)-(b.comp?.rank ?? 1e9));
   }
+  // Teams whose SV Available cell shows the full list instead of the first five
+  const poolAvailOpen = new Set();
+  window.togglePoolAvail = (t, e) => { if (e) e.stopPropagation(); poolAvailOpen.has(t) ? poolAvailOpen.delete(t) : poolAvailOpen.add(t); renderPools(); };
   // Teams whose pool row is expanded to show their picks so far (session-scoped)
   const poolOpen = new Set();
   window.togglePoolTeam = (t) => { poolOpen.has(t) ? poolOpen.delete(t) : poolOpen.add(t); renderPools(); };
@@ -4133,13 +4140,14 @@
         <td>${money(t.pool)}</td>
         <td>${money(t.overage)}</td>
         <td${roomBg(t.room ?? 0)}>${t.hasEst?"~":""}${money(t.room)}</td>
+        <td>${t.hasEst?"~":""}${money(t.roomPool)}</td>
         <td>${money(t.poolCharge)}${t.hasEst?' <span class="outag est atslot">est</span>':""}</td>
         <td>${hasKnown ? `<span class="outag ${ouCls}">${ou(t.overUnder)}</span>` : `<span class="sub">—</span>`}</td>
         <td>${t.poolCharge ? `<span class="outag ${pctCls}">${t.pctNum>=0?"+":""}${t.pctNum.toFixed(1)}%</span>` : `<span class="sub">—</span>`}</td>
-        <td class="pool-avcell">${t._avail.length ? t._avail.slice(0,5).map(c =>
+        <td class="pool-avcell">${t._avail.length ? (avOpen => t._avail.slice(0, avOpen ? t._avail.length : 5).map(c =>
             `<span class="pool-av" onclick="event.stopPropagation();openPlayer('${c.key.replace(/'/g,"\\'")}')">${intelDot(c.key,t.team)}${_esc(String(c.name||"").trim().split(/\s+/).pop())}</span>`).join(" ")
-            + (t._avail.length>5 ? ` <span class="sub" title="${_esc(t._avail.slice(5).map(c=>c.name).join(", "))}">+${t._avail.length-5}</span>` : "")
-          : `<span class="sub">—</span>`}</td>
+            + (t._avail.length>5 ? ` <span class="pool-avmore" onclick="togglePoolAvail('${t.team}',event)">${avOpen?"− less":`+${t._avail.length-5}`}</span>` : "")
+          )(poolAvailOpen.has(t.team)) : `<span class="sub">—</span>`}</td>
       </tr>` + (open ? `<tr class="pool-x"><td colspan="${POOL_COLS.length}">${poolPicksHtml(t)}</td></tr>` : "");
     }).join("");
   }
