@@ -439,6 +439,7 @@
   .bcard.ent-hot { border-color:#e8820e; background:#fffaf5; }
   .bcard.ent-chalk { border-color:#1a7f37; background:#f5fff7; }
   .bcard .bc-no { font-size:10px; font-weight:700; color:var(--muted); }
+  .bcard .bc-no .bc-rd { font-weight:600; opacity:.75; }
   .bcard .bc-team { font-weight:900; font-size:14px; line-height:1.1; display:flex; align-items:center; gap:4px; }
   .bcard .bc-slot { font-size:10px; color:var(--muted); }
   .bcard .bc-pool { font-size:9px; color:var(--muted); font-weight:700; }
@@ -1575,7 +1576,11 @@
   const fmt$ = (n) => n == null ? "—" : "$" + Math.round(n).toLocaleString();
   // Ages always show one decimal (20.0, not 20) — everywhere an age renders.
   const fmtAge = (a) => { if (a==null||a==="") return ""; const n=parseFloat(a); return Number.isFinite(n) ? n.toFixed(1) : String(a); };
-  const fmtM = (n) => n == null ? "—" : "$" + (n/1e6).toFixed(2) + "M";
+  // compact money: $2.35M at a million and up, $400K below it (never "$0.40M")
+  const fmtM = (n) => n == null ? "—" : n < 0 ? "-" + fmtM(-n)
+    : n < 1000 ? "$" + Math.round(n)
+    : n < 999500 ? "$" + Math.round(n/1e3) + "K"
+    : "$" + (n/1e6).toFixed(2) + "M";
   const sgn$ = (n) => n == null ? "—" : (n<0?"−":"+") + "$" + Math.abs(n/1e6).toFixed(2) + "M";
   const DRAFT_START = Date.UTC(2026, 6, 11, 17, 0, 0);   // Sat Jul 11 2026, 1:00 PM ET (EDT = UTC-4)
   function fmtCountdown(ms) {
@@ -4000,7 +4005,7 @@
       // ~ marks a pool that includes chip-entered ESTIMATES (unvalidated money)
       const poolPre = tPool && tPool.hasEst ? "~" : "";
       html += `<div class="${cardCls.trim().replace(/\s+/g," ")}${expSel}${land}"${cardStyle} data-overall="${p.overall}" ${onclock?'id="ocRow"':""} onclick="${onclick}">
-        <div class="bc-no">#${p.overall}</div>
+        <div class="bc-no">#${p.overall} <span class="bc-rd">${/^\d+$/.test(String(p.round))?"Rd "+p.round:_esc(String(p.round))}</span></div>
         <div class="bc-team">${teamLogo(p.team,15)}${p.team||"—"}</div>
         <div class="bc-slot">${p.slot>0?fmt$(p.slot):"—"}</div>
         ${room!=null?`<div class="bc-pool" title="team's remaining bonus pool${poolPre?" — includes estimated bonuses":""}">pool ${poolPre}${fmtM(room)}</div>`:""}
@@ -4041,16 +4046,16 @@
         : (inCard ? `goCardPick(${p.overall})` : `expandPick(${p.overall})`);
       // Drafted rows show known money only (official > confirmed > reported/estimated log) —
       // model estimates stay off the feed; they surface as the suggestion in the entry form.
-      let val = p.slot>0?fmtM(p.slot):"—";
+      let val = p.slot>0?fmtM(p.slot):"—", vTtl = p.slot>0?`slot ${fmt$(p.slot)}`:"";
       if (p.isDrafted) {
         const eb = effectiveBonus(p);
         const shown = MODE==="mock" ? !!p.bonusUser : (eb.bonus!=null && (p.bonus!=null || eb.src));
-        if (shown) val = `${fmtM(eb.bonus)}${eb.src?` <span class="fr-src">${eb.src==="confirmed"?"✓":eb.src.slice(0,3)}</span>`:""}`;
+        if (shown) { val = `${fmtM(eb.bonus)}${eb.src?` <span class="fr-src">${eb.src==="confirmed"?"✓":eb.src.slice(0,3)}</span>`:""}`; vTtl = `bonus ${fmt$(eb.bonus)}`; }
       }
       rows += `<div class="${cls}" onclick="${onclick}">
         <span class="fr-no">#${p.overall}</span><span class="fr-tm">${teamLogo(p.team,16)}${p.team||"—"}</span>
         <div class="fr-body"><div class="fr-who">${who}${ours?' <span class="svtag">SV</span>':""}</div>${sub?`<div class="fr-sub">${sub}</div>`:""}</div>
-        <span class="fr-val">${val}</span></div>`;
+        <span class="fr-val"${vTtl?` title="${vTtl}"`:""}>${val}</span></div>`;
     }
     const jump = inCard ? "" : `<button class="feed-jump" title="re-pin the feed to the pick on the clock" onclick="feedJump(event)">⏱ current</button>`;
     return `<div class="feed-hd"><span class="live"></span>Live Pick Feed${jump}</div><div class="feed-scroll">${rows}</div>`;
