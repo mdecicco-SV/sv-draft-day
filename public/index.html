@@ -348,6 +348,7 @@
   table.ba .pool-picks td { border-bottom:0; border-top:1px solid var(--line); padding:3px 14px 3px 0; font-size:var(--fs-4); }
   .pool-x .pool-tc { font-size:11px; color:var(--muted); margin:2px 0 4px; }
   .pool-x .pool-tc a { color:var(--red); cursor:pointer; text-decoration:none; font-weight:700; }
+  .tc-stat .tc-posv { font-size:12px; font-weight:800; letter-spacing:.2px; }
   /* SV Available column: dot + last name per still-gettable client, click-through to dossier */
   #viewPools td.pool-avcell { max-width:230px; }
   .pool-av { display:inline-flex; align-items:center; gap:3px; margin-right:6px; white-space:nowrap; cursor:pointer; }
@@ -1886,7 +1887,7 @@
     const raw = String(p.pos || (comp && comp.pos) || "").toUpperCase();
     if (!raw) return "";
     const m = raw.match(/[LR]HP/); if (m) return m[0];
-    if (isPitcher(raw)) return comp && comp.throws ? (comp.throws==="L" ? "LHP" : "RHP") : raw;
+    if (isPitcher(raw)) { const t = (comp && comp.throws) || p.throws; return t ? (t==="L" ? "LHP" : "RHP") : raw; }
     const b = comp && comp.bats ? String(comp.bats).toUpperCase().replace("B","S") : "";
     return raw + (b ? ` <span class="posb">${b}</span>` : "");
   }
@@ -4260,7 +4261,21 @@
   // and the over/under. Rows click through to the player dossier.
   function poolPicksHtml(t) {
     const made = currentState.picks.filter(p => p.team===t.team && (p.isDrafted || p.reported)).sort((a,b)=>a.overall-b.overall);
-    const card = `<div class="pool-tc">${_esc(t.teamName||t.team)} · <a onclick="event.stopPropagation();openTeam('${t.team}')">full team card →</a></div>`;
+    const tly = teamPosTally(currentState, t.team);
+    // HS/College split: feed bucket first (authoritative for official picks), composite
+    // level as the fallback for reported-but-unofficial names the feed hasn't stamped yet
+    const lvl = new Map();
+    for (const p of made) {
+      const nm = p.isDrafted ? p.player : p.reported.player;
+      const comp = DATA.compByName.get(normName(nm||""));
+      const b = p.bucket && p.bucket!=="UNK" ? p.bucket
+        : comp ? (comp.level==="HS"?"HS":comp.level==="JUCO"?"JUCO":"4YR") : "UNK";
+      const label = b==="HS" ? "HS" : b==="JUCO" ? "JuCo" : b==="4YR" ? "College" : b==="OTHER" ? "Other" : "?";
+      lvl.set(label, (lvl.get(label)||0)+1);
+    }
+    const lvlStr = ["College","HS","JuCo","Other","?"].filter(k=>lvl.get(k))
+      .map(k=>`<b>${k}</b>&hairsp;${lvl.get(k)}`).join(" · ");
+    const card = `<div class="pool-tc">${_esc(t.teamName||t.team)}${tly.length?` · positions: ${tly.map(([k,n])=>`<b>${k}</b>&hairsp;${n}`).join(" · ")}`:""}${lvlStr?` · ${lvlStr}`:""} · <a onclick="event.stopPropagation();openTeam('${t.team}')">full team card →</a></div>`;
     if (!made.length) return card + `<span class="sub">No picks made yet.</span>`;
     const rows = made.map(p => {
       const name = p.isDrafted ? p.player : p.reported.player;
@@ -4841,6 +4856,26 @@
         || up.find(p => tcPickFit(comp, p, state).reachOk) || null;
   }
 
+  // Positions a team has taken so far (official + hard-reported picks), tallied and
+  // sorted most-taken first: [["RHP",5],["SS",2],...]. Pitchers normalize to LHP/RHP;
+  // hitters use the primary listed position.
+  function teamPosTally(state, team) {
+    const counts = new Map();
+    for (const p of state.picks) {
+      if (p.team !== team) continue;
+      const nm = p.isDrafted && p.player ? p.player : (repHard(p.reported) ? p.reported.player : null);
+      if (!nm) continue;
+      const comp = DATA.compByName.get(normName(nm));
+      let raw = String(p.pos || (comp && comp.pos) || "").toUpperCase();
+      const m = raw.match(/[LR]HP/);
+      const thr = (comp && comp.throws) || p.throws || "";   // feed pitchHand covers non-composite arms
+      const tok = m ? m[0]
+        : raw && isPitcher(raw) ? (thr==="L"?"LHP":thr==="R"?"RHP":"P")
+        : (raw.split(/[\/,]/)[0].trim() || "?");
+      counts.set(tok, (counts.get(tok)||0)+1);
+    }
+    return [...counts.entries()].sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
+  }
   function renderTeamCard(state) {
     const bd = $("teamCard"); if (!bd || cardPick==null || !state) return;
     const pk = pickByOverall(state, cardPick);
@@ -4997,6 +5032,11 @@
       ["Team spent", pool?fmt$(pool.poolCharge)+(pool.hasEst?" est":""):"—", "spent to date"],
       ["Over / under", pool?fmtOU(pool.overUnder):"—", "vs slot"],
     ];
+    // what they've taken so far, tallied by position — reads the team's draft shape at a glance
+    const tally = teamPosTally(state, team);
+    if (tally.length) stats.push(["Positions taken",
+      `<span class="tc-posv">${tally.map(([k,n])=>`${k}&hairsp;${n}`).join(" · ")}</span>`,
+      `${tally.reduce((s,[,n])=>s+n,0)} picks so far`]);
     // stats + player selector share one horizontal band (card fills the screen, no scrolling)
     let selHtml;
     if (roster.length) {

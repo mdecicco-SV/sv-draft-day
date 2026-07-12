@@ -58,6 +58,8 @@ function normalize(raw, year) {
         rank: num(p.rank),               // MLB's pre-draft rank of the player taken
         playerId: p.person?.id ?? null,
         player: p.person?.fullName ?? null,
+        pos: p.person?.primaryPosition?.abbreviation ?? null,   // "SS", "P", "OF", ...
+        throws: p.person?.pitchHand?.code ?? null,              // "L"/"R" -> LHP/RHP for non-composite players
         headshot: p.headshotLink ?? null,
         school: p.school?.name ?? null,
         schoolClass: p.school?.schoolClass ?? null,
