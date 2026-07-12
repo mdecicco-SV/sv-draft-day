@@ -1804,12 +1804,14 @@
   async function loadSlotHistory() {
     if (DATA.slotHistory.length) return;
     try {
-      const [txt, hi, svr] = await Promise.all([
+      const [txt, hi, svr, cst] = await Promise.all([
         fetch(SLOT_HISTORY_URL, { cache:"force-cache" }).then(r=>r.text()),
         fetch("/data/hilevel.json").then(r=>r.ok?r.json():{}).catch(()=>({})),   // mlbid → highest pro level (build_hilevel.py)
         fetch("/data/svregistry.json").then(r=>r.ok?r.json():null).catch(()=>null),   // SV registry names for the history-card badge (build_svregistry.js)
+        fetch("/data/collegestates.json").then(r=>r.ok?r.json():{}).catch(()=>({})),  // college/JuCo name → state, for the research state lens
       ]);
       DATA.hiLevel = hi || {};
+      const collSt = cst || {};
       DATA.svReg = new Set(Object.keys((svr && svr.names) || {}));
       const lines = txt.split(/\r?\n/);
       const num = s => { const n=parseFloat((s||"").replace(/[",]/g,"")); return Number.isFinite(n)?n:null; };
@@ -1820,6 +1822,9 @@
           level:(f[13]==="HS"?"HS":(isJucoSchool(f[14])?"JuCo":"College")), school:f[14], team:f[17], bonus, slot,
           bats:f[9]||"", throws:f[10]||"", born:f[15]||"", ht:f[18]||"", wt:num(f[19]), full:f[16]||"",
           homeplace:(f[12]||"").trim(), hst:((/,\s*([A-Z]{2})\s*$/.exec(f[12]||"")||[])[1]||""),
+          // school state (college/JuCo rows only): the drafting school is the LAST entry in
+          // the CSV's school-history field ("Aledo (HS) ,Memphis" → Memphis) → collegestates.json
+          sst: f[13]==="HS" ? "" : (collSt[(f[14]||"").split(",").pop().trim()] || ""),
           diff:(f[22]!==""&&f[22]!=null?num(f[22]):(bonus!=null&&slot!=null?bonus-slot:null)) });
       }
       DATA.slotHistory = rows;
@@ -5433,7 +5438,7 @@
     if (research.hl.size)   rows = rows.filter(r => research.hl.has(hiLvlOf(r)));
     if (research.bats.size) rows = rows.filter(r => research.bats.has((r.bats||"").replace("B","S")));
     if (research.thr.size)  rows = rows.filter(r => research.thr.has(r.throws));
-    if (research.st.size)   rows = rows.filter(r => research.st.has(r.hst));
+    if (research.st.size)   rows = rows.filter(r => research.st.has(r.hst) || (r.sst && research.st.has(r.sst)));   // home state OR the college's state
     for (const s of RES_SLIDERS) {
       const lo = research[s.key+"Lo"], hi = research[s.key+"Hi"];
       if (lo > s.min || hi < s.max) rows = rows.filter(r => { const v = s.of(r); return v!=null && v>=lo && v<=hi; });
@@ -5461,7 +5466,7 @@
     const set = (lbl, s) => { if (s.size) parts.push(`${lbl} ${[...s].join("/")}`); };
     set("Pos", research.pos); set("Class", research.cls); set("Level", research.lvl);
     set("Money", research.money); set("Round", research.round); set("Hi level", research.hl);
-    set("Bats", research.bats); set("Throws", research.thr); set("Home", research.st);
+    set("Bats", research.bats); set("Throws", research.thr); set("State (home/college)", research.st);
     for (const s of RES_SLIDERS) { const lo = research[s.key+"Lo"], hi = research[s.key+"Hi"];
       if (lo > s.min || hi < s.max) parts.push(`${s.lab} ${s.fmt(lo)}–${s.fmt(hi)}`); }
     return parts.length ? parts.join(" · ") : "All 2018–25 signings (no lenses)";
@@ -5624,11 +5629,12 @@
         `<button class="tc-chip${research.pos.has(t)?' on':''}" onclick="resPosTok('${t}',event)">${t}</button>`).join("")}</div>`;}).join("")}</div>`;
     const posBtn = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab">Position</span>
       <button class="tc-chip${research.pos.size?' on':''}" onclick="toggleResPos(event)">${research.pos.size?(hitOnly?"Hitters":[...research.pos].join(" ")):"Any"} ▾</button>${posMenu}</div>`;
-    // home-state dropdown — options are whatever states the tracker actually carries
-    const sts = [...new Set(DATA.slotHistory.map(r=>r.hst).filter(Boolean))].sort();
+    // state dropdown — matches hometown OR the college's state; options are whatever
+    // states the tracker actually carries (home states + mapped college states)
+    const sts = [...new Set(DATA.slotHistory.flatMap(r=>[r.hst, r.sst]).filter(Boolean))].sort();
     const stMenu = !resStOpen ? "" : `<div class="res-posmenu res-stmenu" onclick="event.stopPropagation()"><div class="res-posrow">${sts.map(t=>
       `<button class="tc-chip${research.st.has(t)?' on':''}" onclick="resStTok('${t}',event)">${t}</button>`).join("")}</div></div>`;
-    const stBtn = `<div class="tc-wizgrp res-pdrop"><span class="tc-wizlab">Home</span>
+    const stBtn = `<div class="tc-wizgrp res-pdrop" title="hometown or college in the state"><span class="tc-wizlab">State</span>
       <button class="tc-chip${research.st.size?' on':''}" onclick="toggleResSt(event)">${research.st.size?[...research.st].sort().join(" "):"Any state"} ▾</button>${stMenu}</div>`;
     // display-columns dropdown: same pattern as the position dropdown
     const colsMenu = !resColsOpen ? "" : `<div class="res-posmenu" onclick="event.stopPropagation()"><div class="res-posrow">${RES_XCOLS.map(([k,lbl])=>
