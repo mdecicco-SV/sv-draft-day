@@ -3816,11 +3816,15 @@
   const closedRounds = new Set();
   window.toggleRound = (r) => { closedRounds.has(r) ? closedRounds.delete(r) : closedRounds.add(r); renderActive(); };
   // "% of pool" on a tile once a number is in: the entered bonus as a share of the
-  // team's full pool (pool picks only — rounds 11+ charge the pool only past $150k)
+  // team's full pool. Rounds 11+ (slot 0) charge the pool only past the $150k
+  // exemption, so their tag shows just that excess — mirrors poolCharge in derive().
   function poolPctTag(p, eb, state) {
     const tp = state.poolsMap ? state.poolsMap[p.team] : null;
-    if (!(tp && tp.pool > 0) || eb.bonus == null || !(p.slot > 0)) return "";
-    return `<span class="bc-pct" title="share of ${p.team}'s bonus pool (${fmtM(tp.pool)})">${(eb.bonus/tp.pool*100).toFixed(1)}% of pool</span>`;
+    if (!(tp && tp.pool > 0) || eb.bonus == null) return "";
+    if (p.slot > 0)
+      return `<span class="bc-pct" title="share of ${p.team}'s bonus pool (${fmtM(tp.pool)})">${(eb.bonus/tp.pool*100).toFixed(1)}% of pool</span>`;
+    if (eb.bonus <= LATE_EXEMPT) return "";   // fully exempt — no pool charge
+    return `<span class="bc-pct" title="amount over the $150k rounds-11+ exemption vs ${p.team}'s pool (${fmtM(tp.pool)})">+${((eb.bonus-LATE_EXEMPT)/tp.pool*100).toFixed(1)}% of pool</span>`;
   }
   function renderBoardGrid(state) {
     const svOnly = $("bSv").checked, teamSel = $("bTeam")?.value || "", focus = boardSelClients.size>0, CAP = 6;
