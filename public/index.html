@@ -454,6 +454,9 @@
   .bc-bform label { display:inline-flex; align-items:center; gap:2px; color:var(--muted); cursor:pointer; white-space:nowrap; }
   .bc-bform button { font:inherit; border:1px solid var(--line); border-radius:4px; background:#fff; cursor:pointer; padding:1px 5px; }
   .bc-bform button.ok { background:#1a7f37; border-color:#1a7f37; color:#fff; }
+  .bc-qk { display:flex; gap:3px; width:100%; margin-top:2px; }
+  .bc-qk button { color:var(--muted); padding:1px 5px; }
+  .bc-qk button:hover { color:var(--ink); border-color:#9aa2ae; }
   .bcard .bc-ti { display:flex; flex-wrap:wrap; gap:2px; margin-top:auto; padding-top:3px; }
   .bcard .ti-pill { font-size:9px; font-weight:800; background:#f0f1f3; border-radius:3px; padding:1px 4px; color:#444; }
   .bcard .ti-Ap { background:#d4edda; color:#155724; }
@@ -1434,6 +1437,7 @@
   <section id="viewBoard" class="view on">
     <div class="ba-filters">
       <label><input type="checkbox" id="bSv" onchange="renderBoard(currentState)"> SV picks only</label>
+      <select id="bTeam" class="ctl" title="Show only this team's picks" onchange="renderBoard(currentState)"><option value="">All teams</option></select>
       <span id="boardPlayers" class="board-players"></span>
       <button class="ctl" onclick="jumpCurrent()">↧ Jump to current pick</button>
       <span id="tvCtl"></span>
@@ -3467,6 +3471,13 @@
   function renderBoard(state) {
     if (!state) return;
     $("boardCount").textContent = `${state.madeCount} of ${state.picks.length} picks made`;
+    // team filter options fill once from the feed (abbrev -> full name)
+    const ts = $("bTeam");
+    if (ts && ts.options.length<=1) {
+      const seen = new Map();
+      for (const p of state.picks) if (p.team && !seen.has(p.team)) seen.set(p.team, p.teamName||p.team);
+      for (const [ab,nm] of [...seen].sort((a,b)=>a[0].localeCompare(b[0]))) ts.add(new Option(`${ab} — ${nm}`, ab));
+    }
     renderBoardPlayers(state);
     renderBoardGrid(state);
     renderBoardFeed(state);
@@ -3749,6 +3760,20 @@
     while (pos < el.value.length && seen < digitsBefore) { if (/\d/.test(el.value[pos])) seen++; pos++; }
     el.setSelectionRange(pos, pos);
   };
+  // One-tap presets in the entry form: % of slot saved straight through (validated
+  // checkbox state carries). Rounds 11+ carry slot 0, so no preset row there.
+  const BONUS_PRESETS = [["over",1.10],["over+",1.25],["slot",1],["under",0.90],["under+",0.75]];
+  function bonusQuickRow(p) {
+    if (!(p.slot>0)) return "";
+    return `<div class="bc-qk">` + BONUS_PRESETS.map(([lb,m]) =>
+      `<button title="${Math.round(m*100)}% of slot = $${Math.round(p.slot*m).toLocaleString("en-US")}" onclick="quickBonus(${p.overall},${m},event)">${lb}</button>`).join("") + `</div>`;
+  }
+  window.quickBonus = (ov, mult, e) => {
+    if (e) e.stopPropagation();
+    const p = (currentState?.picks||[]).find(x=>x.overall===ov); if (!p || !(p.slot>0)) return;
+    const a = $("bxAmt"); if (a) a.value = Math.round(p.slot*mult).toLocaleString("en-US");
+    saveBonusChip(ov, e);
+  };
   window.saveBonusChip = (ov, e) => {
     if (e) e.stopPropagation();
     const amt = parseFloat(($("bxAmt")?.value||"").replace(/[^\d.]/g,"")), val = !!($("bxVal")?.checked);
@@ -3773,7 +3798,7 @@
   const openRounds = new Set();
   window.toggleRound = (r) => { openRounds.has(r) ? openRounds.delete(r) : openRounds.add(r); renderActive(); };
   function renderBoardGrid(state) {
-    const svOnly = $("bSv").checked, focus = boardSelClients.size>0, CAP = 6;
+    const svOnly = $("bSv").checked, teamSel = $("bTeam")?.value || "", focus = boardSelClients.size>0, CAP = 6;
     const leadMap = leadsByPick();   // active X leads resolved onto their target pick tiles
     // Exactly one player selected → full intel-color "heat" board around that player.
     const single = boardSelClients.size===1 ? [...boardSelClients][0] : null;
@@ -3800,8 +3825,10 @@
     for (const p of state.picks) {
       const ours = p.isDrafted && DATA.clients.has(normName(p.player||""));
       if (svOnly && !ours) continue;
+      if (teamSel && p.team!==teamSel) continue;
       const rs = rdStat.get(p.round), complete = rs.done === rs.total;
-      const folded = complete && p.overall < activeStart && !svOnly && !openRounds.has(String(p.round));
+      // team view is sparse like SV-only — no round folding there either
+      const folded = complete && p.overall < activeStart && !svOnly && !teamSel && !openRounds.has(String(p.round));
       if (!seenRounds.has(p.round)) {
         seenRounds.add(p.round);
         const sum = complete ? ` <span class="rc-sum">· ✓ ${rs.total} picks${rs.sv.length?` · <b>SV:</b> ${rs.sv.map(_esc).join(", ")}`:""}</span><span class="rc-tgl">${folded?"▸ expand":"▾ collapse"}</span>` : "";
@@ -3832,7 +3859,7 @@
             $<input id="bxAmt" type="text" inputmode="numeric" value="${cur.toLocaleString("en-US")}" oninput="fmtBonusInput(this)" onkeydown="if(event.key==='Enter')saveBonusChip(${p.overall},event)">
             <label><input id="bxVal" type="checkbox"${validated?" checked":""}>validated</label>
             <button class="ok" onclick="saveBonusChip(${p.overall},event)">Save</button>
-            <button onclick="closeBonusChip(event)">✕</button></div>`);
+            <button onclick="closeBonusChip(event)">✕</button>${bonusQuickRow(p)}</div>`);
         } else if (shown) {
           const src = eb.src && eb.src!=="confirmed" ? ` <span class="bc-src">${eb.src.slice(0,3)}</span>` : "";
           const chip = `<span class="bc-chip${validated?" val":""}" title="Click to edit signing bonus" onclick="openBonusChip(${p.overall},event)"><span class="bc-ck">${validated?"✓":""}</span>${fmtM(eb.bonus)}${src}</span>`;
@@ -3868,7 +3895,7 @@
             $<input id="bxAmt" type="text" inputmode="numeric" value="${cur.toLocaleString("en-US")}" oninput="fmtBonusInput(this)" onkeydown="if(event.key==='Enter')saveBonusChip(${p.overall},event)">
             <label><input id="bxVal" type="checkbox"${validated?" checked":""}>validated</label>
             <button class="ok" onclick="saveBonusChip(${p.overall},event)">Save</button>
-            <button onclick="closeBonusChip(event)">✕</button></div>`);
+            <button onclick="closeBonusChip(event)">✕</button>${bonusQuickRow(p)}</div>`);
         } else if (shown) {
           const src = eb.src && eb.src!=="confirmed" ? ` <span class="bc-src">${eb.src.slice(0,3)}</span>` : "";
           const chip = `<span class="bc-chip${validated?" val":""}" title="Click to edit signing bonus" onclick="openBonusChip(${p.overall},event)"><span class="bc-ck">${validated?"✓":""}</span>${fmtM(eb.bonus)}${src}</span>`;
