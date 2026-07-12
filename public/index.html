@@ -342,6 +342,10 @@
   table.ba .pool-picks td { border-bottom:0; border-top:1px solid var(--line); padding:3px 14px 3px 0; font-size:var(--fs-4); }
   .pool-x .pool-tc { font-size:11px; color:var(--muted); margin:2px 0 4px; }
   .pool-x .pool-tc a { color:var(--red); cursor:pointer; text-decoration:none; font-weight:700; }
+  /* SV Available column: dot + last name per still-gettable client, click-through to dossier */
+  #viewPools td.pool-avcell { max-width:230px; }
+  .pool-av { display:inline-flex; align-items:center; gap:3px; margin-right:6px; white-space:nowrap; cursor:pointer; }
+  .pool-av:hover { text-decoration:underline; }
   table.ba tr.sv { background:#fff5f6; }
   table.ba tbody tr.clickrow:hover { background:#f6f7f9; cursor:pointer; }
   table.ba td.ba-draft { width:1%; white-space:nowrap; }
@@ -1283,7 +1287,8 @@
      Spent(6) / Over-Under(7) / %(8) go */
   body.mob #viewPools th:nth-child(6), body.mob #viewPools td:nth-child(6),
   body.mob #viewPools th:nth-child(7), body.mob #viewPools td:nth-child(7),
-  body.mob #viewPools th:nth-child(8), body.mob #viewPools td:nth-child(8) { display:none; }
+  body.mob #viewPools th:nth-child(8), body.mob #viewPools td:nth-child(8),
+  body.mob #viewPools th:nth-child(9), body.mob #viewPools td:nth-child(9) { display:none; }
   /* best available on mobile: full table, swipeable left-right (all hide-sm columns
      come back — School/Commit/Agency/Age/Ranks/Trend — reachable by horizontal scroll
      rather than being dropped). B/T stays always-visible. */
@@ -4038,13 +4043,23 @@
   function jumpCurrent() { document.getElementById("ocRow")?.scrollIntoView({ block:"center", behavior:"smooth" }); }
   // ---------- VIEW: BONUS POOLS ----------
   const POOL_COLS = [["team","Team"],["picksMade","Picks"],["pool","Pool"],["overage","Overage"],["room","Room"],
-                     ["poolCharge","Spent"],["overUnder","Over/Under"],["pctNum","%"]];
+                     ["poolCharge","Spent"],["overUnder","Over/Under"],["pctNum","%"],["svAvail","SV Available"]];
   let poolSort = { key:"room", dir:-1 };   // dir: -1 desc, 1 asc
   window.sortPools = (key) => {
     if (poolSort.key === key) poolSort.dir *= -1;
     else poolSort = { key, dir: key==="team" ? 1 : -1 };
     renderPools();
   };
+  // Our undrafted clients still gettable by this team: landing window covers one of
+  // their remaining picks and they're in play there (rule-outs + sv-teamintel whitelist
+  // respected); a live RED with the team drops them. Sorted green -> no-color, then rank.
+  function poolAvail(team, drafted) {
+    const rem = currentState.picks.filter(p => p.team===team && !p.isDrafted && !p.isPass);
+    return DATA.clientList.filter(c => (c.comp || rangeOf(c.key)) && !drafted.has(c.key)
+        && intelColorRank(c.key, team) !== 4
+        && rem.some(p => tiInPlayAt(c.key, team, p.overall)))
+      .sort((a,b)=> intelColorRank(a.key,team)-intelColorRank(b.key,team) || (a.comp?.rank ?? 1e9)-(b.comp?.rank ?? 1e9));
+  }
   // Teams whose pool row is expanded to show their picks so far (session-scoped)
   const poolOpen = new Set();
   window.togglePoolTeam = (t) => { poolOpen.has(t) ? poolOpen.delete(t) : poolOpen.add(t); renderPools(); };
@@ -4083,7 +4098,10 @@
       return `<th class="sortable" onclick="sortPools('${k}')">${label}${arrow}</th>`;
     }).join("") + "</tr>";
     const { key, dir } = poolSort;
-    const pools = currentState.pools.slice().sort((a,b) =>
+    const draftedSet = new Set(currentState.picks.filter(x=>x.isDrafted&&x.player).map(x=>normName(x.player)));
+    const pools = currentState.pools.slice();
+    for (const t of pools) { t._avail = poolAvail(t.team, draftedSet); t.svAvail = t._avail.length; }
+    pools.sort((a,b) =>
       key==="team" ? dir*a.team.localeCompare(b.team) : dir*(((a[key]??0)) - ((b[key]??0))));
     $("poolNote").textContent = currentState.poolsEst
       ? "Spent counts only official + war-room-entered bonuses (includes unofficial entries)"
@@ -4118,6 +4136,10 @@
         <td>${money(t.poolCharge)}${t.hasEst?' <span class="outag est atslot">est</span>':""}</td>
         <td>${hasKnown ? `<span class="outag ${ouCls}">${ou(t.overUnder)}</span>` : `<span class="sub">—</span>`}</td>
         <td>${t.poolCharge ? `<span class="outag ${pctCls}">${t.pctNum>=0?"+":""}${t.pctNum.toFixed(1)}%</span>` : `<span class="sub">—</span>`}</td>
+        <td class="pool-avcell">${t._avail.length ? t._avail.slice(0,5).map(c =>
+            `<span class="pool-av" onclick="event.stopPropagation();openPlayer('${c.key.replace(/'/g,"\\'")}')">${intelDot(c.key,t.team)}${_esc(String(c.name||"").trim().split(/\s+/).pop())}</span>`).join(" ")
+            + (t._avail.length>5 ? ` <span class="sub" title="${_esc(t._avail.slice(5).map(c=>c.name).join(", "))}">+${t._avail.length-5}</span>` : "")
+          : `<span class="sub">—</span>`}</td>
       </tr>` + (open ? `<tr class="pool-x"><td colspan="${POOL_COLS.length}">${poolPicksHtml(t)}</td></tr>` : "");
     }).join("");
   }
