@@ -1,0 +1,81 @@
+{
+  "slug": "sv-draft-day",
+  "name": "SV Draft Day",
+  "category": "Scouting",
+  "status": "active",
+  "description": "MLB Draft war-room hub: live pick board off a cached proxy of MLB's official tracker feed, round-aware clock, per-team bonus-pool math, team-interest overlay, client tracking, reported-pick ledger, X-insider lead ladder, push notifications, and a Claude-powered 'Ask the data' console. Ran live for the 2026 draft (July 12-14); now in off-season mode until the next draft.",
+  "url": "https://sv-draft-day.vercel.app/",
+  "repo": "Stadium-Ventures/sv-draft-day",
+  "owner": "Mike DeCicco",
+  "builder": "Mike DeCicco",
+  "maintainer": "Mike DeCicco",
+  "users": "SV agents/staff in the draft-weekend war room (desktop + mobile PWA)",
+  "docs": "README.md in the repo (architecture + data spine); MOBILE_COMPANION_SPEC.md for the mobile companion",
+  "stack": [
+    "Vanilla JS static frontend (zero build step, by design)",
+    "Vercel serverless functions (api/) + Edge Middleware password gate",
+    "Upstash Redis (ioredis) — feed cache, reported picks, push dedupe",
+    "Supabase (sv-taskboard project) — draft_intel_events append-only log",
+    "Claude API — /api/ask war-room Q&A + X-lead tweet parsing",
+    "web-push (VAPID) notifications",
+    "Python data builders (scripts/) baking public/data/*.json"
+  ],
+  "hosting": "Vercel (stadium-ventures team), project sv-draft-day; auto-deploys on push to main",
+  "access": "Shared team password (SITE_PASSWORD env) via Edge Middleware — every route returns a 401 login page until entered; cookie lasts 7 days",
+  "pipes": {
+    "inputs": [
+      "MLB official draft tracker feed https://statsapi.mlb.com/api/v1/draft/2026 (year overridable) — proxied by /api/draft with a ~2s Redis cache",
+      "sv-teamintel team-interest JSON (https://sv-teamintel.vercel.app/teamintel.json) — fetched live by the browser, not baked",
+      "Baked board data in public/data/*.json from scripts/refresh.sh — sources: draft-rankings-composite composite_latest.csv, sv-org-review Org.Review xlsx, aWAR.xlsx, sv-draft-fit datasets (all local files on Mike's machine)",
+      "DraftDay_Feed Google Sheet (published CSV) — X insider posts captured every 15 min during the draft window by a standalone Apps Script (scripts/sv_draftday_capture_v1.0.0.gs); /api/xlead reads it and parses leads with Claude",
+      "Optional browser userscript (scripts/sv_x_watcher.user.js) POSTs tweets to /api/xlead-ingest guarded by DD_INGEST_KEY"
+    ],
+    "outputs": [
+      "War-room UI at https://sv-draft-day.vercel.app (password-gated)",
+      "Web-push notifications to subscribed devices when SV clients are picked (live, mock, and manual picks)",
+      "Writes to Supabase table draft_intel_events (medical/range/bonus intel, war-room shared state)",
+      "Reported-pick and lead state in Upstash Redis (dd:* keys)"
+    ]
+  },
+  "links": [
+    {
+      "label": "Live app",
+      "url": "https://sv-draft-day.vercel.app/",
+      "note": "Shared team password required (SITE_PASSWORD)"
+    },
+    {
+      "label": "MLB draft tracker feed",
+      "url": "https://statsapi.mlb.com/api/v1/draft/2026",
+      "note": "The live data spine /api/draft proxies and normalizes"
+    },
+    {
+      "label": "sv-teamintel JSON",
+      "url": "https://sv-teamintel.vercel.app/teamintel.json",
+      "note": "Team-interest overlay, fetched live by the client"
+    }
+  ],
+  "crons": [
+    {
+      "what": "X insider capture → DraftDay_Feed Google Sheet (8 insider accounts, X API v2 recent search)",
+      "schedule": "Every 15 min via a Google Apps Script time-driven trigger — self-idles outside the 48h draft-weekend window (not a cron string; runs in Apps Script, not this repo). Whether the trigger is still installed post-draft is unconfirmed.",
+      "runner": "Google Apps Script (scripts/sv_draftday_capture_v1.0.0.gs)"
+    }
+  ],
+  "monitoring": "None — known gap. No health check and no #sv-automation wiring. Mitigating: the app is seasonal (draft weekend only) and is currently dormant; the 'health-check spec handed to Mike' mentioned in the old registry entry has no trace in the repo.",
+  "knownIssues": [
+    "Off-season mode: LIVE_POLLING is hard-coded false in public/index.html (~line 7922) to stop recurring Vercel polling — 👤 Mike must flip it to true before the next draft",
+    "Draft year 2026 is hard-coded (YEAR/DEFAULT_YEAR consts in api/xlead.js, api/reported.js, and the statsapi URL default) — 👤 Mike bumps for 2027",
+    "README Status checkboxes are stale (say only Phase 0 done; commit history shows the board, pools, feed, teams, and research views all shipped for the 2026 draft) — 👤 Mike to refresh",
+    "Local .env.local (vercel env pull) shows only REDIS_URL, SITE_PASSWORD, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY — ANTHROPIC_API_KEY, VAPID_*, DD_INGEST_KEY, DRAFTDAY_SHEET_CSV_URL are referenced by code and were presumably added to Vercel later; 👤 Mike verify in the Vercel dashboard before next draft"
+  ],
+  "notes": "Repo was transferred into the org: Stadium-Ventures/sv-draft-day (public) is canonical and mdecicco-SV/sv-draft-day is a GitHub 301 redirect to it (identical repo id/created_at) — the old registry claim of 'private repo on Mike's personal GitHub' is outdated. Seasonal app: deployed, reachable, and intact, but dormant until the 2027 draft (last substantive commit 2026-07-13, the off-season polling switch). Status kept 'active' because the deployment is live and it is expected to be re-armed next cycle.",
+  "runbook": [
+    "Clone Stadium-Ventures/sv-draft-day; npm install (deps: ioredis, web-push only)",
+    "Env vars live in the Vercel project (stadium-ventures team): npx vercel env pull .env.local — REDIS_URL (shared Upstash instance with sv-teamintel/sv-draft-cards), SITE_PASSWORD, SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (sv-taskboard Supabase); ANTHROPIC_API_KEY, VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT, DD_INGEST_KEY, DRAFTDAY_SHEET_CSV_URL are also read by the API routes — check the Vercel dashboard",
+    "Run locally: vercel dev (works with no REDIS_URL via direct-fetch fallback to statsapi; no SITE_PASSWORD = site open)",
+    "Re-bake board data: bash scripts/refresh.sh — needs Mike's local source files (composite_latest.csv, Org.Review xlsx); it commits public/data and pushes",
+    "Deploy: push to main — Vercel auto-deploys in ~30s (no build step)",
+    "Re-arm for next draft: set LIVE_POLLING=true in public/index.html, bump the hard-coded year in api/xlead.js + api/reported.js, refresh data, re-install the Apps Script trigger for the capture sheet, verify Vercel env vars",
+    "First troubleshooting step: open /api/draft in a browser (after password) — if it returns the normalized board, the spine is healthy; if not, hit https://statsapi.mlb.com/api/v1/draft/2026 directly to isolate MLB-feed vs proxy/Redis"
+  ]
+}
